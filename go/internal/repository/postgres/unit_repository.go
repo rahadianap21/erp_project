@@ -59,7 +59,7 @@ func (r *sqlUnitRepository) Create(ctx context.Context, unit *domain.Unit) error
 		UpdatedBy:   updatedByPg,
 	})
 	if err != nil {
-		return err
+		return mapDuplicate(err, "kode satuan '"+unit.Kode+"' sudah terdaftar di sistem! Silakan gunakan kode singkat yang lain.")
 	}
 
 	unit.ID = row.ID

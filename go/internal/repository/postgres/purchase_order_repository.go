@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
@@ -10,7 +9,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	// 🌟 SAMAKAN DENGAN MASTER: Menggunakan pgxpool murni
@@ -72,7 +70,7 @@ func (r *sqlPurchaseOrderRepository) Create(ctx context.Context, po *domain.Purc
 		UpdatedBy:   nullableInt8(po.UpdatedBy),
 	})
 	if err != nil {
-		return mapUniqueViolation(err)
+		return mapNomorPOBentrok(err)
 	}
 	po.ID = header.ID
 	po.CreatedAt = header.CreatedAt.Time
@@ -328,25 +326,16 @@ func (r *sqlPurchaseOrderRepository) NextPurchaseOrderSeq(ctx context.Context, p
 	return r.q.NextPurchaseOrderSeq(ctx, prefix)
 }
 
-// mapUniqueViolation menerjemahkan pelanggaran unique constraint menjadi error
-// domain yang bisa dikenali lapisan atas.
-//
-// Tanpa terjemahan ini, user menerima pesan PostgreSQL mentah
-// ("duplicate key value violates unique constraint ..."), yang membocorkan
-// detail skema database sekaligus tidak memberi tahu apa yang harus dilakukan.
-func mapUniqueViolation(err error) error {
-	if err == nil {
-		return nil
-	}
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
+// mapNomorPOBentrok menerjemahkan pelanggaran unique constraint nomor PO
+// menjadi domain.ErrNomorPOBentrok. Lapisan usecase memakai errors.Is terhadap
+// sentinel ini untuk mengulang penomoran, jadi pesan PostgreSQL mentah tidak
+// boleh diteruskan apa adanya.
+func mapNomorPOBentrok(err error) error {
+	if pgErr, ok := asUniqueViolation(err); ok {
 		return fmt.Errorf("%w: %s", domain.ErrNomorPOBentrok, pgErr.ConstraintName)
 	}
 	return err
 }
-
-// pgUniqueViolation adalah kode SQLSTATE untuk pelanggaran unique constraint.
-const pgUniqueViolation = "23505"
 
 // CountReceivedQty melaporkan total kuantitas yang sudah diterima pada satu PO.
 // Dipanggil usecase sebagai pengaman sebelum koreksi.

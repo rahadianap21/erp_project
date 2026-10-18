@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -55,7 +54,7 @@ func (u *saleUsecase) CreateSale(ctx context.Context, in domain.CreateSaleInput)
 		return nil, domain.ErrSaleItemsRequired
 	}
 	if in.CreatedBy <= 0 {
-		return nil, errors.New("tidak terautentikasi")
+		return nil, domain.NewBusinessRuleError("tidak terautentikasi")
 	}
 
 	ids := make([]int64, 0, len(in.Items))
@@ -79,7 +78,7 @@ func (u *saleUsecase) CreateSale(ctx context.Context, in domain.CreateSaleInput)
 			return nil, err
 		}
 		if member == nil {
-			return nil, errors.New("member tidak ditemukan")
+			return nil, domain.NewBusinessRuleError("member tidak ditemukan")
 		}
 		if in.RedeemPoints > 0 {
 			if in.RedeemPoints > member.Points {
@@ -156,13 +155,13 @@ func (u *saleUsecase) resolvePaymentAccounts(ctx context.Context, payments []dom
 			return nil, err
 		}
 		if pm == nil {
-			return nil, fmt.Errorf("metode pembayaran id %d tidak ditemukan", p.PaymentMethodID)
+			return nil, domain.NewBusinessRuleError("metode pembayaran id %d tidak ditemukan", p.PaymentMethodID)
 		}
 		if pm.Channel == domain.PaymentChannelCredit {
-			return nil, errors.New("metode kredit tidak boleh dipakai sebagai pembayaran tunai")
+			return nil, domain.NewBusinessRuleError("metode kredit tidak boleh dipakai sebagai pembayaran tunai")
 		}
 		if pm.AccountID == nil || *pm.AccountID <= 0 {
-			return nil, fmt.Errorf("metode pembayaran %s belum memiliki akun kas/bank", pm.Name)
+			return nil, domain.NewBusinessRuleError("metode pembayaran %s belum memiliki akun kas/bank", pm.Name)
 		}
 		accounts[p.PaymentMethodID] = *pm.AccountID
 	}
@@ -171,7 +170,7 @@ func (u *saleUsecase) resolvePaymentAccounts(ctx context.Context, payments []dom
 
 func (u *saleUsecase) VoidSale(ctx context.Context, id, actorID int64, reason string) error {
 	if id <= 0 {
-		return errors.New("id penjualan tidak valid")
+		return domain.NewBusinessRuleError("id penjualan tidak valid")
 	}
 	sale, err := u.saleRepo.GetByID(ctx, id)
 	if err != nil {
@@ -201,7 +200,7 @@ func (u *saleUsecase) VoidSale(ctx context.Context, id, actorID int64, reason st
 
 func (u *saleUsecase) GetByID(ctx context.Context, id int64) (*domain.Sale, error) {
 	if id <= 0 {
-		return nil, errors.New("id penjualan tidak valid")
+		return nil, domain.NewBusinessRuleError("id penjualan tidak valid")
 	}
 	return u.saleRepo.GetByID(ctx, id)
 }

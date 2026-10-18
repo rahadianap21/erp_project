@@ -48,7 +48,7 @@ func (r *sqlPaymentMethodRepository) Create(ctx context.Context, in domain.Payme
 		UpdatedBy: int8FromID(actorID),
 	})
 	if err != nil {
-		return nil, err
+		return nil, mapDuplicate(err, "kode metode pembayaran sudah dipakai")
 	}
 	return &domain.PaymentMethod{
 		ID:        row.ID,
@@ -63,7 +63,7 @@ func (r *sqlPaymentMethodRepository) Create(ctx context.Context, in domain.Payme
 }
 
 func (r *sqlPaymentMethodRepository) Update(ctx context.Context, id int64, in domain.PaymentMethodInput, actorID int64) error {
-	return r.q.UpdatePaymentMethod(ctx, db.UpdatePaymentMethodParams{
+	err := r.q.UpdatePaymentMethod(ctx, db.UpdatePaymentMethodParams{
 		Code:      in.Code,
 		Name:      in.Name,
 		Channel:   in.Channel,
@@ -74,6 +74,7 @@ func (r *sqlPaymentMethodRepository) Update(ctx context.Context, id int64, in do
 		UpdatedBy: int8FromID(actorID),
 		ID:        id,
 	})
+	return mapDuplicate(err, "kode metode pembayaran sudah dipakai")
 }
 
 func (r *sqlPaymentMethodRepository) Delete(ctx context.Context, id, actorID int64) error {

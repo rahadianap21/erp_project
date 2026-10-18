@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"go_backend/internal/domain"
@@ -25,16 +24,16 @@ var validPaymentChannels = map[string]bool{
 
 func (u *paymentMethodUsecase) validate(in domain.PaymentMethodInput) error {
 	if strings.TrimSpace(in.Code) == "" {
-		return errors.New("kode metode pembayaran wajib diisi")
+		return domain.NewBusinessRuleError("kode metode pembayaran wajib diisi")
 	}
 	if strings.TrimSpace(in.Name) == "" {
-		return errors.New("nama metode pembayaran wajib diisi")
+		return domain.NewBusinessRuleError("nama metode pembayaran wajib diisi")
 	}
 	if !validPaymentChannels[in.Channel] {
-		return errors.New("kanal metode pembayaran tidak dikenal")
+		return domain.NewBusinessRuleError("kanal metode pembayaran tidak dikenal")
 	}
 	if in.Channel != domain.PaymentChannelCredit && (in.AccountID == nil || *in.AccountID <= 0) {
-		return errors.New("akun kas/bank metode pembayaran wajib dipilih")
+		return domain.NewBusinessRuleError("akun kas/bank metode pembayaran wajib dipilih")
 	}
 	return nil
 }
@@ -50,7 +49,7 @@ func (u *paymentMethodUsecase) Create(ctx context.Context, in domain.PaymentMeth
 
 func (u *paymentMethodUsecase) Update(ctx context.Context, id int64, in domain.PaymentMethodInput, actorID int64) error {
 	if id <= 0 {
-		return errors.New("id metode pembayaran tidak valid")
+		return domain.NewBusinessRuleError("id metode pembayaran tidak valid")
 	}
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
@@ -62,14 +61,14 @@ func (u *paymentMethodUsecase) Update(ctx context.Context, id int64, in domain.P
 
 func (u *paymentMethodUsecase) Delete(ctx context.Context, id, actorID int64) error {
 	if id <= 0 {
-		return errors.New("id metode pembayaran tidak valid")
+		return domain.NewBusinessRuleError("id metode pembayaran tidak valid")
 	}
 	return u.repo.Delete(ctx, id, actorID)
 }
 
 func (u *paymentMethodUsecase) GetByID(ctx context.Context, id int64) (*domain.PaymentMethod, error) {
 	if id <= 0 {
-		return nil, errors.New("id metode pembayaran tidak valid")
+		return nil, domain.NewBusinessRuleError("id metode pembayaran tidak valid")
 	}
 	return u.repo.GetByID(ctx, id)
 }

@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"go_backend/internal/domain"
@@ -28,41 +27,41 @@ func (u *memberUsecase) normalize(in domain.MemberInput) domain.MemberInput {
 func (u *memberUsecase) Create(ctx context.Context, in domain.MemberInput, actorID int64) (*domain.Member, error) {
 	in = u.normalize(in)
 	if in.Code == "" {
-		return nil, errors.New("kode member wajib diisi")
+		return nil, domain.NewBusinessRuleError("kode member wajib diisi")
 	}
 	if in.Name == "" {
-		return nil, errors.New("nama member wajib diisi")
+		return nil, domain.NewBusinessRuleError("nama member wajib diisi")
 	}
 	if in.DefaultTermDays < 0 {
-		return nil, errors.New("tempo member tidak boleh negatif")
+		return nil, domain.NewBusinessRuleError("tempo member tidak boleh negatif")
 	}
 	return u.repo.Create(ctx, in, actorID)
 }
 
 func (u *memberUsecase) Update(ctx context.Context, id int64, in domain.MemberInput, actorID int64) error {
 	if id <= 0 {
-		return errors.New("id member tidak valid")
+		return domain.NewBusinessRuleError("id member tidak valid")
 	}
 	in = u.normalize(in)
 	if in.Code == "" || in.Name == "" {
-		return errors.New("kode dan nama member wajib diisi")
+		return domain.NewBusinessRuleError("kode dan nama member wajib diisi")
 	}
 	if in.DefaultTermDays < 0 {
-		return errors.New("tempo member tidak boleh negatif")
+		return domain.NewBusinessRuleError("tempo member tidak boleh negatif")
 	}
 	return u.repo.Update(ctx, id, in, actorID)
 }
 
 func (u *memberUsecase) Delete(ctx context.Context, id, actorID int64) error {
 	if id <= 0 {
-		return errors.New("id member tidak valid")
+		return domain.NewBusinessRuleError("id member tidak valid")
 	}
 	return u.repo.Delete(ctx, id, actorID)
 }
 
 func (u *memberUsecase) GetByID(ctx context.Context, id int64) (*domain.Member, error) {
 	if id <= 0 {
-		return nil, errors.New("id member tidak valid")
+		return nil, domain.NewBusinessRuleError("id member tidak valid")
 	}
 	return u.repo.GetByID(ctx, id)
 }
@@ -80,7 +79,7 @@ func (u *memberUsecase) LookupForPOS(ctx context.Context, search string, limit i
 
 func (u *memberUsecase) ListPointEntries(ctx context.Context, memberID int64, limit int) ([]domain.MemberPointEntry, error) {
 	if memberID <= 0 {
-		return nil, errors.New("id member tidak valid")
+		return nil, domain.NewBusinessRuleError("id member tidak valid")
 	}
 	return u.repo.ListPointEntries(ctx, memberID, limit)
 }

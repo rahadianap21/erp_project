@@ -56,14 +56,14 @@ func (r *sqlMemberRepository) Create(ctx context.Context, in domain.MemberInput,
 		UpdatedBy:       int8FromID(actorID),
 	})
 	if err != nil {
-		return nil, err
+		return nil, mapDuplicate(err, "kode member sudah dipakai")
 	}
 	m := mapMember(row.ID, row.Code, row.Name, row.Phone, row.Email, row.Address, row.DefaultTermDays, row.Points, row.IsActive, row.CreatedAt)
 	return &m, nil
 }
 
 func (r *sqlMemberRepository) Update(ctx context.Context, id int64, in domain.MemberInput, actorID int64) error {
-	return r.q.UpdateMember(ctx, db.UpdateMemberParams{
+	err := r.q.UpdateMember(ctx, db.UpdateMemberParams{
 		Code:            in.Code,
 		Name:            in.Name,
 		Phone:           in.Phone,
@@ -74,6 +74,7 @@ func (r *sqlMemberRepository) Update(ctx context.Context, id int64, in domain.Me
 		UpdatedBy:       int8FromID(actorID),
 		ID:              id,
 	})
+	return mapDuplicate(err, "kode member sudah dipakai")
 }
 
 func (r *sqlMemberRepository) Delete(ctx context.Context, id, actorID int64) error {

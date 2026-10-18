@@ -50,10 +50,10 @@ func applyTaxMatrix(po *domain.PurchaseOrder, totalGrossItems float64) {
 
 func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.PurchaseOrder) error {
 	if po.SupplierID <= 0 {
-		return errors.New("pesanan ditolak: wajib menentukan rekanan vendor / supplier tujuan")
+		return domain.NewBusinessRuleError("pesanan ditolak: wajib menentukan rekanan vendor / supplier tujuan")
 	}
 	if len(po.Items) == 0 {
-		return errors.New("pesanan ditolak: tidak ada baris komoditas barang di dalam detail PO")
+		return domain.NewBusinessRuleError("pesanan ditolak: tidak ada baris komoditas barang di dalam detail PO")
 	}
 
 	// Validasi tipe pajak komersial yang didukung sistem
@@ -74,7 +74,7 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 	for i, item := range po.Items {
 		productObj, err := u.productRepo.GetByID(ctx, item.ProductID)
 		if err != nil {
-			return fmt.Errorf("barang pada baris ke-%d tidak valid: %v", i+1, err)
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
 		}
 
 		po.Items[i].UnitPrice = productObj.PurchasePrice
@@ -120,7 +120,7 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 			return err
 		}
 		if attempt == maksPercobaanNomor {
-			return errors.New(
+			return domain.NewBusinessRuleError(
 				"pesanan ditolak: nomor dokumen bentrok berulang, mohon hubungi administrator",
 			)
 		}
@@ -151,7 +151,7 @@ func (u *purchaseOrderUsecase) FindAllPO(ctx context.Context, param domain.Purch
 
 func (u *purchaseOrderUsecase) FindPOByID(ctx context.Context, id int64) (*domain.PurchaseOrder, error) {
 	if id <= 0 {
-		return nil, errors.New("ID dokumen PO tidak valid")
+		return nil, domain.NewBusinessRuleError("ID dokumen PO tidak valid")
 	}
 	return u.poRepo.GetByID(ctx, id)
 }
@@ -176,7 +176,7 @@ func (u *purchaseOrderUsecase) ApprovePO(ctx context.Context, id int64, userID i
 		return err
 	}
 	if po.Status != poStatusPending {
-		return fmt.Errorf("dokumen tidak dapat disetujui, status saat ini sudah %s", po.Status)
+		return domain.NewBusinessRuleError("dokumen tidak dapat disetujui, status saat ini sudah %s", po.Status)
 	}
 
 	// Pengecekan di atas hanya untuk pesan yang ramah. Penegakan sebenarnya ada
@@ -203,7 +203,7 @@ func (u *purchaseOrderUsecase) CancelPO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if po.Status == poStatusApproved || po.Status == poStatusReceived {
-		return fmt.Errorf("dokumen yang sudah berstatus %s tidak bisa dibatalkan sepihak", po.Status)
+		return domain.NewBusinessRuleError("dokumen yang sudah berstatus %s tidak bisa dibatalkan sepihak", po.Status)
 	}
 
 	// Sama seperti approve: syarat "belum APPROVED dan belum RECEIVED" ikut
@@ -242,10 +242,10 @@ var editablePOStatuses = map[string]bool{
 //     bisa dimanipulasi dari browser.
 func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID int64, req domain.PurchaseOrderUpdateInput) error {
 	if id <= 0 {
-		return errors.New("ID dokumen PO tidak valid")
+		return domain.NewBusinessRuleError("ID dokumen PO tidak valid")
 	}
 	if len(req.Items) == 0 {
-		return errors.New("koreksi ditolak: tidak ada baris komoditas barang di dalam detail PO")
+		return domain.NewBusinessRuleError("koreksi ditolak: tidak ada baris komoditas barang di dalam detail PO")
 	}
 
 	existing, err := u.poRepo.GetByID(ctx, id)
@@ -253,7 +253,7 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if !editablePOStatuses[existing.Status] {
-		return fmt.Errorf("dokumen berstatus %s sudah terkunci dan tidak dapat dikoreksi lagi", existing.Status)
+		return domain.NewBusinessRuleError("dokumen berstatus %s sudah terkunci dan tidak dapat dikoreksi lagi", existing.Status)
 	}
 
 	received, err := u.poRepo.CountReceivedQty(ctx, id)
@@ -261,7 +261,7 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if received > 0 {
-		return fmt.Errorf("koreksi ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
+		return domain.NewBusinessRuleError("koreksi ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
 	}
 
 	taxType := req.TaxType
@@ -277,25 +277,25 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 
 	for i, it := range req.Items {
 		if it.ProductID <= 0 {
-			return fmt.Errorf("baris ke-%d tidak valid: barang belum dipilih", i+1)
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang belum dipilih", i+1)
 		}
 		if it.QtyOrdered <= 0 {
-			return fmt.Errorf("baris ke-%d tidak valid: kuantitas harus lebih besar dari nol", i+1)
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: kuantitas harus lebih besar dari nol", i+1)
 		}
 		if seenProducts[it.ProductID] {
-			return fmt.Errorf("baris ke-%d tidak valid: barang yang sama sudah terisi di baris lain", i+1)
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang yang sama sudah terisi di baris lain", i+1)
 		}
 		seenProducts[it.ProductID] = true
 
 		productObj, err := u.productRepo.GetByID(ctx, it.ProductID)
 		if err != nil {
-			return fmt.Errorf("barang pada baris ke-%d tidak valid: %v", i+1, err)
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
 		}
 
 		// Pengaman integritas: barang harus milik rekanan PO. Tanpa ini klien
 		// bisa menyuntikkan barang vendor lain beserta harga belinya.
 		if productObj.SupplierID != existing.SupplierID {
-			return fmt.Errorf("barang pada baris ke-%d bukan milik rekanan supplier dokumen ini", i+1)
+			return domain.NewBusinessRuleError("barang pada baris ke-%d bukan milik rekanan supplier dokumen ini", i+1)
 		}
 
 		unitPrice := productObj.PurchasePrice
@@ -328,7 +328,7 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 // karena catatan penerimaannya akan ikut hilang dari jejak audit.
 func (u *purchaseOrderUsecase) DeletePO(ctx context.Context, id int64, userID int64) error {
 	if id <= 0 {
-		return errors.New("ID dokumen PO tidak valid")
+		return domain.NewBusinessRuleError("ID dokumen PO tidak valid")
 	}
 
 	existing, err := u.poRepo.GetByID(ctx, id)
@@ -336,7 +336,7 @@ func (u *purchaseOrderUsecase) DeletePO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if !editablePOStatuses[existing.Status] {
-		return fmt.Errorf("dokumen berstatus %s sudah terkunci dan tidak dapat dicabut", existing.Status)
+		return domain.NewBusinessRuleError("dokumen berstatus %s sudah terkunci dan tidak dapat dicabut", existing.Status)
 	}
 
 	received, err := u.poRepo.CountReceivedQty(ctx, id)
@@ -344,7 +344,7 @@ func (u *purchaseOrderUsecase) DeletePO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if received > 0 {
-		return fmt.Errorf("pencabutan ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
+		return domain.NewBusinessRuleError("pencabutan ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
 	}
 
 	return u.poRepo.SoftDelete(ctx, id, userID)
@@ -371,7 +371,7 @@ func (u *purchaseOrderUsecase) RejectPO(ctx context.Context, id int64, userID in
 		return err
 	}
 	if po.Status != poStatusPending {
-		return fmt.Errorf("dokumen tidak dapat ditolak, status saat ini sudah %s", po.Status)
+		return domain.NewBusinessRuleError("dokumen tidak dapat ditolak, status saat ini sudah %s", po.Status)
 	}
 
 	rows, err := u.poRepo.TransitionStatus(ctx, id, []string{poStatusPending}, nil, poStatusCancelled, userID, reason)

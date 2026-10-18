@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"go_backend/internal/domain"
 	"math/rand"
@@ -27,16 +26,16 @@ func (u *productUsecase) generateAutoSKU(categoryID int32) string {
 
 func (u *productUsecase) CreateProduct(ctx context.Context, prod *domain.Product) error {
 	if prod.Name == "" {
-		return errors.New("nama barang/produk tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama barang/produk tidak boleh kosong")
 	}
 	if prod.CategoryID <= 0 {
-		return errors.New("kategori barang wajib ditentukan secara valid")
+		return domain.NewBusinessRuleError("kategori barang wajib ditentukan secara valid")
 	}
 	if prod.SupplierID <= 0 {
-		return errors.New("mitra supplier utama wajib ditentukan secara valid")
+		return domain.NewBusinessRuleError("mitra supplier utama wajib ditentukan secara valid")
 	}
 	if prod.SellingPrice < prod.PurchasePrice {
-		return errors.New("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
+		return domain.NewBusinessRuleError("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
 	}
 	if err := normalizeProductDiscount(prod); err != nil {
 		return err
@@ -68,20 +67,20 @@ func (u *productUsecase) GetAllProducts(ctx context.Context, search string, cate
 
 func (u *productUsecase) GetProductByID(ctx context.Context, id int64) (*domain.Product, error) {
 	if id <= 0 {
-		return nil, errors.New("id produk tidak valid")
+		return nil, domain.NewBusinessRuleError("id produk tidak valid")
 	}
 	return u.productRepo.GetByID(ctx, id)
 }
 
 func (u *productUsecase) UpdateProduct(ctx context.Context, prod *domain.Product) error {
 	if prod.ID <= 0 {
-		return errors.New("id produk yang akan diperbarui tidak valid")
+		return domain.NewBusinessRuleError("id produk yang akan diperbarui tidak valid")
 	}
 	if prod.Name == "" {
-		return errors.New("nama barang/produk tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama barang/produk tidak boleh kosong")
 	}
 	if prod.SellingPrice < prod.PurchasePrice {
-		return errors.New("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
+		return domain.NewBusinessRuleError("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
 	}
 	if err := normalizeProductDiscount(prod); err != nil {
 		return err
@@ -101,7 +100,7 @@ func (u *productUsecase) UpdateProduct(ctx context.Context, prod *domain.Product
 
 func (u *productUsecase) DeleteProduct(ctx context.Context, id int64, deletedBy int64) error {
 	if id <= 0 {
-		return errors.New("id produk yang akan dihapus tidak valid")
+		return domain.NewBusinessRuleError("id produk yang akan dihapus tidak valid")
 	}
 	return u.productRepo.Delete(ctx, id, deletedBy)
 }
@@ -121,14 +120,14 @@ func normalizeProductDiscount(prod *domain.Product) error {
 		return nil
 	case domain.ProductDiscountPercent, domain.ProductDiscountAmount:
 	default:
-		return errors.New("tipe diskon produk tidak dikenal, gunakan NONE, PERCENT, atau AMOUNT")
+		return domain.NewBusinessRuleError("tipe diskon produk tidak dikenal, gunakan NONE, PERCENT, atau AMOUNT")
 	}
 
 	if prod.DiscountValue < 0 {
-		return errors.New("nilai diskon produk tidak boleh negatif")
+		return domain.NewBusinessRuleError("nilai diskon produk tidak boleh negatif")
 	}
 	if prod.DiscountType == domain.ProductDiscountPercent && prod.DiscountValue > 100 {
-		return errors.New("diskon persen produk tidak boleh lebih dari 100")
+		return domain.NewBusinessRuleError("diskon persen produk tidak boleh lebih dari 100")
 	}
 	return nil
 }

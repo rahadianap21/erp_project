@@ -17,16 +17,6 @@ func NewPaymentMethodHandler(uc domain.PaymentMethodUsecase) *PaymentMethodHandl
 	return &PaymentMethodHandler{uc: uc}
 }
 
-func writePaymentMethodError(w http.ResponseWriter, err error) {
-	if isUniqueViolation(err) {
-		w.WriteHeader(http.StatusConflict)
-		_ = json.NewEncoder(w).Encode(map[string]string{"message": "kode metode pembayaran sudah dipakai"})
-		return
-	}
-	w.WriteHeader(http.StatusUnprocessableEntity)
-	_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
-}
-
 // PaymentMethodsCRUDHandler melayani master metode pembayaran.
 func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -75,7 +65,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 			uid := middleware.CurrentUserID(r)
 			pm, err := h.uc.Create(r.Context(), in, uid)
 			if err != nil {
-				writePaymentMethodError(w, err)
+				WriteError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
@@ -98,7 +88,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 			}
 			uid := middleware.CurrentUserID(r)
 			if err := h.uc.Update(r.Context(), id, in, uid); err != nil {
-				writePaymentMethodError(w, err)
+				WriteError(w, err)
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "metode pembayaran berhasil diperbarui"})

@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"go_backend/internal/domain"
 	"regexp"
 	"strings"
@@ -34,7 +33,7 @@ func (u *productCategoryUsecase) generateSlug(title string) string {
 
 func (u *productCategoryUsecase) CreateCategory(ctx context.Context, cat *domain.ProductCategory) error {
 	if cat.Name == "" {
-		return errors.New("nama kategori produk wajib diisi")
+		return domain.NewBusinessRuleError("nama kategori produk wajib diisi")
 	}
 	// Otomatis buat slug ramah URL dari nama jika tidak diisi manual
 	if cat.Slug == "" {
@@ -52,17 +51,17 @@ func (u *productCategoryUsecase) GetAllCategories(ctx context.Context, search st
 
 func (u *productCategoryUsecase) GetCategoryByID(ctx context.Context, id int32) (*domain.ProductCategory, error) {
 	if id <= 0 {
-		return nil, errors.New("id kategori tidak valid")
+		return nil, domain.NewBusinessRuleError("id kategori tidak valid")
 	}
 	return u.catRepo.GetByID(ctx, id)
 }
 
 func (u *productCategoryUsecase) UpdateCategory(ctx context.Context, cat *domain.ProductCategory) error {
 	if cat.ID <= 0 {
-		return errors.New("id kategori yang akan diubah tidak valid")
+		return domain.NewBusinessRuleError("id kategori yang akan diubah tidak valid")
 	}
 	if cat.Name == "" {
-		return errors.New("nama kategori tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama kategori tidak boleh kosong")
 	}
 	if cat.Slug == "" {
 		cat.Slug = u.generateSlug(cat.Name)
@@ -72,7 +71,7 @@ func (u *productCategoryUsecase) UpdateCategory(ctx context.Context, cat *domain
 
 func (u *productCategoryUsecase) DeleteCategory(ctx context.Context, id int32, deletedBy int64) error {
 	if id <= 0 {
-		return errors.New("id kategori yang akan dihapus tidak valid")
+		return domain.NewBusinessRuleError("id kategori yang akan dihapus tidak valid")
 	}
 	return u.catRepo.Delete(ctx, id, deletedBy)
 }

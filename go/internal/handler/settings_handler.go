@@ -2,7 +2,6 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"go_backend/internal/domain"
@@ -45,12 +44,7 @@ func (h *SettingsHandler) HandleSettings(w http.ResponseWriter, r *http.Request)
 			uid := middleware.CurrentUserID(r)
 			view, err := h.uc.Update(r.Context(), in, uid)
 			if err != nil {
-				status := http.StatusInternalServerError
-				if errors.Is(err, domain.ErrSettingPPNRateInvalid) || errors.Is(err, domain.ErrSettingPPNModeInvalid) {
-					status = http.StatusUnprocessableEntity
-				}
-				w.WriteHeader(status)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				WriteError(w, err)
 				return
 			}
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "pengaturan berhasil disimpan", "data": view})

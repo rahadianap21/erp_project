@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
 	"go_backend/internal/domain"
 )
@@ -39,31 +38,31 @@ func (u *grnUsecase) GetAll(ctx context.Context, search string, cursorID int64, 
 
 func (u *grnUsecase) GetByID(ctx context.Context, id int64) (*domain.GoodsReceiptNote, error) {
 	if id <= 0 {
-		return nil, errors.New("id grn tidak valid")
+		return nil, domain.NewBusinessRuleError("id grn tidak valid")
 	}
 	return u.grnRepo.GetByID(ctx, id)
 }
 
 func (u *grnUsecase) GetByPOID(ctx context.Context, poID int64) ([]domain.GoodsReceiptNote, error) {
 	if poID <= 0 {
-		return nil, errors.New("id po tidak valid")
+		return nil, domain.NewBusinessRuleError("id po tidak valid")
 	}
 	return u.grnRepo.GetByPOID(ctx, poID)
 }
 
 func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowPartial bool, updatedBy int64) error {
 	if poID <= 0 {
-		return errors.New("id po tidak valid")
+		return domain.NewBusinessRuleError("id po tidak valid")
 	}
 	po, err := u.poRepo.GetByID(ctx, poID)
 	if err != nil {
 		return err
 	}
 	if po == nil {
-		return errors.New("dokumen po tidak ditemukan")
+		return domain.NewBusinessRuleError("dokumen po tidak ditemukan")
 	}
 	if po.Status != "APPROVED" {
-		return errors.New("penerimaan ditolak: po tidak dalam status APPROVED")
+		return domain.NewBusinessRuleError("penerimaan ditolak: po tidak dalam status APPROVED")
 	}
 
 	// Minimal harus ada satu GRN. Tanpa ini PO bisaditandai RECEIVED walau tidak ada barang masuk.
@@ -84,7 +83,7 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 		}
 	}
 	if !allFull && !allowPartial {
-		return errors.New("penerimaan ditolak: masih ada sisa barang yang belum diterima")
+		return domain.NewBusinessRuleError("penerimaan ditolak: masih ada sisa barang yang belum diterima")
 	}
 
 	// Penerbitan jurnal otomatis didahulukan, bukan diakhiri. Bila penerbitan

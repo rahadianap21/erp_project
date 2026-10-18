@@ -2,9 +2,7 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"go_backend/internal/domain"
@@ -35,67 +33,6 @@ func NewAccountingHandler(
 	}
 }
 
-// statusUntukAkuntansi memetakan error domain akuntansi ke status HTTP.
-// Pelanggaran aturan bisnis dikembalikan sebagai 422 agar frontend bisa
-// menampilkan pesannya; error lainnya tetap 500.
-func statusUntukAkuntansi(err error) int {
-	switch {
-	case errors.Is(err, domain.ErrJournalUnbalanced),
-		errors.Is(err, domain.ErrJournalLineDouble),
-		errors.Is(err, domain.ErrAccountDuplicate),
-		errors.Is(err, domain.ErrKodeAkunWajib),
-		errors.Is(err, domain.ErrNamaAkunWajib),
-		errors.Is(err, domain.ErrTipeAkunInvalid),
-		errors.Is(err, domain.ErrSaldoNormalMismatch),
-		errors.Is(err, domain.ErrIndukAkunNotFound),
-		errors.Is(err, domain.ErrAccountNotFound),
-		errors.Is(err, domain.ErrJournalLineKosong),
-		errors.Is(err, domain.ErrJournalDateInvalid),
-		errors.Is(err, domain.ErrJournalPeriodClosed),
-		errors.Is(err, domain.ErrVoidPostedJournal),
-		errors.Is(err, domain.ErrJournalNotPosted),
-		errors.Is(err, domain.ErrJournalAlreadyPost),
-		errors.Is(err, domain.ErrJournalAlreadyVoid),
-		errors.Is(err, domain.ErrJournalAlreadyRev),
-		errors.Is(err, domain.ErrJournalNotDraft),
-		errors.Is(err, domain.ErrJournalPostBox),
-		errors.Is(err, domain.ErrPeriodNotFound),
-		errors.Is(err, domain.ErrPeriodClosed),
-		errors.Is(err, domain.ErrPeriodOpen),
-		errors.Is(err, domain.ErrPeriodeInvalid),
-		errors.Is(err, domain.ErrPeriodeBerubah),
-		errors.Is(err, domain.ErrRentangTanggalInvalid):
-		return http.StatusUnprocessableEntity
-	}
-	var jnp *domain.JournalNotPostableError
-	if errors.As(err, &jnp) {
-		return http.StatusUnprocessableEntity
-	}
-	return http.StatusInternalServerError
-}
-
-func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func respondError(w http.ResponseWriter, err error) {
-	respondJSON(w, statusUntukAkuntansi(err), map[string]string{"message": err.Error()})
-}
-
-func parseInt64Param(r *http.Request, key string) (int64, bool) {
-	raw := r.URL.Query().Get(key)
-	if raw == "" {
-		return 0, false
-	}
-	v, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil {
-		return 0, false
-	}
-	return v, true
-}
-
 // --- Bagan Akun ---
 
 // AccountsCRUDHandler melayani GET (list/detail), POST, PUT, DELETE bagan akun.
@@ -106,7 +43,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 			if id, ok := parseInt64Param(r, "id"); ok && id > 0 {
 				acc, err := h.CoaUsecase.FindAccountByID(r.Context(), id)
 				if err != nil {
-					respondError(w, err)
+					WriteError(w, err)
 					return
 				}
 				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": acc})
@@ -124,7 +61,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				Direction: r.URL.Query().Get("direction"),
 			})
 			if err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list, "total": total})
@@ -154,7 +91,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				IsHeader:      req.IsHeader,
 			}
 			if err := h.CoaUsecase.CreateAccount(r.Context(), acc, userID); err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -194,7 +131,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				IsActive:      req.IsActive,
 			}
 			if err := h.CoaUsecase.UpdateAccount(r.Context(), acc, userID); err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -211,7 +148,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 			}
 			userID := middleware.CurrentUserID(r)
 			if err := h.CoaUsecase.DeleteAccount(r.Context(), id, userID); err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -235,7 +172,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 				m, _ := parseInt64Param(r, "month")
 				period, err := h.PeriodUsecase.GetPeriod(r.Context(), y, m)
 				if err != nil {
-					respondError(w, err)
+					WriteError(w, err)
 					return
 				}
 				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": period})
@@ -244,7 +181,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 			limitVal, _ := parseInt64Param(r, "limit")
 			list, err := h.PeriodUsecase.ListPeriods(r.Context(), int(limitVal))
 			if err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list})
@@ -262,7 +199,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 			}
 			period, err := h.PeriodUsecase.OpenPeriod(r.Context(), req.Year, req.Month, middleware.CurrentUserID(r))
 			if err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -288,7 +225,7 @@ func (h *AccountingHandler) HandleClosePeriod(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if err := h.PeriodUsecase.ClosePeriod(r.Context(), y, m, middleware.CurrentUserID(r)); err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -310,7 +247,7 @@ func (h *AccountingHandler) HandleReopenPeriod(w http.ResponseWriter, r *http.Re
 			return
 		}
 		if err := h.PeriodUsecase.ReopenPeriod(r.Context(), int(y), int(m), middleware.CurrentUserID(r)); err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -329,7 +266,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 			if id, ok := parseInt64Param(r, "id"); ok && id > 0 {
 				entry, err := h.JournalUsecase.FindJournalByID(r.Context(), id)
 				if err != nil {
-					respondError(w, err)
+					WriteError(w, err)
 					return
 				}
 				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": entry})
@@ -348,7 +285,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 				Direction:    r.URL.Query().Get("direction"),
 			})
 			if err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list, "total": total})
@@ -389,7 +326,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 			}
 			entry, err := h.JournalUsecase.CreateJournal(r.Context(), input, middleware.CurrentUserID(r))
 			if err != nil {
-				respondError(w, err)
+				WriteError(w, err)
 				return
 			}
 			respondJSON(w, http.StatusCreated, map[string]interface{}{
@@ -414,7 +351,7 @@ func (h *AccountingHandler) HandlePostJournal(w http.ResponseWriter, r *http.Req
 			return
 		}
 		if err := h.JournalUsecase.PostJournal(r.Context(), id, middleware.CurrentUserID(r)); err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -439,7 +376,7 @@ func (h *AccountingHandler) HandleVoidJournal(w http.ResponseWriter, r *http.Req
 		}
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 		if err := h.JournalUsecase.VoidJournal(r.Context(), id, middleware.CurrentUserID(r), payload.Reason); err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -464,7 +401,7 @@ func (h *AccountingHandler) HandleReverseJournal(w http.ResponseWriter, r *http.
 		}
 		_ = json.NewDecoder(r.Body).Decode(&payload)
 		if err := h.JournalUsecase.ReverseJournal(r.Context(), id, middleware.CurrentUserID(r), payload.Reason); err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{

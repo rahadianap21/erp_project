@@ -2,12 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"go_backend/internal/domain"
 	"go_backend/internal/middleware"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 type PurchaseOrderHandler struct {
@@ -61,8 +59,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			if err := h.PoUsecase.CreatePO(r.Context(), newPO); err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				WriteError(w, err)
 				return
 			}
 
@@ -101,8 +98,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 				// Tarik data utuh header + berserta baris detail itemnya sekaligus dari database Go
 				singlePO, err := h.PoUsecase.FindPOByID(r.Context(), poID)
 				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+					WriteError(w, err)
 					return
 				}
 
@@ -131,8 +127,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 
 			list, total, err := h.PoUsecase.FindAllPO(r.Context(), param)
 			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				WriteError(w, err)
 				return
 			}
 
@@ -189,15 +184,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			if err := h.PoUsecase.UpdatePO(r.Context(), poID, userID, input); err != nil {
-				// Aturan bisnis yang dilanggar (dokumen terkunci, barang bukan milik
-				// rekanan, qty tidak valid) dikembalikan sebagai 422 supaya frontend
-				// bisa menampilkannya apa adanya, bukan "Internal Server Error".
-				status := http.StatusInternalServerError
-				if isBusinessRuleError(err) {
-					status = http.StatusUnprocessableEntity
-				}
-				w.WriteHeader(status)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				WriteError(w, err)
 				return
 			}
 
@@ -224,12 +211,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			userID := middleware.CurrentUserID(r)
 
 			if err := h.PoUsecase.DeletePO(r.Context(), poID, userID); err != nil {
-				status := http.StatusInternalServerError
-				if isBusinessRuleError(err) {
-					status = http.StatusUnprocessableEntity
-				}
-				w.WriteHeader(status)
-				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				WriteError(w, err)
 				return
 			}
 
@@ -243,52 +225,6 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 	}
 
 	w.WriteHeader(http.StatusMethodNotAllowed)
-}
-
-// businessRulePrefix adalah awalan pesan error yang berasal dari pelanggaran
-// aturan bisnis (bukan kegagalan infrastruktur). Dipakai handler untuk memilih
-// status HTTP yang tepat agar pesan sampai ke user apa adanya.
-var businessRulePrefixes = []string{
-	"pesanan ditolak",
-	"koreksi ditolak",
-	"pencabutan ditolak",
-	"dokumen berstatus",
-	"dokumen tidak dapat disetujui",
-	"dokumen yang sudah berstatus",
-	"baris ke-",
-	"barang pada baris ke-",
-	"ID dokumen PO tidak valid",
-	"penerimaan ditolak",
-}
-
-// statusUntukErrorPO memetakan error PO ke status HTTP yang tepat.
-//
-// Konflik transisi status dikenali lewat tipe error, bukan lewat awalan pesan.
-// Versi sebelumnya hanya mencocokkan daftar awalan kalimat, dan pesan konflik
-// pembatalan tidak ada di daftar itu sehingga penolakan yang benar ikut tercatat
-// sebagai 500.
-func statusUntukErrorPO(err error) int {
-	var conflict *domain.TransitionStatusConflictError
-	if errors.As(err, &conflict) {
-		return http.StatusUnprocessableEntity
-	}
-	if isBusinessRuleError(err) {
-		return http.StatusUnprocessableEntity
-	}
-	return http.StatusInternalServerError
-}
-
-func isBusinessRuleError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	for _, p := range businessRulePrefixes {
-		if strings.HasPrefix(msg, p) {
-			return true
-		}
-	}
-	return false
 }
 
 // HandleApprovePO melayani pengesahan dokumen (PUT /api/purchase-orders/approve?id=)
@@ -310,9 +246,7 @@ func (h *PurchaseOrderHandler) HandleApprovePO(w http.ResponseWriter, r *http.Re
 
 		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.ApprovePO(r.Context(), poID, userID); err != nil {
-			status := statusUntukErrorPO(err)
-			w.WriteHeader(status)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+			WriteError(w, err)
 			return
 		}
 
@@ -348,9 +282,7 @@ func (h *PurchaseOrderHandler) HandleCancelPO(w http.ResponseWriter, r *http.Req
 
 		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.CancelPO(r.Context(), poID, userID); err != nil {
-			status := statusUntukErrorPO(err)
-			w.WriteHeader(status)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+			WriteError(w, err)
 			return
 		}
 
@@ -360,15 +292,6 @@ func (h *PurchaseOrderHandler) HandleCancelPO(w http.ResponseWriter, r *http.Req
 			"message": "Dokumen Purchase Order berhasil dibatalkan",
 		})
 	})(w, r)
-}
-
-func parsePOID(r *http.Request) (int64, error) {
-	idStr := r.URL.Query().Get("id")
-	poID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil || poID <= 0 {
-		return 0, errors.New("Parameter ID dokumen PO tidak valid")
-	}
-	return poID, nil
 }
 
 // HandleRejectPO melayani penolakan dokumen PO (PUT /api/purchase-orders/reject?id=)
@@ -399,9 +322,7 @@ func (h *PurchaseOrderHandler) HandleRejectPO(w http.ResponseWriter, r *http.Req
 
 		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.RejectPO(r.Context(), poID, userID, payload.Reason); err != nil {
-			status := statusUntukErrorPO(err)
-			w.WriteHeader(status)
-			_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+			WriteError(w, err)
 			return
 		}
 

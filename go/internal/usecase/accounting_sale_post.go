@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -23,7 +22,7 @@ import (
 // ditulis; repository penjualan yang menulisnya di dalam transaksi nota.
 func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale, paymentAccounts map[int64]int64, actorID int64) (*domain.SaleJournalPlan, error) {
 	if sale == nil {
-		return nil, errors.New("jurnal penjualan ditolak: nota tidak valid")
+		return nil, domain.NewBusinessRuleError("jurnal penjualan ditolak: nota tidak valid")
 	}
 
 	var mapping map[string]int64
@@ -144,7 +143,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 // kredit ditukar), lalu menandai jurnal asli sebagai sumber pembalikan.
 func (u *journalUsecase) PlanSaleReversal(ctx context.Context, sale *domain.Sale, reason string, actorID int64) (*domain.SaleJournalPlan, error) {
 	if sale == nil {
-		return nil, errors.New("pembatalan penjualan ditolak: nota tidak valid")
+		return nil, domain.NewBusinessRuleError("pembatalan penjualan ditolak: nota tidak valid")
 	}
 	if sale.JournalEntryID == nil || *sale.JournalEntryID <= 0 {
 		return nil, nil

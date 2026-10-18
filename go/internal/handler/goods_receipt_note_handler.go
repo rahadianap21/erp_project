@@ -39,13 +39,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 			in.CreatedBy = uid
 			grn, err := h.uc.CreateGRN(r.Context(), in)
 			if err != nil {
-				status := statusUntukErrorPO(err)
-				msg := err.Error()
-				if msg == "" {
-					msg = "gagal membuat grn"
-				}
-				w.WriteHeader(status)
-				json.NewEncoder(w).Encode(map[string]string{"message": msg})
+				WriteError(w, err)
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
@@ -126,13 +120,7 @@ func (h *GoodsReceiptNoteHandler) HandleFinishReceiving(w http.ResponseWriter, r
 			return
 		}
 		if err := h.uc.FinishReceiving(r.Context(), id, allowPartial, uid); err != nil {
-			status := statusUntukErrorPO(err)
-			msg := err.Error()
-			if msg == "" {
-				msg = "gagal menyelesaikan penerimaan"
-			}
-			w.WriteHeader(status)
-			json.NewEncoder(w).Encode(map[string]string{"message": msg})
+			WriteError(w, err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

@@ -55,13 +55,13 @@ func validateAccount(acc *domain.ChartOfAccount) error {
 		return domain.ErrKodeAkunWajib
 	}
 	if len(acc.Code) > 20 {
-		return errors.New("kode akun maksimal 20 karakter")
+		return domain.NewBusinessRuleError("kode akun maksimal 20 karakter")
 	}
 	if acc.Name == "" {
 		return domain.ErrNamaAkunWajib
 	}
 	if len(acc.Name) > 150 {
-		return errors.New("nama akun maksimal 150 karakter")
+		return domain.NewBusinessRuleError("nama akun maksimal 150 karakter")
 	}
 	expected, ok := balanceForType(acc.AccountType)
 	if !ok {
@@ -88,7 +88,7 @@ func (u *chartOfAccountUsecase) CreateAccount(ctx context.Context, acc *domain.C
 			return notFoundAs(err, domain.ErrIndukAkunNotFound)
 		}
 		if parent.IsHeader == false {
-			return errors.New("akun induk harus akun bertipe header")
+			return domain.NewBusinessRuleError("akun induk harus akun bertipe header")
 		}
 	} else {
 		acc.ParentID = nil
@@ -121,7 +121,7 @@ func (u *chartOfAccountUsecase) UpdateAccount(ctx context.Context, acc *domain.C
 			return notFoundAs(err, domain.ErrIndukAkunNotFound)
 		}
 		if !parent.IsHeader {
-			return errors.New("akun induk harus akun bertipe header")
+			return domain.NewBusinessRuleError("akun induk harus akun bertipe header")
 		}
 	} else {
 		acc.ParentID = nil
@@ -293,7 +293,7 @@ func (u *journalUsecase) validatePostableAccounts(ctx context.Context, lines []d
 	ids := make([]int64, 0, len(lines))
 	for _, l := range lines {
 		if l.AccountID <= 0 {
-			return nil, errors.New("akun pada baris jurnal tidak valid")
+			return nil, domain.NewBusinessRuleError("akun pada baris jurnal tidak valid")
 		}
 		ids = append(ids, l.AccountID)
 	}
@@ -332,13 +332,13 @@ func (u *journalUsecase) CreateJournal(ctx context.Context, in domain.JournalCre
 	var totalDebit, totalCredit float64
 	for i, l := range in.Lines {
 		if l.Debit < 0 || l.Credit < 0 {
-			return nil, errors.New("debit/kredit tidak boleh negatif")
+			return nil, domain.NewBusinessRuleError("debit/kredit tidak boleh negatif")
 		}
 		if l.Debit > 0 && l.Credit > 0 {
 			return nil, domain.ErrJournalLineDouble
 		}
 		if l.Debit == 0 && l.Credit == 0 {
-			return nil, fmt.Errorf("baris ke-%d: debit atau kredit wajib diisi", i+1)
+			return nil, domain.NewBusinessRuleError("baris ke-%d: debit atau kredit wajib diisi", i+1)
 		}
 		totalDebit += l.Debit
 		totalCredit += l.Credit
@@ -396,10 +396,10 @@ func (u *journalUsecase) CreateJournal(ctx context.Context, in domain.JournalCre
 			return nil, err
 		}
 		if attempt == maksPercobaanNomor {
-			return nil, errors.New("jurnal ditolak: nomor dokumen bentrok berulang, mohon hubungi administrator")
+			return nil, domain.NewBusinessRuleError("jurnal ditolak: nomor dokumen bentrok berulang, mohon hubungi administrator")
 		}
 	}
-	return nil, errors.New("jurnal ditolak: gagal menerbitkan nomor dokumen")
+	return nil, domain.NewBusinessRuleError("jurnal ditolak: gagal menerbitkan nomor dokumen")
 }
 
 func (u *journalUsecase) FindAllJournals(ctx context.Context, param domain.JournalEntryParam) ([]domain.JournalEntry, int64, error) {
@@ -562,10 +562,10 @@ func grnReceivedValues(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder) (
 // sehingga penutupan penerimaan yang diulang tidak pernah mencatat dua kali.
 func (u *journalUsecase) PostGRNJournal(ctx context.Context, grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder, actorID int64) error {
 	if grn == nil || grn.ID <= 0 {
-		return errors.New("jurnal penerimaan ditolak: grn tidak valid")
+		return domain.NewBusinessRuleError("jurnal penerimaan ditolak: grn tidak valid")
 	}
 	if po == nil || po.ID <= 0 {
-		return errors.New("jurnal penerimaan ditolak: po tidak valid")
+		return domain.NewBusinessRuleError("jurnal penerimaan ditolak: po tidak valid")
 	}
 
 	dpp, vat, err := grnReceivedValues(grn, po)
@@ -674,10 +674,10 @@ func (u *journalUsecase) PostGRNJournal(ctx context.Context, grn *domain.GoodsRe
 			return err
 		}
 		if attempt == maksPercobaanNomor {
-			return errors.New("jurnal penerimaan gagal diterbitkan: nomor dokumen bentrok berulang, mohon hubungi administrator")
+			return domain.NewBusinessRuleError("jurnal penerimaan gagal diterbitkan: nomor dokumen bentrok berulang, mohon hubungi administrator")
 		}
 	}
-	return errors.New("jurnal penerimaan gagal diterbitkan: gagal menerbitkan nomor dokumen")
+	return domain.NewBusinessRuleError("jurnal penerimaan gagal diterbitkan: gagal menerbitkan nomor dokumen")
 }
 
 // --- Jurnal penutup (closing entry) ---
@@ -704,7 +704,7 @@ func periodEndDate(year, month int) time.Time {
 // periode bisa diulang tanpa mencatat dua kali.
 func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.AccountingPeriod, actorID int64) error {
 	if period == nil || period.ID <= 0 {
-		return errors.New("jurnal penutup ditolak: periode tidak valid")
+		return domain.NewBusinessRuleError("jurnal penutup ditolak: periode tidak valid")
 	}
 	periodEnd := periodEndDate(period.PeriodYear, period.PeriodMonth)
 
@@ -816,10 +816,10 @@ func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.Ac
 			return err
 		}
 		if attempt == maksPercobaanNomor {
-			return errors.New("jurnal penutup gagal diterbitkan: nomor dokumen bentrok berulang, mohon hubungi administrator")
+			return domain.NewBusinessRuleError("jurnal penutup gagal diterbitkan: nomor dokumen bentrok berulang, mohon hubungi administrator")
 		}
 	}
-	return errors.New("jurnal penutup gagal diterbitkan: gagal menerbitkan nomor dokumen")
+	return domain.NewBusinessRuleError("jurnal penutup gagal diterbitkan: gagal menerbitkan nomor dokumen")
 }
 
 // ReverseClosingEntry membalik jurnal penutup sebuah periode bila ada, sehingga

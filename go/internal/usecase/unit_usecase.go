@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"go_backend/internal/domain"
 )
 
@@ -22,10 +21,10 @@ func (u *unitUsecase) GetAllUnits(ctx context.Context) ([]domain.Unit, error) {
 
 func (u *unitUsecase) CreateUnit(ctx context.Context, unit *domain.Unit) error {
 	if unit.Kode == "" {
-		return errors.New("kode singkat satuan tidak boleh kosong")
+		return domain.NewBusinessRuleError("kode singkat satuan tidak boleh kosong")
 	}
 	if unit.Name == "" {
-		return errors.New("nama panjang satuan tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama panjang satuan tidak boleh kosong")
 	}
 	return u.unitRepo.Create(ctx, unit)
 }

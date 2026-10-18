@@ -23,7 +23,7 @@ func (u *roleUsecase) GetAllRolesMaster(ctx context.Context, search string, page
 	// 1 KALI TEMBAK: Langsung mendapatkan data list, array permissions, dan total count sekaligus!
 	roles, total, err := u.roleRepo.GetAllRolesMaster(ctx, search, offset, limit)
 	if err != nil {
-		return nil, 0, errors.New("gagal memuat data master peran dari database")
+		return nil, 0, domain.NewBusinessRuleError("gagal memuat data master peran dari database")
 	}
 
 	return roles, total, nil
@@ -42,7 +42,7 @@ func (u *roleUsecase) GetRolesCursor(ctx context.Context, params domain.RoleCurs
 func (u *roleUsecase) GetAllMasterPermissions(ctx context.Context) ([]string, error) {
 	permissions, err := u.roleRepo.GetAllMasterPermissions(ctx)
 	if err != nil {
-		return nil, errors.New("gagal memuat daftar pilihan hak akses")
+		return nil, domain.NewBusinessRuleError("gagal memuat daftar pilihan hak akses")
 	}
 	return permissions, nil
 }
@@ -50,7 +50,7 @@ func (u *roleUsecase) GetAllMasterPermissions(ctx context.Context) ([]string, er
 // CreateRoleWithPermissions memproses pembuatan peran baru sekaligus menyematkan hak akses granularnya
 func (u *roleUsecase) CreateRoleWithPermissions(ctx context.Context, name string, permissions []string) error {
 	if name == "" {
-		return errors.New("nama peran tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama peran tidak boleh kosong")
 	}
 
 	// Teruskan data ke layer repositori untuk dieksekusi dalam 1 kali transaksi (Tx) DB aman
@@ -63,7 +63,7 @@ func (u *roleUsecase) CreateRoleWithPermissions(ctx context.Context, name string
 
 func (u *roleUsecase) UpdateRoleWithPermissions(ctx context.Context, id int32, name string, permissions []string) error {
 	if name == "" {
-		return errors.New("nama peran tidak boleh kosong")
+		return domain.NewBusinessRuleError("nama peran tidak boleh kosong")
 	}
 
 	err := u.roleRepo.UpdateRoleWithPermissions(ctx, id, name, permissions)

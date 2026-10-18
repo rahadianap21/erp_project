@@ -44,12 +44,12 @@ func (h *AccountingHandler) HandleBalanceSheet(w http.ResponseWriter, r *http.Re
 	withReportRead(func(w http.ResponseWriter, r *http.Request) {
 		asOf, err := parseTanggalLaporan(r, "as_of")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		report, err := h.ReportUsecase.BalanceSheet(r.Context(), asOf)
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
@@ -62,17 +62,17 @@ func (h *AccountingHandler) HandleIncomeStatement(w http.ResponseWriter, r *http
 	withReportRead(func(w http.ResponseWriter, r *http.Request) {
 		from, err := parseTanggalLaporan(r, "from")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		to, err := parseTanggalLaporan(r, "to")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		report, err := h.ReportUsecase.IncomeStatement(r.Context(), from, to)
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
@@ -85,17 +85,17 @@ func (h *AccountingHandler) HandleTrialBalance(w http.ResponseWriter, r *http.Re
 	withReportRead(func(w http.ResponseWriter, r *http.Request) {
 		from, err := parseTanggalLaporan(r, "from")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		to, err := parseTanggalLaporan(r, "to")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		report, err := h.ReportUsecase.TrialBalance(r.Context(), from, to)
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
@@ -113,17 +113,17 @@ func (h *AccountingHandler) HandleGeneralLedger(w http.ResponseWriter, r *http.R
 		}
 		from, err := parseTanggalLaporan(r, "from")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		to, err := parseTanggalLaporan(r, "to")
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		report, err := h.ReportUsecase.GeneralLedger(r.Context(), accountID, from, to)
 		if err != nil {
-			respondError(w, err)
+			WriteError(w, err)
 			return
 		}
 		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
