@@ -18,10 +18,15 @@ const MinJWTSecretLen = 32
 // jadi fallback di sini aman.
 const DefaultPort = "8090"
 
+// DefaultCORSOrigin dipakai kalau CORS_ORIGIN tidak di-set. Mengarah ke dev
+// server Next.js lokal, bukan nilai rahasia.
+const DefaultCORSOrigin = "http://localhost:3000"
+
 type Config struct {
 	Port        string
 	DatabaseURL string
 	JWTSecret   string
+	CORSOrigin  string
 }
 
 // LoadConfig membaca konfigurasi dari environment dan mengembalikan error
@@ -58,9 +63,15 @@ func LoadConfig() (*Config, error) {
 		port = DefaultPort
 	}
 
+	corsOrigin := os.Getenv("CORS_ORIGIN")
+	if corsOrigin == "" {
+		corsOrigin = DefaultCORSOrigin
+	}
+
 	return &Config{
 		Port:        port,
 		DatabaseURL: databaseURL,
 		JWTSecret:   jwtSecret,
+		CORSOrigin:  corsOrigin,
 	}, nil
 }

@@ -15,6 +15,9 @@ import (
 
 // RegisterRoutes mengelompokkan dan mendaftarkan seluruh endpoint API sistem
 func RegisterRoutes(cfg *config.Config, resolver domain.PermissionResolver, userHandler *handler.UserHandler, roleHandler *handler.RoleHandler, regionHandler *handler.RegionHandler, supplierHandler *handler.SupplierHandler, bankHandler *handler.BankHandler, catHandler *handler.ProductCategoryHandler, productHandler *handler.ProductHandler, unitHandler *handler.UnitHandler, poHandler *handler.PurchaseOrderHandler, lookupHandler *handler.LookupHandler, grnHandler *handler.GoodsReceiptNoteHandler, dashboardHandler *handler.DashboardHandler, accountingHandler *handler.AccountingHandler, saleHandler *handler.SaleHandler, memberHandler *handler.MemberHandler, paymentMethodHandler *handler.PaymentMethodHandler, settingsHandler *handler.SettingsHandler) {
+	// 0. Terapkan origin CORS dari konfigurasi (default localhost:3000).
+	middleware.SetAllowedOrigin(cfg.CORSOrigin)
+
 	// 1. Endpoint Otentikasi Publik
 	loginLimiter := limiter.NewIPRateLimiter(rate.Every(time.Second), 5, 5*time.Minute)
 	http.HandleFunc("/api/login", middleware.EnableCORS(loginLimiter.Middleware(userHandler.Login)))

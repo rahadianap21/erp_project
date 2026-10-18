@@ -20,13 +20,26 @@ type contextKey string
 
 const UserContextKey contextKey = "user_claims"
 
+// allowedOrigin menyimpan origin frontend yang diizinkan untuk CORS. Diisi
+// sekali saat startup lewat SetAllowedOrigin (dari config.LoadConfig). Nilai
+// default dipertahankan untuk pengembangan lokal bila CORS_ORIGIN tidak di-set.
+var allowedOrigin = "http://localhost:3000"
+
+// SetAllowedOrigin menetapkan origin CORS dari konfigurasi. Panggil sekali
+// saat wiring startup (lihat router.RegisterRoutes).
+func SetAllowedOrigin(origin string) {
+	if origin != "" {
+		allowedOrigin = origin
+	}
+}
+
 // =========================================================================
 // SOLUSI UTAMA CORS: Menangani Preflight (OPTIONS) dan Menyematkan Header
 // =========================================================================
 func EnableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Setel asal domain frontend Next.js Anda
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
