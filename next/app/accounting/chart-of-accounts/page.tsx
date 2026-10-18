@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError, apiDelete } from "@/lib/api-client";
+import { ApiError, apiDelete, messageFromError } from "@/lib/api-client";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -69,10 +69,10 @@ export default function ChartOfAccountsPage() {
         duration: 3000,
       });
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
       toast.error("Operasi Gagal", {
-        description: error.message || "Masalah internal server.",
+        description: messageFromError(error) || "Masalah internal server.",
       });
     } finally {
       setIsProcessing(false);

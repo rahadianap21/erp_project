@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { CalendarRange, Lock, LockOpen, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -80,8 +80,8 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
         description: `${monthNames[openMonth - 1]} ${openYear} kini aktif.`,
       });
       fetchPeriods();
-    } catch (error: any) {
-      toast.error("Operasi Gagal", { description: error.message });
+    } catch (error) {
+      toast.error("Operasi Gagal", { description: messageFromError(error) });
     } finally {
       setProcessing(null);
     }
@@ -104,8 +104,8 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
         }
       );
       fetchPeriods();
-    } catch (error: any) {
-      toast.error("Operasi Gagal", { description: error.message });
+    } catch (error) {
+      toast.error("Operasi Gagal", { description: messageFromError(error) });
     } finally {
       setProcessing(null);
       setTarget(null);

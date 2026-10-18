@@ -1,6 +1,6 @@
 "use client";
 
-import { apiPost, apiPut } from "@/lib/api-client";
+import { apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
@@ -75,7 +75,7 @@ export default function UserForm({
       ? `/api/users?id=${editingUser.id}`
       : `/api/users`;
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, unknown> = {
       name,
       email,
       role_name: selectedRole,
@@ -92,10 +92,10 @@ export default function UserForm({
       resetForm();
       setIsExpanded(false);
       onSuccess(isEditMode ? "update" : "create", name);
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Gagal Menyimpan Pengguna", {
         description:
-          error.message ||
+          messageFromError(error) ||
           "Email sudah terdaftar atau terjadi kesalahan server.",
         duration: 4000, // Berikan waktu 4 detik agar teks terbaca utuh
       });

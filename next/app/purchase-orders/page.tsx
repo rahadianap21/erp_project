@@ -1,6 +1,12 @@
 "use client";
 
-import { ApiError, apiDelete, apiGet, apiPut } from "@/lib/api-client";
+import {
+  ApiError,
+  apiDelete,
+  apiGet,
+  apiPut,
+  messageFromError,
+} from "@/lib/api-client";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -84,9 +90,11 @@ export default function PurchaseOrdersPage() {
         `/api/purchase-orders?id=${po.id}`
       );
       setFinishItems((detail.data?.items ?? []) as typeof finishItems);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
-      toast.error("Gagal Memuat Data", { description: error.message });
+      toast.error("Gagal Memuat Data", {
+        description: messageFromError(error),
+      });
       setPoToFinish(null);
     } finally {
       setFinishLoading(false);
@@ -115,9 +123,9 @@ export default function PurchaseOrdersPage() {
         description: `Dokumen ${targetedNumber} kini berstatus RECEIVED.`,
       });
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
-      toast.error("Operasi Ditolak", { description: error.message });
+      toast.error("Operasi Ditolak", { description: messageFromError(error) });
     } finally {
       setIsProcessing(false);
     }
@@ -146,10 +154,11 @@ export default function PurchaseOrdersPage() {
       }, 100);
 
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
       toast.error("Operasi Ditolak", {
-        description: error.message || "Terjadi kesalahan jaringan server.",
+        description:
+          messageFromError(error) || "Terjadi kesalahan jaringan server.",
       });
     } finally {
       setIsProcessing(false);
@@ -178,10 +187,10 @@ export default function PurchaseOrdersPage() {
       }, 100);
 
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
       toast.error("Operasi Gagal", {
-        description: error.message || "Masalah internal server.",
+        description: messageFromError(error) || "Masalah internal server.",
       });
     } finally {
       setIsProcessing(false);
@@ -209,10 +218,11 @@ export default function PurchaseOrdersPage() {
       }, 100);
 
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
       toast.error("Operasi Gagal", {
-        description: error.message || "Terjadi kesalahan koneksi server.",
+        description:
+          messageFromError(error) || "Terjadi kesalahan koneksi server.",
       });
     } finally {
       setIsProcessing(false);

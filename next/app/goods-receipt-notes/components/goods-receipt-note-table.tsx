@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet } from "@/lib/api-client";
+import { apiGet, messageFromError } from "@/lib/api-client";
 import React, { useState } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -102,8 +102,10 @@ export function GoodsReceiptNoteTable({
           `/api/goods-receipt-notes?id=${id}`
         );
         setRowItems((prev) => ({ ...prev, [id]: result.data?.items ?? [] }));
-      } catch (error: any) {
-        toast.error("Gagal Memuat Detail", { description: error.message });
+      } catch (error) {
+        toast.error("Gagal Memuat Detail", {
+          description: messageFromError(error),
+        });
       } finally {
         setRowLoading((prev) => ({ ...prev, [id]: false }));
       }

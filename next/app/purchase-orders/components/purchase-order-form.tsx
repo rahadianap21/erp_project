@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,16 @@ interface SelectedItem {
   // Nama barang yang dibawa response detail PO. Dipakai sebagai fallback label
   // agar baris tidak tampak kosong walau barangnya absen dari daftar lookup.
   product_label: string;
+}
+
+// Bentuk baris dari response detail PO (GET /api/purchase-orders?id=...).
+interface PORowDetail {
+  product_id: number | string;
+  qty_ordered: number;
+  unit_price: number;
+  unit_kode: string;
+  product_sku: string;
+  product_name: string;
 }
 
 // Susun label barang dengan format yang sama dengan lookup endpoint, supaya
@@ -294,11 +304,11 @@ export function PurchaseOrderForm({
 
       const fetchPODetailsForEdit = async () => {
         try {
-          const result = await apiGet<{ items?: unknown[] }>(
+          const result = await apiGet<{ items?: PORowDetail[] }>(
             `/api/purchase-orders?id=${editingPO.id}`
           );
           if (result.data?.items) {
-            const mappedItems = result.data.items.map((item: any) => ({
+            const mappedItems = result.data.items.map((item) => ({
               product_id: String(item.product_id), // ✨ Wajib dipaksa menjadi String agar ComboboxSelect mengenali kecocokan nilainya
               qty_ordered: item.qty_ordered,
               purchase_price: item.unit_price,
@@ -408,10 +418,10 @@ export function PurchaseOrderForm({
     setItems(items.filter((_, i) => i !== index));
   };
 
-  const handleUpdateRowValue = (
+  const handleUpdateRowValue = <K extends keyof SelectedItem>(
     index: number,
-    field: keyof SelectedItem,
-    value: any
+    field: K,
+    value: SelectedItem[K]
   ) => {
     const updated = [...items];
     if (field === "product_id") {
@@ -511,9 +521,9 @@ export function PurchaseOrderForm({
       // bocor ke render berikutnya.
       resetForm();
       setIsExpanded(false);
-    } catch (err: any) {
+    } catch (err) {
       toast.error(isEditMode ? "Gagal Menyimpan Koreksi" : "Gagal Menyimpan", {
-        description: err.message,
+        description: messageFromError(err),
       });
     } finally {
       setIsLoading(false);

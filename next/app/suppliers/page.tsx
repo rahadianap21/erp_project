@@ -1,6 +1,6 @@
 "use client";
 
-import { apiDelete } from "@/lib/api-client";
+import { apiDelete, messageFromError } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -89,10 +89,10 @@ export default function SuppliersCRUDPage() {
       }, 100);
 
       setRefreshTrigger((prev) => prev + 1);
-    } catch (error: any) {
+    } catch (error) {
       toast.error("Gagal Menghapus Vendor", {
         description:
-          error.message ||
+          messageFromError(error) ||
           "Terjadi kesalahan koneksi atau masalah internal server.",
       });
     } finally {

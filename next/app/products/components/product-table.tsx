@@ -136,7 +136,7 @@ export function ProductTable({
       >
         <div className="flex items-center gap-2">
           <select
-            value={filters.category_id ?? ""}
+            value={String(filters.category_id ?? "")}
             onChange={(e) => updateFilter("category_id", e.target.value || "")}
             className="text-xs h-9 px-3 bg-white border border-slate-200 rounded-lg outline-none cursor-pointer focus:border-blue-500 font-medium text-slate-700"
           >

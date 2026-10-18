@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, messageFromError } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -80,9 +80,11 @@ export function GRNFormDialog({
         setQtyInput({});
         setNotes("");
         setReceivedDate(new Date().toISOString().slice(0, 10));
-      } catch (error: any) {
+      } catch (error) {
         if (!cancelled)
-          toast.error("Gagal Memuat Data", { description: error.message });
+          toast.error("Gagal Memuat Data", {
+            description: messageFromError(error),
+          });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -170,8 +172,10 @@ export function GRNFormDialog({
       });
       onOpenChange(false);
       onSuccess();
-    } catch (error: any) {
-      toast.error("Penerimaan Ditolak", { description: error.message });
+    } catch (error) {
+      toast.error("Penerimaan Ditolak", {
+        description: messageFromError(error),
+      });
     } finally {
       setSubmitting(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,8 +132,10 @@ export function ChartOfAccountForm({
           ? `Akun ${code} berhasil dikoreksi.`
           : `Akun ${code} berhasil dibuat.`
       );
-    } catch (error: any) {
-      toast.error("Gagal Menyimpan Akun", { description: error.message });
+    } catch (error) {
+      toast.error("Gagal Menyimpan Akun", {
+        description: messageFromError(error),
+      });
     } finally {
       setIsLoading(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPut } from "@/lib/api-client";
+import { apiGet, apiPut, messageFromError } from "@/lib/api-client";
 import { readPermissionList } from "@/lib/permissions";
 import * as React from "react";
 import {
@@ -52,8 +52,10 @@ export function SettingsPageView() {
       const view: SettingsView = body.data ?? ({} as SettingsView);
       setRatePercent(Math.round((view.ppn_rate ?? 0.12) * 10000) / 100);
       setMode(view.ppn_price_mode || "INCLUSIVE");
-    } catch (err: any) {
-      toast.error("Gagal Memuat Pengaturan", { description: err.message });
+    } catch (err) {
+      toast.error("Gagal Memuat Pengaturan", {
+        description: messageFromError(err),
+      });
     } finally {
       setLoading(false);
     }
@@ -86,8 +88,8 @@ export function SettingsPageView() {
         description:
           "Perubahan tarif & mode PPN langsung berlaku untuk transaksi POS berikutnya.",
       });
-    } catch (err: any) {
-      toast.error("Gagal Menyimpan", { description: err.message });
+    } catch (err) {
+      toast.error("Gagal Menyimpan", { description: messageFromError(err) });
     } finally {
       setSaving(false);
     }

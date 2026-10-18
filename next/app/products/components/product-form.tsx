@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost, apiPut } from "@/lib/api-client";
+import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -295,8 +295,8 @@ export function ProductForm({
       resetForm();
       setIsExpanded(false);
       onSuccess(isEditMode ? "update" : "create", name);
-    } catch (error: any) {
-      toast.error("Gagal Menyimpan", { description: error.message });
+    } catch (error) {
+      toast.error("Gagal Menyimpan", { description: messageFromError(error) });
     } finally {
       setIsLoading(false);
     }

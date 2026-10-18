@@ -33,7 +33,8 @@ export function useDebounceFetch<T>({
   const [hasPrev, setHasPrev] = useState<boolean>(false);
 
   // State khusus penampung filter data riil (misal: role, status, kategori, dll.)
-  const [filters, setFilters] = useState<Record<string, any>>(initialFilters);
+  const [filters, setFilters] =
+    useState<Record<string, string | number | boolean>>(initialFilters);
 
   const [data, setData] = useState<T[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -242,7 +243,7 @@ export function useDebounceFetch<T>({
     resetPagination();
   };
 
-  const updateFilter = (key: string, value: any) => {
+  const updateFilter = (key: string, value: string | number | boolean) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     resetPagination();
   };

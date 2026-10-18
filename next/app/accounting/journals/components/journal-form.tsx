@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError, apiGet, apiPost } from "@/lib/api-client";
+import { ApiError, apiGet, apiPost, messageFromError } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -130,10 +130,12 @@ export function JournalForm({
         { account_id: 0, description: "", debit: 0, credit: 0 },
       ]);
       onSuccess(errorData.data?.entry_number || "");
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof ApiError && error.status === 403)
         onPermissionDenied?.();
-      toast.error("Gagal Menyimpan Jurnal", { description: error.message });
+      toast.error("Gagal Menyimpan Jurnal", {
+        description: messageFromError(error),
+      });
     } finally {
       setIsLoading(false);
     }

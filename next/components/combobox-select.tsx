@@ -1,6 +1,6 @@
 "use client";
 
-import { apiGet, apiPost } from "@/lib/api-client";
+import { apiGet, apiPost, messageFromError } from "@/lib/api-client";
 import * as React from "react";
 import {
   Combobox,
@@ -72,7 +72,7 @@ export function ComboboxSelect({
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
 
   const [parentCategoryOptions, setParentCategoryOptions] = React.useState<
-    any[]
+    { id: number | string; name: string }[]
   >([]);
 
   // Buffer State Kolektif Penampung Nilai Formulir Dinamis
@@ -123,7 +123,9 @@ export function ComboboxSelect({
   const fetchModalParentCategories = async () => {
     if (!authToken || !permissionCode?.startsWith("categories")) return;
     try {
-      const result = await apiGet<any[]>(`/api/categories?limit=100`);
+      const result = await apiGet<{ id: number | string; name: string }[]>(
+        `/api/categories?limit=100`
+      );
       if (result.data) {
         setParentCategoryOptions(result.data);
         console.log("Parent Category Options:", result.data);
@@ -189,7 +191,7 @@ export function ComboboxSelect({
   }, [isModalOpen, permissionCode]);
 
   // EKSEKUSI PENYIMPANAN DATA TRANSAKSIONAL KE GO BACKEND
-  const handleDynamicQuickSubmit = async (e: React.FormEvent) => {
+  const handleDynamicQuickSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!authToken || !moduleMeta.endpoint) return;
 
@@ -218,7 +220,7 @@ export function ComboboxSelect({
 
     try {
       // Pembentukan skema Payload JSON adaptif mengikuti target endpoint backend Go
-      let payload: any = {};
+      let payload: Record<string, unknown> = {};
       if (permissionCode?.startsWith("units")) {
         payload = {
           kode: cleanKode,
@@ -280,10 +282,10 @@ export function ComboboxSelect({
           onChange(String(result.data.id));
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       toast.error("Gagal Menyimpan data", {
         id: toastId,
-        description: err.message,
+        description: messageFromError(err),
       });
     } finally {
       setIsSubmitting(false);
@@ -309,7 +311,9 @@ export function ComboboxSelect({
           placeholder={placeholder}
           disabled={disabled}
           showClear={!disabled && !!value}
-          onChange={(e: any) => setSearchValue(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            setSearchValue(e.target.value)
+          }
           className={cn(
             "w-full text-xs bg-white border-slate-200 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 [&_input]:text-xs [&_input]:placeholder:text-slate-400 h-8",
             disabled && "opacity-50 cursor-not-allowed bg-slate-50",
@@ -510,7 +514,7 @@ export function ComboboxSelect({
                         value: "",
                         label: "--- JADIKAN KATEGORI UTAMA / TANPA INDUK ---",
                       },
-                      ...parentCategoryOptions.map((opt: any) => ({
+                      ...parentCategoryOptions.map((opt) => ({
                         value: String(opt.id),
                         label: opt.name.toUpperCase(),
                       })),
@@ -658,7 +662,7 @@ export function ComboboxSelect({
                 type="button"
                 size="sm"
                 disabled={isSubmitting}
-                onClick={(e) => handleDynamicQuickSubmit(e as any)}
+                onClick={handleDynamicQuickSubmit}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 flex items-center gap-1 cursor-pointer"
               >
                 {isSubmitting ? (

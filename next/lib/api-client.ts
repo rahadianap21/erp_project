@@ -60,6 +60,12 @@ function dataFromBody<T>(body: unknown): T | null {
   return (body as T) ?? null;
 }
 
+/** Pesan dari nilai apa pun yang dilempar (biasanya Error/ApiError). */
+export function messageFromError(error: unknown, fallback = ""): string {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 /** Jalur inti semua method HTTP. */
 export async function request<T = unknown>(
   path: string,

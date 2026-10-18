@@ -210,7 +210,7 @@ export function PurchaseOrderTable({
             <Filter className="size-3" /> Status Dokumen:
           </div>
           <select
-            value={filters.status}
+            value={String(filters.status ?? "")}
             onChange={(e) => updateFilter("status", e.target.value)}
             className="text-xs h-9 px-3 bg-white border border-slate-200 rounded-lg outline-none cursor-pointer focus:border-blue-500 font-medium text-slate-700"
           >
