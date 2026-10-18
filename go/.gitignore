@@ -1,0 +1,14 @@
+# Berisi kredensial dan secret. Jangan pernah di-commit.
+.env
+.env.local
+.env.*.local
+
+# Artefak build
+/api
+/tmp/bin/
+*.exe
+*.test
+*.out
+
+# Log
+*.log

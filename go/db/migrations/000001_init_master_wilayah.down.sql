@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS m_villages;
+DROP TABLE IF EXISTS m_districts;
+DROP TABLE IF EXISTS m_regencies;
+DROP TABLE IF EXISTS m_provinces;
