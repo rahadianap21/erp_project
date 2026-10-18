@@ -91,6 +91,44 @@ export default function SupplierForm({
   const [selectedVillage, setSelectedVillage] = useState<string>("");
   const [postalCode, setPostalCode] = useState<string>("");
 
+  const fetchRegions = async <T,>(
+    query: string,
+    setter: (data: T[]) => void
+  ) => {
+    try {
+      const result = await apiGet<T[]>(`/api/regions${query}`);
+      if (result.data) setter(result.data);
+    } catch (err) {
+      console.error("Gagal memuat data regional:", err);
+    }
+  };
+
+  const resetForm = () => {
+    setName("");
+    setPicName("");
+    setPhone("");
+    setEmail("");
+    setAddress("");
+    setSelectedProvince("");
+    setSelectedRegency("");
+    setSelectedDistrict("");
+    setSelectedVillage("");
+    setPostalCode("");
+    setSelectedBank("");
+    setAccountNumber("");
+    setAccountName("");
+    setIsActive(true);
+  };
+
+  const fetchMasterBanks = async () => {
+    try {
+      const result = await apiGet<BankOption[]>(`/api/banks`);
+      if (result.data) setBankOptions(result.data);
+    } catch (err) {
+      console.error("Gagal memuat master bank:", err);
+    }
+  };
+
   // Load Data Provinsi Pertama Kali (On Mount)
   useEffect(() => {
     if (token) fetchRegions("", setProvinces);
@@ -147,44 +185,6 @@ export default function SupplierForm({
     if (villageObj) setPostalCode(villageObj.postal_code || "");
     else setPostalCode("");
   }, [selectedVillage, villages]);
-
-  const fetchRegions = async <T,>(
-    query: string,
-    setter: (data: T[]) => void
-  ) => {
-    try {
-      const result = await apiGet<T[]>(`/api/regions${query}`);
-      if (result.data) setter(result.data);
-    } catch (err) {
-      console.error("Gagal memuat data regional:", err);
-    }
-  };
-
-  const resetForm = () => {
-    setName("");
-    setPicName("");
-    setPhone("");
-    setEmail("");
-    setAddress("");
-    setSelectedProvince("");
-    setSelectedRegency("");
-    setSelectedDistrict("");
-    setSelectedVillage("");
-    setPostalCode("");
-    setSelectedBank("");
-    setAccountNumber("");
-    setAccountName("");
-    setIsActive(true);
-  };
-
-  const fetchMasterBanks = async () => {
-    try {
-      const result = await apiGet<BankOption[]>(`/api/banks`);
-      if (result.data) setBankOptions(result.data);
-    } catch (err) {
-      console.error("Gagal memuat master bank:", err);
-    }
-  };
 
   // Memoized options untuk Combobox
   const provinceOptions = useMemo(() => {

@@ -62,6 +62,11 @@ export default function RoleForm({
     }
   }, [isExpanded, editingRole, token]);
 
+  const resetForm = () => {
+    setName("");
+    setSelectedPermissions([]);
+  };
+
   // Efek Reaktif untuk Mode Edit
   useEffect(() => {
     if (editingRole) {
@@ -72,11 +77,6 @@ export default function RoleForm({
       resetForm();
     }
   }, [editingRole]);
-
-  const resetForm = () => {
-    setName("");
-    setSelectedPermissions([]);
-  };
 
   const handleCancel = () => {
     resetForm();

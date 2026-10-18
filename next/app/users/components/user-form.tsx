@@ -35,6 +35,14 @@ export default function UserForm({
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
 
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setSelectedRole("");
+    setPassword("");
+    setShowPassword(false);
+  };
+
   // Efek Reaktif untuk Mode Edit
   useEffect(() => {
     if (editingUser) {
@@ -48,14 +56,6 @@ export default function UserForm({
       resetForm();
     }
   }, [editingUser]);
-
-  const resetForm = () => {
-    setName("");
-    setEmail("");
-    setSelectedRole("");
-    setPassword("");
-    setShowPassword(false);
-  };
 
   const handleCancel = () => {
     resetForm();

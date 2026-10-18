@@ -78,6 +78,16 @@ export function ChartOfAccountForm({
     if (token) fetchParentOptions();
   }, [token, fetchParentOptions]);
 
+  const resetForm = () => {
+    setCode("");
+    setName("");
+    setAccountType("ASSET");
+    setNormalBalance("DEBIT");
+    setParentId("");
+    setIsHeader(false);
+    setIsActive(true);
+  };
+
   useEffect(() => {
     if (editingAccount) {
       setCode(editingAccount.code);
@@ -94,16 +104,6 @@ export function ChartOfAccountForm({
       resetForm();
     }
   }, [editingAccount]);
-
-  const resetForm = () => {
-    setCode("");
-    setName("");
-    setAccountType("ASSET");
-    setNormalBalance("DEBIT");
-    setParentId("");
-    setIsHeader(false);
-    setIsActive(true);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

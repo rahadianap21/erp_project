@@ -70,6 +70,14 @@ export function ProductCategoryForm({
     if (token) fetchParentOptions();
   }, [token, fetchParentOptions]);
 
+  const resetForm = () => {
+    setName("");
+    setSlug("");
+    setDescription("");
+    setParentId("");
+    setIsActive(true);
+  };
+
   useEffect(() => {
     if (editingCategory) {
       setName(editingCategory.name);
@@ -84,14 +92,6 @@ export function ProductCategoryForm({
       resetForm();
     }
   }, [editingCategory]);
-
-  const resetForm = () => {
-    setName("");
-    setSlug("");
-    setDescription("");
-    setParentId("");
-    setIsActive(true);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

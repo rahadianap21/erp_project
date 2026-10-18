@@ -128,6 +128,25 @@ export function ProductForm({
     if (token) fetchRelations();
   }, [token]);
 
+  const resetForm = () => {
+    setSku("");
+    setBarcode("");
+    setName("");
+    setDescription("");
+    setCategoryId("");
+    setSupplierId("");
+    setSellingUnitId("");
+    setPurchaseUnitId("");
+    setPurchasePrice(0);
+    setSellingPrice(0);
+    setMinStock(5);
+    setCurrentStock(0);
+    setIsActive(true);
+    setDiscountType("NONE");
+    setDiscountValue(0);
+    setIsTaxable(true);
+  };
+
   // Jalur Sinkronisasi Mode Edit Data
   useEffect(() => {
     if (editingProduct) {
@@ -207,25 +226,6 @@ export function ProductForm({
   //         console.error("Gagal memuat data regional:", err);
   //     }
   // };
-
-  const resetForm = () => {
-    setSku("");
-    setBarcode("");
-    setName("");
-    setDescription("");
-    setCategoryId("");
-    setSupplierId("");
-    setSellingUnitId("");
-    setPurchaseUnitId("");
-    setPurchasePrice(0);
-    setSellingPrice(0);
-    setMinStock(5);
-    setCurrentStock(0);
-    setIsActive(true);
-    setDiscountType("NONE");
-    setDiscountValue(0);
-    setIsTaxable(true);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
