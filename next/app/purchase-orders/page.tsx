@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, apiDelete, apiGet, apiPut } from "@/lib/api-client";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -60,13 +61,10 @@ export default function PurchaseOrdersPage() {
         setFinishLoading(true);
         setFinishItems([]);
         try {
-            const res = await fetch(`/api/purchase-orders?id=${po.id}`, {
-                headers: { Authorization: `Bearer ${authToken}` },
-            });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.message || "Gagal memuat rincian PO.");
-            setFinishItems(result.data?.items ?? []);
+            const detail = await apiGet<{ items?: unknown[] }>(`/api/purchase-orders?id=${po.id}`);
+            setFinishItems((detail.data?.items ?? []) as typeof finishItems);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Gagal Memuat Data", { description: error.message });
             setPoToFinish(null);
         } finally {
@@ -83,19 +81,7 @@ export default function PurchaseOrdersPage() {
         const targetedNumber = poToFinish.po_number;
 
         try {
-            const res = await fetch(`/api/purchase-orders/finish-receiving?id=${poToFinish.id}&allow_partial=true`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${authToken}`,
-                },
-            });
-
-            if (!res.ok) {
-                const result = await res.json().catch(() => ({}));
-                if (res.status === 403) setHttpStatus(403);
-                throw new Error(result.message || "Gagal menutup penerimaan PO.");
-            }
+            await apiPut(`/api/purchase-orders/finish-receiving?id=${poToFinish.id}&allow_partial=true`, undefined, { redirectOn403: false });
 
             setPoToFinish(null);
             toast.success("Penerimaan PO Ditutup", {
@@ -103,6 +89,7 @@ export default function PurchaseOrdersPage() {
             });
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Ditolak", { description: error.message });
         } finally {
             setIsProcessing(false);
@@ -117,19 +104,7 @@ export default function PurchaseOrdersPage() {
         const targetedNumber = poToApprove.po_number;
 
         try {
-            const response = await fetch(`/api/purchase-orders/approve?id=${poToApprove.id}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 403) setHttpStatus(403);
-                throw new Error(errorData.message || "Gagal menyetujui dokumen PO.");
-            }
+            await apiPut(`/api/purchase-orders/approve?id=${poToApprove.id}`, undefined, { redirectOn403: false });
 
             setPoToApprove(null);
             setTimeout(() => {
@@ -141,6 +116,7 @@ export default function PurchaseOrdersPage() {
 
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Ditolak", {
                 description: error.message || "Terjadi kesalahan jaringan server.",
             });
@@ -156,19 +132,7 @@ export default function PurchaseOrdersPage() {
         const targetedNumber = poToCancel.po_number;
 
         try {
-            const response = await fetch(`/api/purchase-orders/cancel?id=${poToCancel.id}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 403) setHttpStatus(403);
-                throw new Error(errorData.message || "Gagal membatalkan dokumen PO.");
-            }
+            await apiPut(`/api/purchase-orders/cancel?id=${poToCancel.id}`, undefined, { redirectOn403: false });
 
             setPoToCancel(null);
             setTimeout(() => {
@@ -180,6 +144,7 @@ export default function PurchaseOrdersPage() {
 
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Gagal", {
                 description: error.message || "Masalah internal server.",
             });
@@ -196,19 +161,7 @@ export default function PurchaseOrdersPage() {
         const targetedNumber = poToDelete.po_number;
 
         try {
-            const response = await fetch(`/api/purchase-orders?id=${poToDelete.id}`, {
-                method: "DELETE",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 403) setHttpStatus(403);
-                throw new Error(errorData.message || "Gagal memusnahkan dokumen PO.");
-            }
+            await apiDelete(`/api/purchase-orders?id=${poToDelete.id}`, { redirectOn403: false });
 
             setPoToDelete(null);
             setTimeout(() => {
@@ -220,6 +173,7 @@ export default function PurchaseOrdersPage() {
 
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Gagal", {
                 description: error.message || "Terjadi kesalahan koneksi server.",
             });

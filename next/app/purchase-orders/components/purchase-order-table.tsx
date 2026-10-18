@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet } from "@/lib/api-client";
 import { FileText, Phone, User, Calendar, DollarSign, Filter, CheckCircle2, XCircle, ChevronRight as ArrowRight, Loader2, Package, ListOrdered, Percent, Landmark, Trash2, Edit2, PackageCheck, CheckCheck } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -97,12 +98,9 @@ export function PurchaseOrderTable({ canUpdate,
         if (!isCurrentlyExpanded && !rowItems[poId] && token) {
             setRowLoading((prev) => ({ ...prev, [poId]: true }));
             try {
-                const res = await fetch(`/api/purchase-orders?id=${poId}`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                const result = await res.json();
-                if (res.ok && result.data?.items) {
-                    setRowItems((prev) => ({ ...prev, [poId]: result.data.items }));
+                const result = await apiGet<{ items?: DetailItem[] }>(`/api/purchase-orders?id=${poId}`);
+                if (result.data?.items) {
+                    setRowItems((prev) => ({ ...prev, [poId]: result.data!.items! }));
                 }
             } catch (err) {
                 console.error("Gagal memuat sub-item detail PO:", err);

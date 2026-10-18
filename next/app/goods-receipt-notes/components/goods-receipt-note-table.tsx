@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet } from "@/lib/api-client";
 import React, { useState } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -87,11 +88,7 @@ export function GoodsReceiptNoteTable({ refreshTrigger, onForbidden }: GoodsRece
         if (!isCurrentlyExpanded && !rowItems[id] && authToken) {
             setRowLoading((prev) => ({ ...prev, [id]: true }));
             try {
-                const res = await fetch(`/api/goods-receipt-notes?id=${id}`, {
-                    headers: { Authorization: `Bearer ${authToken}` },
-                });
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.message || "Gagal memuat detail GRN.");
+                const result = await apiGet<{ items?: GRNDetail[] }>(`/api/goods-receipt-notes?id=${id}`);
                 setRowItems((prev) => ({ ...prev, [id]: result.data?.items ?? [] }));
             } catch (error: any) {
                 toast.error("Gagal Memuat Detail", { description: error.message });

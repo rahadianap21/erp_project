@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, ShoppingCart, Loader2, Package, Layers, DollarSign, FileText, ChevronDown, ChevronUp, Percent, X } from "lucide-react";
@@ -150,12 +151,8 @@ export function PurchaseOrderForm({ token, onSuccess, editingPO, onCancelEdit }:
         `${path}`;
 
     const lookupFetch = async <T,>(path: string): Promise<T[]> => {
-        const res = await fetch(lookupUrl(path), { headers: { "Authorization": `Bearer ${token}` } });
-        if (!res.ok) {
-            throw new Error(`Lookup ${path} gagal: HTTP ${res.status}`);
-        }
-        const body = await res.json();
-        return Array.isArray(body?.data) ? (body.data as T[]) : [];
+        const body = await apiGet<T[]>(lookupUrl(path));
+        return Array.isArray(body.data) ? body.data : [];
     };
 
     // Ambil daftar supplier (dipakai untuk mode create dan edit alike)
@@ -233,11 +230,8 @@ export function PurchaseOrderForm({ token, onSuccess, editingPO, onCancelEdit }:
 
             const fetchPODetailsForEdit = async () => {
                 try {
-                    const res = await fetch(`/api/purchase-orders?id=${editingPO.id}`, {
-                        headers: { "Authorization": `Bearer ${token}` }
-                    });
-                    const result = await res.json();
-                    if (res.ok && result.data?.items) {
+                    const result = await apiGet<{ items?: unknown[] }>(`/api/purchase-orders?id=${editingPO.id}`);
+                    if (result.data?.items) {
                         const mappedItems = result.data.items.map((item: any) => ({
                             product_id: String(item.product_id), // ✨ Wajib dipaksa menjadi String agar ComboboxSelect mengenali kecocokan nilainya
                             qty_ordered: item.qty_ordered,
@@ -387,28 +381,15 @@ export function PurchaseOrderForm({ token, onSuccess, editingPO, onCancelEdit }:
                 payload.supplier_id = Number(supplierId);
             }
 
-            const res = await fetch(targetUrl, {
-                method: targetMethod,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            const result = await res.json().catch(() => ({}));
-            if (res.ok) {
-                onSuccess(isEditMode ? editingPO.po_number : (result.data?.po_number || "PO BARU"), isEditMode);
-                // resetForm() menutup mode koreksi lewat onCancelEdit, jadi
-                // form perlu disetel ulang lebih dulu supaya state edit tidak
-                // bocor ke render berikutnya.
-                resetForm();
-                setIsExpanded(false);
-            } else {
-                // Lapisan RBAC membalas {"error": ...} sedangkan pelanggaran aturan
-                // bisnis membalas {"message": ...}. Keduanya harus ditampilkan.
-                throw new Error(result.message || result.error || "Gagal menyimpan dokumen PO.");
-            }
+            const result = await (isEditMode
+                ? apiPut<{ po_number?: string }>(targetUrl, payload)
+                : apiPost<{ po_number?: string }>(targetUrl, payload));
+            onSuccess(isEditMode ? editingPO.po_number : (result.data?.po_number || "PO BARU"), isEditMode);
+            // resetForm() menutup mode koreksi lewat onCancelEdit, jadi
+            // form perlu disetel ulang lebih dulu supaya state edit tidak
+            // bocor ke render berikutnya.
+            resetForm();
+            setIsExpanded(false);
         } catch (err: any) {
             toast.error(isEditMode ? "Gagal Menyimpan Koreksi" : "Gagal Menyimpan", {
                 description: err.message

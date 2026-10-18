@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -63,15 +64,9 @@ export function GRNFormDialog({ open, onOpenChange, poId, poNumber, onSuccess }:
         const load = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/purchase-orders?id=${poId}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-                const result = await res.json();
+                const result = await apiGet<{ items?: ReceiveLine[] }>(`/api/purchase-orders?id=${poId}`);
                 if (cancelled) return;
 
-                if (!res.ok) {
-                    throw new Error(result.message || "Gagal memuat rincian PO.");
-                }
                 const items: ReceiveLine[] = result.data?.items ?? [];
                 setLines(items);
                 setQtyInput({});
@@ -145,24 +140,12 @@ export function GRNFormDialog({ open, onOpenChange, poId, poNumber, onSuccess }:
 
         setSubmitting(true);
         try {
-            const res = await fetch(`/api/goods-receipt-notes`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    purchase_order_id: poId,
-                    received_date: receivedDate,
-                    notes,
-                    items,
-                }),
+            const result = await apiPost<{ grn_number?: string }>(`/api/goods-receipt-notes`, {
+                purchase_order_id: poId,
+                received_date: receivedDate,
+                notes,
+                items,
             });
-
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(result.message || "Gagal menyimpan penerimaan barang.");
-            }
 
             toast.success("Penerimaan Barang Tersimpan", {
                 description: `Dokumen ${result.data?.grn_number ?? "GRN"} tercatat untuk PO ${poNumber}.`,
