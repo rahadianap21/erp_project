@@ -131,10 +131,8 @@ export default function Page() {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const res = await apiGet("/api/dashboard")
-      if (!res.ok) throw new Error(`Server error: ${res.status}`)
-      const result = await res.json()
-      setOverview(result.data as DashboardOverview)
+      const res = await apiGet<DashboardOverview>("/api/dashboard")
+      setOverview(res.data)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat data dashboard")

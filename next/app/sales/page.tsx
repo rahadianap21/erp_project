@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Cookies from "js-cookie"
+import { readPermissionList } from "@/lib/permissions"
 import { BanIcon, ChevronLeftIcon, ChevronRightIcon, ReceiptTextIcon, SearchIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -50,16 +51,7 @@ const LIMIT = 20
 
 export default function SalesHistoryPage() {
   const authToken = Cookies.get("session_active")
-  const permissions = React.useMemo<string[]>(() => {
-    const raw = Cookies.get("user_permissions")
-    if (!raw) return []
-    try {
-      const parsed = JSON.parse(decodeURIComponent(raw))
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }, [])
+  const permissions = React.useMemo<string[]>(() => readPermissionList() ?? [], [])
   const canVoid = permissions.includes("sales:void")
 
   const [sales, setSales] = React.useState<Sale[]>([])

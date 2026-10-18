@@ -1,5 +1,6 @@
 "use client";
 
+import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
@@ -68,37 +69,8 @@ export default function MasterProductsCRUDPage() {
 
 
     const loadPermissions = () => {
-        const savedPermissions = Cookies.get("user_permissions");
-        const authToken = Cookies.get("session_active");
-
-        // 🌟 PERBAIKAN DEFENSIF MUTLAK:
-        // Jika salah satu komponen kuki otorisasi hilang/kedaluwarsa saat idle, paksa bersihkan dan tendang ke halaman login
-        if (!savedPermissions || !authToken) {
-            Cookies.remove("session_active");
-            Cookies.remove("user_permissions");
-
-            toast.error("Sesi Anda Telah Berakhir", {
-                description: "Silakan lakukan login ulang untuk mengamankan kredensial rantai pasok Anda.",
-                duration: 4000,
-            });
-
-            // Alihkan paksa rute navigasi jendela browser secara mutlak ke pintu login utama
-            window.location.href = "/";
-            return;
-        }
-
-        try {
-            const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
-            if (Array.isArray(parsed)) {
-                setPermissions({
-                    create: parsed.includes("products:create"),
-                    update: parsed.includes("products:update"),
-                    delete: parsed.includes("products:delete"),
-                });
-            }
-        } catch (e) {
-            console.error("Gagal membaca cookie permissions:", e);
-        }
+        if (!ensureSession()) return;
+        setPermissions(readPermissionFlags("products"));
     };
 
     const handleDeleteConfirm = async () => {

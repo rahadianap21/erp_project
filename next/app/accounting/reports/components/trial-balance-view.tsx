@@ -5,7 +5,8 @@ import { BadgeCheck, TriangleAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { ReportState } from "./report-state";
 import { AccountTable } from "./account-table";
-import { TrialBalance, awalTahunISO, fetchLaporan, todayISO } from "./report-types";
+import { fetchLaporan } from "@/lib/api-client";
+import { TrialBalance, awalTahunISO, todayISO } from "./report-types";
 
 interface TrialBalanceViewProps {
     token?: string;
@@ -25,8 +26,7 @@ export function TrialBalanceView({ token, onForbidden }: TrialBalanceViewProps) 
         setError(null);
         const result = await fetchLaporan<TrialBalance>(
             `/api/accounting/reports/trial-balance?from=${from}&to=${to}`,
-            token,
-        );
+);
         if (result.status === 403) {
             onForbidden();
             return;

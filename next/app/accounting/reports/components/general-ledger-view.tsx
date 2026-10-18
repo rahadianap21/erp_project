@@ -9,9 +9,9 @@ import {
     ACCOUNT_TYPE_LABEL,
     GeneralLedger,
     awalTahunISO,
-    fetchLaporan,
     todayISO,
 } from "./report-types";
+import { fetchLaporan } from "@/lib/api-client";
 import { ChartOfAccount } from "../../chart-of-accounts/components/chart-of-account-table";
 
 interface GeneralLedgerViewProps {
@@ -53,8 +53,7 @@ export function GeneralLedgerView({ token, onForbidden }: GeneralLedgerViewProps
         setError(null);
         const result = await fetchLaporan<GeneralLedger>(
             `/api/accounting/reports/general-ledger?account_id=${accountId}&from=${from}&to=${to}`,
-            token,
-        );
+);
         if (result.status === 403) {
             onForbidden();
             return;

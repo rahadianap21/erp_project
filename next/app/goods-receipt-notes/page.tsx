@@ -1,5 +1,6 @@
 "use client";
 
+import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
@@ -30,29 +31,11 @@ export default function GoodsReceiptNotesPage() {
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const loadPermissions = () => {
-        const savedPermissions = Cookies.get("user_permissions");
-        const currentToken = Cookies.get("session_active");
-
-        if (!savedPermissions || !currentToken) {
-            Cookies.remove("session_active");
-            Cookies.remove("user_permissions");
-            toast.error("Sesi Anda Telah Berakhir", {
-                description: "Silakan lakukan login ulang.",
-            });
-            window.location.href = "/";
-            return;
-        }
-
-        try {
-            const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
-            if (Array.isArray(parsed)) {
-                // Diperbarui lewat efek, jadi render pertama server dan client
-                // sama-sama memakai status awal 200.
-                setHttpStatus(parsed.includes("grn:read") ? 200 : 403);
-            }
-        } catch (e) {
-            console.error("Gagal membaca cookie permissions GRN:", e);
-        }
+        if (!ensureSession()) return;
+        const list = readPermissionList() ?? [];
+        // Diperbarui lewat efek, jadi render pertama server dan client
+        // sama-sama memakai status awal 200.
+        setHttpStatus(list.includes("grn:read") ? 200 : 403);
     };
 
     useEffect(() => {

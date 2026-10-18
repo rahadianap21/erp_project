@@ -4,7 +4,7 @@ import { Edit2, Trash2, Package, Layers, Search, Barcode, ShieldAlert, Building2
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDebounceFetch } from "@/hooks/use-debounce";
+import { useDebounceFetch } from "@/hooks/use-api-list";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
 import { DataTablePagination } from "@/components/data-table-pagination";
 import React from "react";

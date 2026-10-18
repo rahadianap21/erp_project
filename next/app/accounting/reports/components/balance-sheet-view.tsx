@@ -5,7 +5,8 @@ import { BadgeCheck, TriangleAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportState } from "./report-state";
 import { AccountTable } from "./account-table";
-import { BalanceSheet, fetchLaporan, formatIDR, formatTanggal, todayISO } from "./report-types";
+import { BalanceSheet, formatIDR, formatTanggal, todayISO } from "./report-types";
+import { fetchLaporan } from "@/lib/api-client";
 
 interface BalanceSheetViewProps {
     token?: string;
@@ -24,8 +25,7 @@ export function BalanceSheetView({ token, onForbidden }: BalanceSheetViewProps) 
         setError(null);
         const result = await fetchLaporan<BalanceSheet>(
             `/api/accounting/reports/balance-sheet?as_of=${asOf}`,
-            token,
-        );
+);
         if (result.status === 403) {
             onForbidden();
             return;

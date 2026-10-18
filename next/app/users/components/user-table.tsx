@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useDebounceFetch } from "@/hooks/use-debounce";
+import { useDebounceFetch } from "@/hooks/use-api-list";
 import { Edit2, Trash2, Search, Filter, Users } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";

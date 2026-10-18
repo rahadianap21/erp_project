@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ChevronRight, PackageCheck, ListOrdered, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDebounceFetch } from "@/hooks/use-debounce";
+import { useDebounceFetch } from "@/hooks/use-api-list";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
 import { DataTablePagination } from "@/components/data-table-pagination";
 

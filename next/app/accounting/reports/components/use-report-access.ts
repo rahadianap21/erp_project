@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Cookies from "js-cookie";
+import { ensureSession, hasPermission } from "@/lib/permissions";
 import { toast } from "sonner";
 
 // useReportAccess memusatkan pemeriksaan sesi dan izin accounting:read untuk
@@ -14,29 +15,10 @@ export function useReportAccess() {
     const [httpStatus, setHttpStatus] = useState<number>(200);
 
     const loadPermissions = useCallback(() => {
-        const savedPermissions = Cookies.get("user_permissions");
-        const currentToken = Cookies.get("session_active");
+        if (!ensureSession()) return;
 
-        if (!savedPermissions || !currentToken) {
-            Cookies.remove("session_active");
-            Cookies.remove("user_permissions");
-            toast.error("Sesi Anda Telah Berakhir", {
-                description: "Silakan login ulang untuk melihat laporan keuangan.",
-                duration: 4000,
-            });
-            window.location.href = "/";
-            return;
-        }
-
-        setToken(currentToken);
-        try {
-            const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
-            if (Array.isArray(parsed)) {
-                setCanRead(parsed.includes("accounting:read"));
-            }
-        } catch (e) {
-            console.error("Gagal membaca cookie permissions akuntansi:", e);
-        }
+        setToken(Cookies.get("session_active"));
+        setCanRead(hasPermission("accounting:read"));
         setReady(true);
     }, []);
 

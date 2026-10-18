@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/api"
+import { API_BASE_URL } from "@/lib/config"
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 

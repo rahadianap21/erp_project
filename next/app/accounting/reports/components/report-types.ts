@@ -92,27 +92,3 @@ export function todayISO(): string {
 export function awalTahunISO(): string {
     return `${new Date().getFullYear()}-01-01`;
 }
-
-// fetchLaporan membungkus pemanggilan endpoint laporan: menyertakan token,
-// membaca amplop {status, data}, dan mengembalikan status HTTP apa adanya agar
-// halaman bisa membedakan 403 (sesi/izin) dari kegagalan lain.
-export async function fetchLaporan<T>(
-    path: string,
-    token: string | undefined,
-): Promise<{ status: number; data?: T; message?: string }> {
-    try {
-        const response = await fetch(`${path}`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) {
-            return {
-                status: response.status,
-                message: body?.message || body?.error || "Gagal memuat laporan.",
-            };
-        }
-        return { status: response.status, data: body?.data as T };
-    } catch {
-        return { status: 0, message: "Tidak dapat menghubungi server." };
-    }
-}

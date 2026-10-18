@@ -9,7 +9,7 @@ import {
   ComboboxItem,
   ComboboxEmpty,
 } from "@/components/ui/combobox";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import { Plus, Loader2, Save, Link2, FolderTree, FileText } from "lucide-react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";

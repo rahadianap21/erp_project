@@ -7,11 +7,11 @@ import { AccountTable } from "./account-table";
 import {
     IncomeStatement,
     awalTahunISO,
-    fetchLaporan,
     formatIDR,
     formatTanggal,
     todayISO,
 } from "./report-types";
+import { fetchLaporan } from "@/lib/api-client";
 
 interface IncomeStatementViewProps {
     token?: string;
@@ -31,8 +31,7 @@ export function IncomeStatementView({ token, onForbidden }: IncomeStatementViewP
         setError(null);
         const result = await fetchLaporan<IncomeStatement>(
             `/api/accounting/reports/income-statement?from=${from}&to=${to}`,
-            token,
-        );
+);
         if (result.status === 403) {
             onForbidden();
             return;

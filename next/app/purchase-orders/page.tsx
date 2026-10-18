@@ -1,5 +1,6 @@
 "use client";
 
+import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -38,41 +39,18 @@ export default function PurchaseOrdersPage() {
 
     // 🌟 EVALUASI OTORISASI DEFENSIF MUTLAK (SAMA DENGAN MODUL ROLES)
     const loadPermissions = () => {
-        const savedPermissions = Cookies.get("user_permissions");
-        const currentToken = Cookies.get("session_active");
-
-        // Jika komponen kuki otorisasi hilang/kedaluwarsa saat idle, paksa bersihkan dan tendang ke halaman login utama
-        if (!savedPermissions || !currentToken) {
-            Cookies.remove("session_active");
-            Cookies.remove("user_permissions");
-
-            toast.error("Sesi Anda Telah Berakhir", {
-                description: "Silakan lakukan login ulang untuk mengamankan kredensial rantai pasok Anda.",
-                duration: 4000,
-            });
-
-            window.location.href = "/";
-            return;
-        }
-
-        try {
-            const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
-            if (Array.isArray(parsed)) {
-                // Memetakan otorisasi khusus kluster transaksi PO lengkap dengan Update & Delete
-                setPermissions({
-                    create: parsed.includes("po:create"),
-                    read: parsed.includes("po:read"),
-                    approve: parsed.includes("po:approve"),
-                    cancel: parsed.includes("po:reject"),
-                    update: parsed.includes("po:update"),
-                    delete: parsed.includes("po:delete"),
-                    grnCreate: parsed.includes("grn:create"),
-                    poReceive: parsed.includes("po:receive"),
-                });
-            }
-        } catch (e) {
-            console.error("Gagal membaca cookie permissions PO:", e);
-        }
+        if (!ensureSession()) return;
+        const list = readPermissionList() ?? [];
+        setPermissions({
+            create: list.includes("po:create"),
+            read: list.includes("po:read"),
+            approve: list.includes("po:approve"),
+            cancel: list.includes("po:reject"),
+            update: list.includes("po:update"),
+            delete: list.includes("po:delete"),
+            grnCreate: list.includes("grn:create"),
+            poReceive: list.includes("po:receive"),
+        });
     };
 
     // Sisa barang decide apakah perlu, jadi detail PO ditarik

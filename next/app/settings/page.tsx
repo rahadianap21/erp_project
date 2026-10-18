@@ -1,5 +1,6 @@
 "use client"
 
+import { readPermissionList } from "@/lib/permissions";
 import * as React from "react"
 import Cookies from "js-cookie"
 import { Loader2Icon, PercentIcon, SaveIcon, ReceiptTextIcon } from "lucide-react"
@@ -28,17 +29,6 @@ const MODE_OPTIONS = [
   },
 ]
 
-function readPermissions(): string[] {
-  const saved = Cookies.get("user_permissions")
-  if (!saved) return []
-  try {
-    const parsed = JSON.parse(decodeURIComponent(saved))
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
 export default function SettingsPage() {
   const authToken = Cookies.get("session_active")
   const headers = React.useMemo(
@@ -46,7 +36,10 @@ export default function SettingsPage() {
     [authToken]
   )
 
-  const canUpdate = React.useMemo(() => readPermissions().includes("settings:update"), [])
+  const canUpdate = React.useMemo(
+    () => (readPermissionList() ?? []).includes("settings:update"),
+    [],
+  )
 
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)

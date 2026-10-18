@@ -1,5 +1,6 @@
 "use client";
 
+import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
@@ -29,33 +30,14 @@ export default function ChartOfAccountsPage() {
     const authToken = Cookies.get("session_active");
 
     const loadPermissions = () => {
-        const savedPermissions = Cookies.get("user_permissions");
-        const currentToken = Cookies.get("session_active");
-
-        if (!savedPermissions || !currentToken) {
-            Cookies.remove("session_active");
-            Cookies.remove("user_permissions");
-            toast.error("Sesi Anda Telah Berakhir", {
-                description: "Silakan lakukan login ulang untuk mengamankan kredensial keuangan Anda.",
-                duration: 4000,
-            });
-            window.location.href = "/";
-            return;
-        }
-
-        try {
-            const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
-            if (Array.isArray(parsed)) {
-                setPermissions({
-                    create: parsed.includes("accounting:create"),
-                    read: parsed.includes("accounting:read"),
-                    update: parsed.includes("accounting:update"),
-                    delete: parsed.includes("accounting:delete"),
-                });
-            }
-        } catch (e) {
-            console.error("Gagal membaca cookie permissions akuntansi:", e);
-        }
+        if (!ensureSession()) return;
+        const list = readPermissionList() ?? [];
+        setPermissions({
+            create: list.includes("accounting:create"),
+            read: list.includes("accounting:read"),
+            update: list.includes("accounting:update"),
+            delete: list.includes("accounting:delete"),
+        });
     };
 
     const handleDeactivateConfirm = async () => {

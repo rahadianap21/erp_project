@@ -178,7 +178,7 @@ describe("sessionCookieOptions", () => {
     assert.equal(
       options.path,
       "/",
-      "path harus eksplisit agar konsisten dengan register-form",
+      "path harus eksplisit agar konsisten dengan login-form",
     );
   });
 });

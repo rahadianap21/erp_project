@@ -30,7 +30,7 @@ export type SessionKey = (typeof SESSION_REFRESH_KEYS)[number];
  * Cookie yang dulu ikut di-refresh tapi tidak pernah ditulis di mana pun:
  * - `user_role` dibaca di session-extender, tapi tidak pernah di-`Cookies.set`.
  * - `role_id` ditulis di session-extender dari `user_role` (jadi selalu
- *   `undefined`), sementara penulisan aslinya di register-form dikomentari.
+ *   `undefined`), sementara penulisan aslinya di login-form dikomentari.
  * Keduanya tidak pernah dibaca halaman mana pun, jadi dibuang di sini.
  */
 export const DEPRECATED_SESSION_KEYS = ['user_role', 'role_id'] as const;
