@@ -71,19 +71,21 @@ export function ComboboxSelect({
   const [isModalOpen, setIsModalOpen] = React.useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
 
-  const [parentCategoryOptions, setParentCategoryOptions] = React.useState<any[]>([]);
+  const [parentCategoryOptions, setParentCategoryOptions] = React.useState<
+    any[]
+  >([]);
 
   // Buffer State Kolektif Penampung Nilai Formulir Dinamis
   const [formFields, setFormFields] = React.useState({
     kode: "",
     name: "",
     description: "",
-    slug: "",         // 🌟 Tambahan untuk Kategori
+    slug: "", // 🌟 Tambahan untuk Kategori
     parentId: "",
     picName: "",
     phone: "",
     email: "",
-    address: ""
+    address: "",
   });
 
   const authToken = Cookies.get("session_active") || "";
@@ -107,7 +109,9 @@ export function ComboboxSelect({
 
     // Jika user mengetik kata kunci, saring dari seluruh isi 'effectiveOptions' di memori, lalu potong maksimal 10 baris saja
     return effectiveOptions
-      .filter((opt) => opt.label.toLowerCase().includes(searchValue.toLowerCase()))
+      .filter((opt) =>
+        opt.label.toLowerCase().includes(searchValue.toLowerCase())
+      )
       .slice(0, 10); // ✨ Kunci Efisiensi DOM: Batasi maksimal 10 data yang di-render di layar
   }, [effectiveOptions, searchValue]);
 
@@ -122,7 +126,7 @@ export function ComboboxSelect({
       const result = await apiGet<any[]>(`/api/categories?limit=100`);
       if (result.data) {
         setParentCategoryOptions(result.data);
-        console.log('Parent Category Options:', result.data);
+        console.log("Parent Category Options:", result.data);
       }
     } catch (err) {
       console.error("Gagal memuat opsi induk kategori di dalam modal:", err);
@@ -138,7 +142,9 @@ export function ComboboxSelect({
     const savedPermissions = Cookies.get("user_permissions");
     if (savedPermissions) {
       try {
-        const parsed: string[] = JSON.parse(decodeURIComponent(savedPermissions));
+        const parsed: string[] = JSON.parse(
+          decodeURIComponent(savedPermissions)
+        );
         if (Array.isArray(parsed)) {
           setHasPermission(parsed.includes(permissionCode));
         }
@@ -153,13 +159,25 @@ export function ComboboxSelect({
   const moduleMeta = React.useMemo(() => {
     const code = permissionCode || "";
     if (code.startsWith("units")) {
-      return { title: "Satuan Ukur / UoM Baru", endpoint: "/api/units", placeholder: "Contoh: PACK, ROLL, CRT" };
+      return {
+        title: "Satuan Ukur / UoM Baru",
+        endpoint: "/api/units",
+        placeholder: "Contoh: PACK, ROLL, CRT",
+      };
     }
     if (code.startsWith("categories")) {
-      return { title: "Kategori Produk Baru", endpoint: "/api/categories", placeholder: "Contoh: Bahan Baku Logistik" };
+      return {
+        title: "Kategori Produk Baru",
+        endpoint: "/api/categories",
+        placeholder: "Contoh: Bahan Baku Logistik",
+      };
     }
     if (code.startsWith("suppliers")) {
-      return { title: "Rekanan Vendor / Supplier Baru", endpoint: "/api/suppliers", placeholder: "Contoh: PT. Sumber Jaya" };
+      return {
+        title: "Rekanan Vendor / Supplier Baru",
+        endpoint: "/api/suppliers",
+        placeholder: "Contoh: PT. Sumber Jaya",
+      };
     }
     return { title: "Data Baru", endpoint: "", placeholder: "" };
   }, [permissionCode]);
@@ -176,14 +194,22 @@ export function ComboboxSelect({
     if (!authToken || !moduleMeta.endpoint) return;
 
     // Bersihkan format kode khusus untuk modul master satuan ukuran
-    const cleanKode = formFields.kode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const cleanKode = formFields.kode
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
 
     if (permissionCode?.startsWith("units") && cleanKode.length < 2) {
-      toast.error("Validasi Gagal", { description: "Kode satuan minimal terdiri dari 2 karakter alfanumerik murni!" });
+      toast.error("Validasi Gagal", {
+        description:
+          "Kode satuan minimal terdiri dari 2 karakter alfanumerik murni!",
+      });
       return;
     }
     if (!formFields.name.trim()) {
-      toast.error("Validasi Gagal", { description: "Nama bidang wajib diisi secara lengkap!" });
+      toast.error("Validasi Gagal", {
+        description: "Nama bidang wajib diisi secara lengkap!",
+      });
       return;
     }
 
@@ -191,18 +217,21 @@ export function ComboboxSelect({
     const toastId = toast.loading(`Mendaftarkan ${moduleMeta.title}...`);
 
     try {
-
       // Pembentukan skema Payload JSON adaptif mengikuti target endpoint backend Go
       let payload: any = {};
       if (permissionCode?.startsWith("units")) {
-        payload = { kode: cleanKode, name: formFields.name.trim(), description: formFields.description };
+        payload = {
+          kode: cleanKode,
+          name: formFields.name.trim(),
+          description: formFields.description,
+        };
       } else if (permissionCode?.startsWith("categories")) {
         payload = {
           name: formFields.name.trim(),
           slug: formFields.slug.trim() || undefined,
           description: formFields.description.trim() || "",
           parent_id: formFields.parentId ? Number(formFields.parentId) : null,
-          is_active: true
+          is_active: true,
         };
       } else if (permissionCode?.startsWith("suppliers")) {
         payload = {
@@ -212,17 +241,33 @@ export function ComboboxSelect({
           email: formFields.email.trim(),
           address: formFields.address.trim(),
           // village_id: formFields.villageId.trim(), // Kunci kelurahan penyeimbang foreign key
-          is_active: true
+          is_active: true,
         };
       }
 
-      const result = await apiPost<{ id?: number }>(moduleMeta.endpoint, payload, { redirectOn403: false });
+      const result = await apiPost<{ id?: number }>(
+        moduleMeta.endpoint,
+        payload,
+        { redirectOn403: false }
+      );
 
       if (result.ok) {
-        toast.success(`${moduleMeta.title} Sukses Ditambahkan`, { id: toastId });
+        toast.success(`${moduleMeta.title} Sukses Ditambahkan`, {
+          id: toastId,
+        });
 
         // Reset seluruh form buffer ke string kosong
-        setFormFields({ kode: "", name: "", description: "", slug: "", parentId: "", picName: "", phone: "", email: "", address: "" });
+        setFormFields({
+          kode: "",
+          name: "",
+          description: "",
+          slug: "",
+          parentId: "",
+          picName: "",
+          phone: "",
+          email: "",
+          address: "",
+        });
         setIsModalOpen(false);
 
         // Memicu trigger pembaruan list dropdown di form induk Next.js secara reaktif
@@ -236,7 +281,10 @@ export function ComboboxSelect({
         }
       }
     } catch (err: any) {
-      toast.error("Gagal Menyimpan data", { id: toastId, description: err.message });
+      toast.error("Gagal Menyimpan data", {
+        id: toastId,
+        description: err.message,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -287,7 +335,9 @@ export function ComboboxSelect({
                 value={item}
                 className="text-xs px-2.5 py-1.5 rounded-lg hover:bg-blue-50 hover:text-blue-700 data-[highlighted]:bg-blue-50 data-[highlighted]:text-blue-700 cursor-pointer flex items-center justify-between transition-colors font-medium"
               >
-                <span className="truncate block w-full text-left uppercase tracking-tight">{item.label}</span>
+                <span className="truncate block w-full text-left uppercase tracking-tight">
+                  {item.label}
+                </span>
               </ComboboxItem>
             ))}
           </ComboboxList>
@@ -299,9 +349,15 @@ export function ComboboxSelect({
               onClick={() => {
                 // Tangkap kata kunci ketikan pencarian terakhir sebagai input otomatis nama/kode awal
                 if (permissionCode?.startsWith("units")) {
-                  setFormFields((prev) => ({ ...prev, kode: searchValue.trim().toUpperCase() }));
+                  setFormFields((prev) => ({
+                    ...prev,
+                    kode: searchValue.trim().toUpperCase(),
+                  }));
                 } else {
-                  setFormFields((prev) => ({ ...prev, name: searchValue.trim() }));
+                  setFormFields((prev) => ({
+                    ...prev,
+                    name: searchValue.trim(),
+                  }));
                 }
                 setIsModalOpen(true);
               }}
@@ -323,17 +379,29 @@ export function ComboboxSelect({
         onOpenChange={(open) => {
           if (!open && !isSubmitting) {
             setIsModalOpen(false);
-            setFormFields({ kode: "", name: "", description: "", slug: "", parentId: "", picName: "", phone: "", email: "", address: "" });
+            setFormFields({
+              kode: "",
+              name: "",
+              description: "",
+              slug: "",
+              parentId: "",
+              picName: "",
+              phone: "",
+              email: "",
+              address: "",
+            });
           }
         }}
       >
         <DialogContent className="w-full !max-w-2xl sm:!max-w-2xl p-6 bg-white rounded-xl border shadow-lg z-50 !overflow-visible">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
-              <Plus className="size-4 text-blue-600" /> Registrasi {moduleMeta.title}
+              <Plus className="size-4 text-blue-600" /> Registrasi{" "}
+              {moduleMeta.title}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Formulir pembuatan kilat (*On the Fly*). Mohon lengkapi seluruh parameter logistik berikut dengan valid.
+              Formulir pembuatan kilat (*On the Fly*). Mohon lengkapi seluruh
+              parameter logistik berikut dengan valid.
             </DialogDescription>
           </DialogHeader>
 
@@ -343,16 +411,52 @@ export function ComboboxSelect({
             {permissionCode?.startsWith("units") && (
               <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Kode Satuan</label>
-                  <input type="text" required value={formFields.kode} onChange={(e) => setFormFields({ ...formFields, kode: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none uppercase font-mono" placeholder={moduleMeta.placeholder} />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Kode Satuan
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formFields.kode}
+                    onChange={(e) =>
+                      setFormFields({ ...formFields, kode: e.target.value })
+                    }
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none uppercase font-mono"
+                    placeholder={moduleMeta.placeholder}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Nama Lengkap Satuan</label>
-                  <input type="text" required value={formFields.name} onChange={(e) => setFormFields({ ...formFields, name: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium" placeholder="Contoh: GULUNGAN KABEL BESAR" />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Nama Lengkap Satuan
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formFields.name}
+                    onChange={(e) =>
+                      setFormFields({ ...formFields, name: e.target.value })
+                    }
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium"
+                    placeholder="Contoh: GULUNGAN KABEL BESAR"
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Deskripsi Satuan</label>
-                  <textarea rows={3} required value={formFields.description} onChange={(e) => setFormFields({ ...formFields, description: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium" placeholder="Contoh: GULUNGAN KABEL BESAR" />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Deskripsi Satuan
+                  </label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={formFields.description}
+                    onChange={(e) =>
+                      setFormFields({
+                        ...formFields,
+                        description: e.target.value,
+                      })
+                    }
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium"
+                    placeholder="Contoh: GULUNGAN KABEL BESAR"
+                  />
                 </div>
               </div>
             )}
@@ -363,34 +467,59 @@ export function ComboboxSelect({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
-                      <FolderTree className="size-3 text-blue-600" /> Nama Kategori
+                      <FolderTree className="size-3 text-blue-600" /> Nama
+                      Kategori
                     </label>
-                    <input type="text" required value={formFields.name} onChange={(e) => setFormFields({ ...formFields, name: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium focus:border-blue-500 focus:bg-white" placeholder={moduleMeta.placeholder} />
+                    <input
+                      type="text"
+                      required
+                      value={formFields.name}
+                      onChange={(e) =>
+                        setFormFields({ ...formFields, name: e.target.value })
+                      }
+                      className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium focus:border-blue-500 focus:bg-white"
+                      placeholder={moduleMeta.placeholder}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
-                      <Link2 className="size-3 text-slate-400" /> Slug Kustom (Opsional)
+                      <Link2 className="size-3 text-slate-400" /> Slug Kustom
+                      (Opsional)
                     </label>
-                    <input type="text" value={formFields.slug} onChange={(e) => setFormFields({ ...formFields, slug: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:border-blue-500 focus:bg-white" placeholder="Otomatis jika kosong" />
+                    <input
+                      type="text"
+                      value={formFields.slug}
+                      onChange={(e) =>
+                        setFormFields({ ...formFields, slug: e.target.value })
+                      }
+                      className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:border-blue-500 focus:bg-white"
+                      placeholder="Otomatis jika kosong"
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-1.5 relative">
                   <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
-                    <FolderTree className="size-3 text-blue-600" /> Induk Kategori (Hierarki)
+                    <FolderTree className="size-3 text-blue-600" /> Induk
+                    Kategori (Hierarki)
                   </label>
                   <ComboboxSelect
                     // 🌟 PERBAIKAN ABSOLUT: Sisipkan opsi kosong di urutan pertama array sebelum data database di-mapping
                     options={[
-                      { value: "", label: "--- JADIKAN KATEGORI UTAMA / TANPA INDUK ---" },
+                      {
+                        value: "",
+                        label: "--- JADIKAN KATEGORI UTAMA / TANPA INDUK ---",
+                      },
                       ...parentCategoryOptions.map((opt: any) => ({
                         value: String(opt.id),
-                        label: opt.name.toUpperCase()
-                      }))
+                        label: opt.name.toUpperCase(),
+                      })),
                     ]}
                     value={formFields.parentId}
                     placeholder="Pilih Kategori Induk..."
-                    onChange={(val) => setFormFields({ ...formFields, parentId: val })}
+                    onChange={(val) =>
+                      setFormFields({ ...formFields, parentId: val })
+                    }
                     emptyText="Kategori induk tidak ditemukan..."
                     popoverClassName="!w-[620px] !min-w-[620px] !max-w-2xl !z-50"
                   />
@@ -400,7 +529,18 @@ export function ComboboxSelect({
                   <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
                     <FileText className="size-3" /> Deskripsi Kategori
                   </label>
-                  <textarea value={formFields.description} onChange={(e) => setFormFields({ ...formFields, description: e.target.value })} rows={3} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-medium resize-none focus:border-blue-500 focus:bg-white" placeholder="Tulis catatan penjelasan klasifikasi barang di sini..." />
+                  <textarea
+                    value={formFields.description}
+                    onChange={(e) =>
+                      setFormFields({
+                        ...formFields,
+                        description: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-medium resize-none focus:border-blue-500 focus:bg-white"
+                    placeholder="Tulis catatan penjelasan klasifikasi barang di sini..."
+                  />
                 </div>
               </div>
             )}
@@ -409,26 +549,81 @@ export function ComboboxSelect({
             {permissionCode?.startsWith("suppliers") && (
               <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto pr-1">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Nama Resmi Perusahaan Vendor</label>
-                  <input type="text" required value={formFields.name} onChange={(e) => setFormFields({ ...formFields, name: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium" placeholder={moduleMeta.placeholder} />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Nama Resmi Perusahaan Vendor
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formFields.name}
+                    onChange={(e) =>
+                      setFormFields({ ...formFields, name: e.target.value })
+                    }
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium"
+                    placeholder={moduleMeta.placeholder}
+                  />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Nama Lengkap PIC Narahubung</label>
-                  <input type="text" required value={formFields.picName} onChange={(e) => setFormFields({ ...formFields, picName: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium" placeholder="Contoh: Hendra Wijaya" />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Nama Lengkap PIC Narahubung
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formFields.picName}
+                    onChange={(e) =>
+                      setFormFields({ ...formFields, picName: e.target.value })
+                    }
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium"
+                    placeholder="Contoh: Hendra Wijaya"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase">No. Telepon / Fax</label>
-                    <input type="text" required value={formFields.phone} onChange={(e) => setFormFields({ ...formFields, phone: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono" placeholder="021-555xxxx" />
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">
+                      No. Telepon / Fax
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formFields.phone}
+                      onChange={(e) =>
+                        setFormFields({ ...formFields, phone: e.target.value })
+                      }
+                      className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono"
+                      placeholder="021-555xxxx"
+                    />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase">Email Korespondensi</label>
-                    <input type="email" required value={formFields.email} onChange={(e) => setFormFields({ ...formFields, email: e.target.value })} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium" placeholder="vendor@company.com" />
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">
+                      Email Korespondensi
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formFields.email}
+                      onChange={(e) =>
+                        setFormFields({ ...formFields, email: e.target.value })
+                      }
+                      className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium"
+                      placeholder="vendor@company.com"
+                    />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">Alamat Operasional Pabrik / Kantor Utama</label>
-                  <textarea required value={formFields.address} onChange={(e) => setFormFields({ ...formFields, address: e.target.value })} rows={2} className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-medium resize-none" placeholder="Jl. Raya Industri Barat Blok H No. 12..." />
+                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    Alamat Operasional Pabrik / Kantor Utama
+                  </label>
+                  <textarea
+                    required
+                    value={formFields.address}
+                    onChange={(e) =>
+                      setFormFields({ ...formFields, address: e.target.value })
+                    }
+                    rows={2}
+                    className="w-full text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-slate-800 font-medium resize-none"
+                    placeholder="Jl. Raya Industri Barat Blok H No. 12..."
+                  />
                 </div>
               </div>
             )}
@@ -442,7 +637,17 @@ export function ComboboxSelect({
                 disabled={isSubmitting}
                 onClick={() => {
                   setIsModalOpen(false);
-                  setFormFields({ kode: "", name: "", description: "", slug: "", parentId: "", picName: "", phone: "", email: "", address: "" });
+                  setFormFields({
+                    kode: "",
+                    name: "",
+                    description: "",
+                    slug: "",
+                    parentId: "",
+                    picName: "",
+                    phone: "",
+                    email: "",
+                    address: "",
+                  });
                 }}
                 className="text-xs h-8 cursor-pointer"
               >
@@ -456,7 +661,11 @@ export function ComboboxSelect({
                 onClick={(e) => handleDynamicQuickSubmit(e as any)}
                 className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8 flex items-center gap-1 cursor-pointer"
               >
-                {isSubmitting ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />}
+                {isSubmitting ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Save className="size-3" />
+                )}
                 <span>Daftarkan Data</span>
               </Button>
             </DialogFooter>

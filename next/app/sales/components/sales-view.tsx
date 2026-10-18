@@ -1,14 +1,20 @@
-"use client"
+"use client";
 
 import { apiGet, apiPost } from "@/lib/api-client";
-import * as React from "react"
-import { readPermissionList } from "@/lib/permissions"
-import { BanIcon, ChevronLeftIcon, ChevronRightIcon, ReceiptTextIcon, SearchIcon } from "lucide-react"
-import { toast } from "sonner"
+import * as React from "react";
+import { readPermissionList } from "@/lib/permissions";
+import {
+  BanIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ReceiptTextIcon,
+  SearchIcon,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -16,149 +22,155 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { formatRupiah } from "@/app/pos/components/types"
+} from "@/components/ui/dialog";
+import { formatRupiah } from "@/app/pos/components/types";
 
 interface Sale {
-  id: number
-  sale_number: string
-  sale_date: string
-  member_id: number
-  member_name: string
-  tax_type: string
-  subtotal: number
-  item_discount: number
-  discount_amount: number
-  dpp_amount: number
-  tax_amount: number
-  total_amount: number
-  paid_amount: number
-  change_amount: number
-  payment_status: string
-  status: string
-  due_date?: string | null
+  id: number;
+  sale_number: string;
+  sale_date: string;
+  member_id: number;
+  member_name: string;
+  tax_type: string;
+  subtotal: number;
+  item_discount: number;
+  discount_amount: number;
+  dpp_amount: number;
+  tax_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  change_amount: number;
+  payment_status: string;
+  status: string;
+  due_date?: string | null;
   details?: {
-    id: number
-    product_name: string
-    qty: number
-    unit_price: number
-    line_total: number
-  }[]
-  payments?: { id: number; payment_method_name: string; amount: number }[]
+    id: number;
+    product_name: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+  }[];
+  payments?: { id: number; payment_method_name: string; amount: number }[];
 }
 
-const LIMIT = 20
+const LIMIT = 20;
 
 export function SalesView() {
-  const permissions = React.useMemo<string[]>(() => readPermissionList() ?? [], [])
-  const canVoid = permissions.includes("sales:void")
+  const permissions = React.useMemo<string[]>(
+    () => readPermissionList() ?? [],
+    []
+  );
+  const canVoid = permissions.includes("sales:void");
 
-  const [sales, setSales] = React.useState<Sale[]>([])
-  const [total, setTotal] = React.useState(0)
-  const [search, setSearch] = React.useState("")
-  const [status, setStatus] = React.useState("ALL")
-  const [cursor, setCursor] = React.useState(0)
-  const [direction, setDirection] = React.useState<"next" | "prev">("next")
-  const [history, setHistory] = React.useState<number[]>([])
-  const [loading, setLoading] = React.useState(false)
+  const [sales, setSales] = React.useState<Sale[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [search, setSearch] = React.useState("");
+  const [status, setStatus] = React.useState("ALL");
+  const [cursor, setCursor] = React.useState(0);
+  const [direction, setDirection] = React.useState<"next" | "prev">("next");
+  const [history, setHistory] = React.useState<number[]>([]);
+  const [loading, setLoading] = React.useState(false);
 
-  const [detail, setDetail] = React.useState<Sale | null>(null)
-  const [voidReason, setVoidReason] = React.useState("")
-  const [voiding, setVoiding] = React.useState(false)
-
+  const [detail, setDetail] = React.useState<Sale | null>(null);
+  const [voidReason, setVoidReason] = React.useState("");
+  const [voiding, setVoiding] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const params = new URLSearchParams()
-      if (search) params.set("search", search)
-      if (status !== "ALL") params.set("status", status)
-      params.set("limit", String(LIMIT))
-      params.set("direction", direction)
-      if (cursor) params.set("cursor_id", String(cursor))
-      const body = await apiGet<Sale[]>(`/api/sales?${params.toString()}`)
-      setSales(body.data ?? [])
-      setTotal(Number((body.body as { total?: number })?.total ?? 0))
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (status !== "ALL") params.set("status", status);
+      params.set("limit", String(LIMIT));
+      params.set("direction", direction);
+      if (cursor) params.set("cursor_id", String(cursor));
+      const body = await apiGet<Sale[]>(`/api/sales?${params.toString()}`);
+      setSales(body.data ?? []);
+      setTotal(Number((body.body as { total?: number })?.total ?? 0));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat penjualan")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memuat penjualan"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [search, status, cursor, direction])
+  }, [search, status, cursor, direction]);
 
   React.useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
 
   const openDetail = async (id: number) => {
     try {
-      const body = await apiGet<Sale>(`/api/sales?id=${id}`)
-      setDetail(body.data)
+      const body = await apiGet<Sale>(`/api/sales?id=${id}`);
+      setDetail(body.data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat detail")
+      toast.error(err instanceof Error ? err.message : "Gagal memuat detail");
     }
-  }
+  };
 
   const resetToFirstPage = () => {
-    setCursor(0)
-    setDirection("next")
-    setHistory([])
-  }
+    setCursor(0);
+    setDirection("next");
+    setHistory([]);
+  };
 
   const goNext = () => {
-    if (sales.length === 0) return
-    setHistory((h) => [...h, cursor])
-    setCursor(sales[sales.length - 1].id)
-    setDirection("next")
-  }
+    if (sales.length === 0) return;
+    setHistory((h) => [...h, cursor]);
+    setCursor(sales[sales.length - 1].id);
+    setDirection("next");
+  };
 
   const goPrev = () => {
     if (history.length === 0) {
-      resetToFirstPage()
-      return
+      resetToFirstPage();
+      return;
     }
-    const prevCursor = history[history.length - 1]
-    setHistory((h) => h.slice(0, -1))
-    setDirection("prev")
-    setCursor(prevCursor || (sales.length > 0 ? sales[0].id : 0))
-  }
+    const prevCursor = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    setDirection("prev");
+    setCursor(prevCursor || (sales.length > 0 ? sales[0].id : 0));
+  };
 
   const handleVoid = async () => {
-    if (!detail) return
-    setVoiding(true)
+    if (!detail) return;
+    setVoiding(true);
     try {
-      await apiPost(`/api/sales/void?id=${detail.id}`, { reason: voidReason })
-      toast.success("Penjualan dibatalkan")
-      setDetail(null)
-      setVoidReason("")
-      resetToFirstPage()
-      load()
+      await apiPost(`/api/sales/void?id=${detail.id}`, { reason: voidReason });
+      toast.success("Penjualan dibatalkan");
+      setDetail(null);
+      setVoidReason("");
+      resetToFirstPage();
+      load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal membatalkan")
+      toast.error(err instanceof Error ? err.message : "Gagal membatalkan");
     } finally {
-      setVoiding(false)
+      setVoiding(false);
     }
-  }
+  };
 
   const statusBadge = (s: string) =>
     s === "VOID" ? (
       <Badge variant="destructive">VOID</Badge>
     ) : (
       <Badge variant="secondary">POSTED</Badge>
-    )
+    );
 
   const paymentBadge = (s: string) => {
-    if (s === "PAID") return <Badge className="bg-emerald-600 text-white">PAID</Badge>
-    if (s === "PARTIAL") return <Badge variant="outline">PARTIAL</Badge>
-    return <Badge variant="outline">UNPAID</Badge>
-  }
+    if (s === "PAID")
+      return <Badge className="bg-emerald-600 text-white">PAID</Badge>;
+    if (s === "PARTIAL") return <Badge variant="outline">PARTIAL</Badge>;
+    return <Badge variant="outline">UNPAID</Badge>;
+  };
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <ReceiptTextIcon className="size-5 text-blue-600" /> Riwayat Penjualan
+            <ReceiptTextIcon className="size-5 text-blue-600" /> Riwayat
+            Penjualan
           </h1>
           <p className="text-xs text-muted-foreground">
             {total} transaksi penjualan tercatat.
@@ -170,8 +182,8 @@ export function SalesView() {
             <Input
               value={search}
               onChange={(e) => {
-                setSearch(e.target.value)
-                resetToFirstPage()
+                setSearch(e.target.value);
+                resetToFirstPage();
               }}
               placeholder="Cari nomor / pelanggan"
               className="h-9 w-56 pl-9"
@@ -180,8 +192,8 @@ export function SalesView() {
           <select
             value={status}
             onChange={(e) => {
-              setStatus(e.target.value)
-              resetToFirstPage()
+              setStatus(e.target.value);
+              resetToFirstPage();
             }}
             className="h-9 rounded-md border bg-background px-2 text-sm"
           >
@@ -208,13 +220,19 @@ export function SalesView() {
           <tbody>
             {loading && sales.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Memuat...
                 </td>
               </tr>
             ) : sales.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Belum ada transaksi.
                 </td>
               </tr>
@@ -226,11 +244,19 @@ export function SalesView() {
                   onClick={() => openDetail(s.id)}
                 >
                   <td className="px-3 py-2 font-medium">{s.sale_number}</td>
-                  <td className="px-3 py-2">{new Date(s.sale_date).toLocaleDateString("id-ID")}</td>
+                  <td className="px-3 py-2">
+                    {new Date(s.sale_date).toLocaleDateString("id-ID")}
+                  </td>
                   <td className="px-3 py-2">{s.member_name || "Umum"}</td>
-                  <td className="px-3 py-2 text-right">{formatRupiah(s.total_amount)}</td>
-                  <td className="px-3 py-2 text-right">{formatRupiah(s.paid_amount)}</td>
-                  <td className="px-3 py-2">{paymentBadge(s.payment_status)}</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatRupiah(s.total_amount)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatRupiah(s.paid_amount)}
+                  </td>
+                  <td className="px-3 py-2">
+                    {paymentBadge(s.payment_status)}
+                  </td>
                   <td className="px-3 py-2">{statusBadge(s.status)}</td>
                 </tr>
               ))
@@ -277,9 +303,12 @@ export function SalesView() {
                 {(detail.details ?? []).map((d) => (
                   <div key={d.id} className="flex justify-between gap-2">
                     <span className="truncate">
-                      {d.product_name} <span className="text-muted-foreground">×{d.qty}</span>
+                      {d.product_name}{" "}
+                      <span className="text-muted-foreground">×{d.qty}</span>
                     </span>
-                    <span className="shrink-0">{formatRupiah(d.line_total)}</span>
+                    <span className="shrink-0">
+                      {formatRupiah(d.line_total)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -289,7 +318,9 @@ export function SalesView() {
               </div>
               <div className="flex justify-between">
                 <span>Diskon</span>
-                <span>-{formatRupiah(detail.item_discount + detail.discount_amount)}</span>
+                <span>
+                  -{formatRupiah(detail.item_discount + detail.discount_amount)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span>PPN</span>
@@ -327,7 +358,8 @@ export function SalesView() {
                     onClick={handleVoid}
                     disabled={voiding}
                   >
-                    <BanIcon /> {voiding ? "Membatalkan..." : "Batalkan Penjualan"}
+                    <BanIcon />{" "}
+                    {voiding ? "Membatalkan..." : "Batalkan Penjualan"}
                   </Button>
                 </div>
               )}
@@ -335,12 +367,16 @@ export function SalesView() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" className="cursor-pointer" onClick={() => setDetail(null)}>
+            <Button
+              variant="outline"
+              className="cursor-pointer"
+              onClick={() => setDetail(null)}
+            >
               Tutup
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </main>
-  )
+  );
 }

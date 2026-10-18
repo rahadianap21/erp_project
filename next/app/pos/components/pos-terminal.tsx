@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
 import { apiGet, apiPost } from "@/lib/api-client";
-import * as React from "react"
+import * as React from "react";
 import {
   MinusIcon,
   PlusIcon,
@@ -11,14 +11,14 @@ import {
   Trash2Icon,
   UserIcon,
   XIcon,
-} from "lucide-react"
-import { toast } from "sonner"
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { PaymentDialog } from "./payment-dialog"
-import { ReceiptDialog } from "./receipt-dialog"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PaymentDialog } from "./payment-dialog";
+import { ReceiptDialog } from "./receipt-dialog";
 import {
   CartLine,
   Member,
@@ -28,30 +28,30 @@ import {
   Sale,
   formatRupiah,
   round2,
-} from "./types"
+} from "./types";
 
 const DISCOUNT_OPTIONS = [
   { value: "NONE", label: "Tanpa Diskon" },
   { value: "PERCENT", label: "Persen (%)" },
   { value: "AMOUNT", label: "Nominal (Rp)" },
-]
+];
 
 interface Totals {
-  subtotal: number
-  itemDiscount: number
-  invoiceDiscount: number
-  dpp: number
-  tax: number
-  total: number
-  redeemAmount: number
-  usedPoints: number
-  maxRedeemPoints: number
-  pointsEarned: number
+  subtotal: number;
+  itemDiscount: number;
+  invoiceDiscount: number;
+  dpp: number;
+  tax: number;
+  total: number;
+  redeemAmount: number;
+  usedPoints: number;
+  maxRedeemPoints: number;
+  pointsEarned: number;
 }
 
-const POINT_VALUE = 100
-const POINT_EARN_PER = 100000
-const REDEEM_MAX_RATIO = 0.5
+const POINT_VALUE = 100;
+const POINT_EARN_PER = 100000;
+const REDEEM_MAX_RATIO = 0.5;
 
 function calculateTotals(
   cart: CartLine[],
@@ -62,61 +62,61 @@ function calculateTotals(
   redeemPoints = 0,
   availablePoints = 0
 ): Totals {
-  const lineNet: number[] = []
-  let subtotal = 0
-  let itemDiscount = 0
+  const lineNet: number[] = [];
+  let subtotal = 0;
+  let itemDiscount = 0;
   for (const line of cart) {
-    const gross = round2(line.qty * line.unitPrice)
-    const disc = lineDiscount(line.discountType, line.discountValue, gross)
-    subtotal += gross
-    itemDiscount += disc
-    lineNet.push(round2(gross - disc))
+    const gross = round2(line.qty * line.unitPrice);
+    const disc = lineDiscount(line.discountType, line.discountValue, gross);
+    subtotal += gross;
+    itemDiscount += disc;
+    lineNet.push(round2(gross - disc));
   }
-  subtotal = round2(subtotal)
-  itemDiscount = round2(itemDiscount)
+  subtotal = round2(subtotal);
+  itemDiscount = round2(itemDiscount);
 
-  const netBefore = round2(subtotal - itemDiscount)
-  const invoiceDiscount = lineDiscount(discountType, discountValue, netBefore)
-  const invAlloc = allocateProportional(invoiceDiscount, lineNet)
-  const postInvNet = lineNet.map((n, i) => round2(n - invAlloc[i]))
+  const netBefore = round2(subtotal - itemDiscount);
+  const invoiceDiscount = lineDiscount(discountType, discountValue, netBefore);
+  const invAlloc = allocateProportional(invoiceDiscount, lineNet);
+  const postInvNet = lineNet.map((n, i) => round2(n - invAlloc[i]));
 
   // Pajak dihitung PER BARIS: hanya produk ber-flag is_taxable yang dikenai PPN.
   const lineTax = (net: number, taxable: boolean) => {
-    if (!taxable) return { dpp: round2(net), tax: 0 }
+    if (!taxable) return { dpp: round2(net), tax: 0 };
     if (taxMode === "EXCLUSIVE") {
-      const dpp = round2(net)
-      return { dpp, tax: round2(dpp * taxRate) }
+      const dpp = round2(net);
+      return { dpp, tax: round2(dpp * taxRate) };
     }
-    const dpp = round2(net / (1 + taxRate))
-    return { dpp, tax: round2(net - dpp) }
-  }
+    const dpp = round2(net / (1 + taxRate));
+    return { dpp, tax: round2(net - dpp) };
+  };
 
   // Batas tukar poin: tidak melebihi 50% total nota DAN tidak melebihi saldo member.
-  let preTotal = 0
+  let preTotal = 0;
   for (let i = 0; i < cart.length; i++) {
-    const t = lineTax(postInvNet[i], cart[i].product.is_taxable)
-    preTotal += t.dpp + t.tax
+    const t = lineTax(postInvNet[i], cart[i].product.is_taxable);
+    preTotal += t.dpp + t.tax;
   }
-  preTotal = round2(preTotal)
-  const notaCapPoints = Math.floor((preTotal * REDEEM_MAX_RATIO) / POINT_VALUE)
-  const cappedAvailable = Math.floor(Math.max(availablePoints, 0))
-  const maxRedeemPoints = Math.min(notaCapPoints, cappedAvailable)
-  const requestedPoints = Math.max(0, Math.floor(redeemPoints))
-  const usedPoints = Math.min(requestedPoints, maxRedeemPoints)
-  const redeemAmount = round2(usedPoints * POINT_VALUE)
-  const redeemAlloc = allocateProportional(redeemAmount, postInvNet)
+  preTotal = round2(preTotal);
+  const notaCapPoints = Math.floor((preTotal * REDEEM_MAX_RATIO) / POINT_VALUE);
+  const cappedAvailable = Math.floor(Math.max(availablePoints, 0));
+  const maxRedeemPoints = Math.min(notaCapPoints, cappedAvailable);
+  const requestedPoints = Math.max(0, Math.floor(redeemPoints));
+  const usedPoints = Math.min(requestedPoints, maxRedeemPoints);
+  const redeemAmount = round2(usedPoints * POINT_VALUE);
+  const redeemAlloc = allocateProportional(redeemAmount, postInvNet);
 
-  let dpp = 0
-  let tax = 0
+  let dpp = 0;
+  let tax = 0;
   for (let i = 0; i < cart.length; i++) {
-    const finalNet = round2(postInvNet[i] - redeemAlloc[i])
-    const t = lineTax(finalNet, cart[i].product.is_taxable)
-    dpp += t.dpp
-    tax += t.tax
+    const finalNet = round2(postInvNet[i] - redeemAlloc[i]);
+    const t = lineTax(finalNet, cart[i].product.is_taxable);
+    dpp += t.dpp;
+    tax += t.tax;
   }
-  dpp = round2(dpp)
-  tax = round2(tax)
-  const total = round2(dpp + tax)
+  dpp = round2(dpp);
+  tax = round2(tax);
+  const total = round2(dpp + tax);
   return {
     subtotal,
     itemDiscount,
@@ -128,143 +128,148 @@ function calculateTotals(
     usedPoints,
     maxRedeemPoints,
     pointsEarned: Math.floor(total / POINT_EARN_PER),
-  }
+  };
 }
 
 // allocateProportional membagi total ke tiap baris sebanding bobot dengan
 // koreksi pembulatan largest-remainder, agar jumlah alokasi tepat = total.
 function allocateProportional(total: number, weights: number[]): number[] {
-  const out = weights.map(() => 0)
-  if (!weights.length) return out
-  const totalR = round2(total)
-  if (totalR === 0) return out
-  let sumW = 0
-  for (const w of weights) if (w > 0) sumW += w
-  if (sumW <= 0) return out
+  const out = weights.map(() => 0);
+  if (!weights.length) return out;
+  const totalR = round2(total);
+  if (totalR === 0) return out;
+  let sumW = 0;
+  for (const w of weights) if (w > 0) sumW += w;
+  if (sumW <= 0) return out;
 
-  const fracs: { idx: number; rem: number }[] = []
-  let allocated = 0
+  const fracs: { idx: number; rem: number }[] = [];
+  let allocated = 0;
   for (let i = 0; i < weights.length; i++) {
-    const w = weights[i]
-    if (w <= 0) continue
-    const exact = (totalR * w) / sumW
-    const floorCents = Math.floor(exact * 100 + 1e-9) / 100
-    out[i] = floorCents
-    allocated = round2(allocated + floorCents)
-    fracs.push({ idx: i, rem: exact - floorCents })
+    const w = weights[i];
+    if (w <= 0) continue;
+    const exact = (totalR * w) / sumW;
+    const floorCents = Math.floor(exact * 100 + 1e-9) / 100;
+    out[i] = floorCents;
+    allocated = round2(allocated + floorCents);
+    fracs.push({ idx: i, rem: exact - floorCents });
   }
-  let remaining = Math.round((totalR - allocated) * 100)
-  if (remaining > fracs.length) remaining = fracs.length
+  let remaining = Math.round((totalR - allocated) * 100);
+  if (remaining > fracs.length) remaining = fracs.length;
   for (let k = 0; k < remaining && fracs.length > 0; k++) {
-    let best = 0
+    let best = 0;
     for (let j = 1; j < fracs.length; j++) {
-      if (fracs[j].rem > fracs[best].rem) best = j
+      if (fracs[j].rem > fracs[best].rem) best = j;
     }
-    out[fracs[best].idx] = round2(out[fracs[best].idx] + 0.01)
-    fracs[best].rem -= 0.01
+    out[fracs[best].idx] = round2(out[fracs[best].idx] + 0.01);
+    fracs[best].rem -= 0.01;
   }
-  return out
+  return out;
 }
 
 function lineDiscount(type: string, value: number, base: number): number {
   if (type === "PERCENT") {
-    const pct = Math.min(Math.max(value, 0), 100)
-    return round2((base * pct) / 100)
+    const pct = Math.min(Math.max(value, 0), 100);
+    return round2((base * pct) / 100);
   }
   if (type === "AMOUNT") {
-    return round2(Math.min(Math.max(value, 0), base))
+    return round2(Math.min(Math.max(value, 0), base));
   }
-  return 0
+  return 0;
 }
 
 export function PosTerminal() {
+  const [bootstrap, setBootstrap] = React.useState<POSBootstrap | null>(null);
+  const [products, setProducts] = React.useState<POSProduct[]>([]);
+  const [search, setSearch] = React.useState("");
+  const [loadingProducts, setLoadingProducts] = React.useState(false);
 
-  const [bootstrap, setBootstrap] = React.useState<POSBootstrap | null>(null)
-  const [products, setProducts] = React.useState<POSProduct[]>([])
-  const [search, setSearch] = React.useState("")
-  const [loadingProducts, setLoadingProducts] = React.useState(false)
+  const [cart, setCart] = React.useState<CartLine[]>([]);
+  const [member, setMember] = React.useState<Member | null>(null);
+  const [memberQuery, setMemberQuery] = React.useState("");
+  const [memberResults, setMemberResults] = React.useState<Member[]>([]);
+  const [showMemberResults, setShowMemberResults] = React.useState(false);
+  const [redeemPoints, setRedeemPoints] = React.useState(0);
 
-  const [cart, setCart] = React.useState<CartLine[]>([])
-  const [member, setMember] = React.useState<Member | null>(null)
-  const [memberQuery, setMemberQuery] = React.useState("")
-  const [memberResults, setMemberResults] = React.useState<Member[]>([])
-  const [showMemberResults, setShowMemberResults] = React.useState(false)
-  const [redeemPoints, setRedeemPoints] = React.useState(0)
+  const [discountType, setDiscountType] = React.useState("NONE");
+  const [discountValue, setDiscountValue] = React.useState(0);
 
-  const [discountType, setDiscountType] = React.useState("NONE")
-  const [discountValue, setDiscountValue] = React.useState(0)
+  const [paymentOpen, setPaymentOpen] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+  const [receipt, setReceipt] = React.useState<Sale | null>(null);
 
-  const [paymentOpen, setPaymentOpen] = React.useState(false)
-  const [submitting, setSubmitting] = React.useState(false)
-  const [receipt, setReceipt] = React.useState<Sale | null>(null)
+  const searchRef = React.useRef<HTMLInputElement>(null);
 
-  const searchRef = React.useRef<HTMLInputElement>(null)
-
-  const showProducts = search.trim().length > 0
-
+  const showProducts = search.trim().length > 0;
 
   const loadBootstrap = React.useCallback(async () => {
     try {
-      const body = await apiGet<POSBootstrap>(`/api/pos/bootstrap`)
-      setBootstrap(body.data)
+      const body = await apiGet<POSBootstrap>(`/api/pos/bootstrap`);
+      setBootstrap(body.data);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat data kasir")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memuat data kasir"
+      );
     }
-  }, [])
+  }, []);
 
   const loadProducts = React.useCallback(async () => {
-    setLoadingProducts(true)
+    setLoadingProducts(true);
     try {
-      const params = new URLSearchParams()
-      if (search) params.set("search", search)
-      params.set("limit", "120")
-      const body = await apiGet<POSProduct[]>(`/api/pos/products?${params.toString()}`)
-      setProducts(body.data ?? [])
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      params.set("limit", "120");
+      const body = await apiGet<POSProduct[]>(
+        `/api/pos/products?${params.toString()}`
+      );
+      setProducts(body.data ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat produk")
+      toast.error(err instanceof Error ? err.message : "Gagal memuat produk");
     } finally {
-      setLoadingProducts(false)
+      setLoadingProducts(false);
     }
-  }, [search])
+  }, [search]);
 
   React.useEffect(() => {
-    loadBootstrap()
-  }, [loadBootstrap])
+    loadBootstrap();
+  }, [loadBootstrap]);
 
   React.useEffect(() => {
     if (!showProducts) {
-      setProducts([])
-      return
+      setProducts([]);
+      return;
     }
     const timer = setTimeout(() => {
-      loadProducts()
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [showProducts, loadProducts])
+      loadProducts();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [showProducts, loadProducts]);
 
   React.useEffect(() => {
-    searchRef.current?.focus()
-  }, [])
+    searchRef.current?.focus();
+  }, []);
 
   React.useEffect(() => {
     if (!memberQuery.trim()) {
-      setMemberResults([])
-      return
+      setMemberResults([]);
+      return;
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await apiGet<Member[]>(`/api/pos/members?search=${encodeURIComponent(memberQuery)}&limit=10`, { redirectOn403: false })
-        setMemberResults(res.data ?? [])
-        setShowMemberResults(true)
+        const res = await apiGet<Member[]>(
+          `/api/pos/members?search=${encodeURIComponent(memberQuery)}&limit=10`,
+          { redirectOn403: false }
+        );
+        setMemberResults(res.data ?? []);
+        setShowMemberResults(true);
       } catch {
         /* abaikan pencarian member */
       }
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [memberQuery])
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [memberQuery]);
 
-  const taxRate = bootstrap?.tax_rate ?? 0.12
-  const taxMode = bootstrap?.tax_mode ?? "INCLUSIVE"
+  const taxRate = bootstrap?.tax_rate ?? 0.12;
+  const taxMode = bootstrap?.tax_mode ?? "INCLUSIVE";
   const totals = React.useMemo(
     () =>
       calculateTotals(
@@ -277,26 +282,27 @@ export function PosTerminal() {
         member?.points ?? 0
       ),
     [cart, taxMode, discountType, discountValue, taxRate, redeemPoints, member]
-  )
+  );
 
   // Tukar poin tidak sah bila jumlah yang diminta melebihi batas (saldo/50% nota).
-  const redeemInvalid = member !== null && Math.floor(redeemPoints) > totals.maxRedeemPoints
+  const redeemInvalid =
+    member !== null && Math.floor(redeemPoints) > totals.maxRedeemPoints;
 
   const addToCart = (product: POSProduct) => {
     if (product.current_stock <= 0) {
-      toast.error("Stok barang habis")
-      return
+      toast.error("Stok barang habis");
+      return;
     }
     setCart((prev) => {
-      const existing = prev.find((l) => l.product.id === product.id)
+      const existing = prev.find((l) => l.product.id === product.id);
       if (existing) {
         if (existing.qty >= product.current_stock) {
-          toast.error(`Stok ${product.name} tersisa ${product.current_stock}`)
-          return prev
+          toast.error(`Stok ${product.name} tersisa ${product.current_stock}`);
+          return prev;
         }
         return prev.map((l) =>
           l.product.id === product.id ? { ...l, qty: l.qty + 1 } : l
-        )
+        );
       }
       return [
         ...prev,
@@ -307,40 +313,40 @@ export function PosTerminal() {
           discountType: product.discount_type || "NONE",
           discountValue: product.discount_value || 0,
         },
-      ]
-    })
-  }
+      ];
+    });
+  };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return
-    e.preventDefault()
+    if (e.key !== "Enter") return;
+    e.preventDefault();
     if (products.length > 0) {
-      addToCart(products[0])
-      setSearch("")
+      addToCart(products[0]);
+      setSearch("");
     }
-  }
+  };
 
   const changeQty = (productID: number, delta: number) => {
     setCart((prev) =>
       prev
         .map((l) => {
-          if (l.product.id !== productID) return l
-          const qty = l.qty + delta
-          return { ...l, qty }
+          if (l.product.id !== productID) return l;
+          const qty = l.qty + delta;
+          return { ...l, qty };
         })
         .filter((l) => l.qty > 0)
-    )
-  }
+    );
+  };
 
   const clearCart = () => {
-    setCart([])
-    setDiscountType("NONE")
-    setDiscountValue(0)
-    setMember(null)
-    setRedeemPoints(0)
-    setMemberQuery("")
-    setMemberResults([])
-  }
+    setCart([]);
+    setDiscountType("NONE");
+    setDiscountValue(0);
+    setMember(null);
+    setRedeemPoints(0);
+    setMemberQuery("");
+    setMemberResults([]);
+  };
 
   const buildItems = () =>
     cart.map((l) => ({
@@ -349,18 +355,18 @@ export function PosTerminal() {
       unit_price: l.unitPrice,
       discount_type: l.discountType,
       discount_value: l.discountValue,
-    }))
+    }));
 
   const submitSale = async (payments: PaymentDraft[], notes: string) => {
     if (redeemInvalid) {
-      toast.error("Tukar poin tidak valid — periksa saldo poin member")
-      return
+      toast.error("Tukar poin tidak valid — periksa saldo poin member");
+      return;
     }
     if (!payments.length) {
-      toast.error("Pilih dan masukkan pembayaran terlebih dahulu")
-      return
+      toast.error("Pilih dan masukkan pembayaran terlebih dahulu");
+      return;
     }
-    setSubmitting(true)
+    setSubmitting(true);
     try {
       const payload = {
         member_id: member?.id ?? 0,
@@ -375,26 +381,28 @@ export function PosTerminal() {
           amount: p.amount,
           reference_number: p.referenceNumber,
         })),
-      }
-      const body = await apiPost<Sale>(`/api/sales`, payload)
-      setPaymentOpen(false)
-      setReceipt(body.data)
-      clearCart()
-      setSearch("")
+      };
+      const body = await apiPost<Sale>(`/api/sales`, payload);
+      setPaymentOpen(false);
+      setReceipt(body.data);
+      clearCart();
+      setSearch("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan penjualan")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menyimpan penjualan"
+      );
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
-  }
+  };
 
   const selectMember = (m: Member) => {
-    setMember(m)
-    setMemberQuery("")
-    setMemberResults([])
-    setShowMemberResults(false)
-    setRedeemPoints(0)
-  }
+    setMember(m);
+    setMemberQuery("");
+    setMemberResults([]);
+    setShowMemberResults(false);
+    setRedeemPoints(0);
+  };
 
   return (
     <div className="mx-auto grid h-[calc(100svh-3.5rem)] w-full max-w-[2560px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_370px] xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_420px] 3xl:grid-cols-[minmax(0,1fr)_500px] 4xl:h-[calc(100svh-4rem)] 4xl:grid-cols-[minmax(0,1fr)_600px]">
@@ -423,7 +431,9 @@ export function PosTerminal() {
               </p>
             </div>
           ) : loadingProducts && products.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Mencari produk...</p>
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Mencari produk...
+            </p>
           ) : products.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               Produk tidak ditemukan.
@@ -431,9 +441,10 @@ export function PosTerminal() {
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 3xl:gap-4 4xl:gap-5">
               {products.map((p) => {
-                const habis = p.current_stock <= 0
-                const stokTipis = !habis && p.current_stock <= 5
-                const adaDiskon = p.discount_type !== "NONE" && p.discount_value > 0
+                const habis = p.current_stock <= 0;
+                const stokTipis = !habis && p.current_stock <= 5;
+                const adaDiskon =
+                  p.discount_type !== "NONE" && p.discount_value > 0;
                 return (
                   <button
                     key={p.id}
@@ -450,7 +461,9 @@ export function PosTerminal() {
                       </span>
                     )}
 
-                    <div className={`min-w-0 space-y-1 ${adaDiskon ? "pr-12" : ""}`}>
+                    <div
+                      className={`min-w-0 space-y-1 ${adaDiskon ? "pr-12" : ""}`}
+                    >
                       <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900 3xl:text-base 4xl:text-lg">
                         {p.name}
                       </p>
@@ -465,12 +478,13 @@ export function PosTerminal() {
                         {formatRupiah(p.selling_price)}
                       </span>
                       <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold 3xl:text-xs 4xl:text-sm ${habis
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold 3xl:text-xs 4xl:text-sm ${
+                          habis
                             ? "bg-destructive/10 text-destructive"
                             : stokTipis
                               ? "bg-amber-100 text-amber-700"
                               : "bg-muted text-muted-foreground"
-                          }`}
+                        }`}
                       >
                         {habis
                           ? "Habis"
@@ -480,7 +494,7 @@ export function PosTerminal() {
                       </span>
                     </div>
                   </button>
-                )
+                );
               })}
             </div>
           )}
@@ -494,7 +508,9 @@ export function PosTerminal() {
             {member ? (
               <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 py-2 pl-9 pr-2 4xl:py-3">
                 <div className="min-w-0">
-                  <span className="block truncate text-sm font-medium 4xl:text-base">{member.name}</span>
+                  <span className="block truncate text-sm font-medium 4xl:text-base">
+                    {member.name}
+                  </span>
                   <span className="block text-xs text-muted-foreground 4xl:text-sm">
                     {member.code} · {member.points} poin
                   </span>
@@ -504,8 +520,8 @@ export function PosTerminal() {
                   size="icon-sm"
                   className="cursor-pointer"
                   onClick={() => {
-                    setMember(null)
-                    setRedeemPoints(0)
+                    setMember(null);
+                    setRedeemPoints(0);
                   }}
                 >
                   <XIcon />
@@ -530,7 +546,9 @@ export function PosTerminal() {
                     onClick={() => selectMember(m)}
                   >
                     <span>{m.name}</span>
-                    <span className="text-xs text-muted-foreground">{m.code}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {m.code}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -550,7 +568,9 @@ export function PosTerminal() {
                   min={0}
                   max={totals.maxRedeemPoints}
                   value={redeemPoints}
-                  onChange={(e) => setRedeemPoints(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) =>
+                    setRedeemPoints(Math.max(0, Number(e.target.value)))
+                  }
                   className="h-9 w-24 text-sm 4xl:h-11 4xl:w-28 4xl:text-base"
                 />
               </div>
@@ -560,7 +580,8 @@ export function PosTerminal() {
                 </p>
               ) : redeemInvalid ? (
                 <p className="text-[10px] font-medium text-rose-600">
-                  Jumlah tukar poin melebihi batas — maksimal {totals.maxRedeemPoints} poin.
+                  Jumlah tukar poin melebihi batas — maksimal{" "}
+                  {totals.maxRedeemPoints} poin.
                 </p>
               ) : totals.maxRedeemPoints <= 0 ? (
                 <p className="text-[10px] font-medium text-rose-600">
@@ -575,17 +596,25 @@ export function PosTerminal() {
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               <ShoppingCartIcon className="size-10 opacity-40 4xl:size-14" />
-              <p className="text-sm 4xl:text-base">Keranjang kosong. Ketuk produk untuk menambah.</p>
+              <p className="text-sm 4xl:text-base">
+                Keranjang kosong. Ketuk produk untuk menambah.
+              </p>
             </div>
           ) : (
             <div className="space-y-2 4xl:space-y-3">
               {cart.map((line) => (
-                <div key={line.product.id} className="rounded-lg border p-3 4xl:p-4">
+                <div
+                  key={line.product.id}
+                  className="rounded-lg border p-3 4xl:p-4"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium 4xl:text-base">{line.product.name}</p>
+                      <p className="truncate text-sm font-medium 4xl:text-base">
+                        {line.product.name}
+                      </p>
                       <p className="text-xs text-muted-foreground 4xl:text-sm">
-                        {formatRupiah(line.unitPrice)} / {line.product.selling_unit || "pcs"}
+                        {formatRupiah(line.unitPrice)} /{" "}
+                        {line.product.selling_unit || "pcs"}
                       </p>
                     </div>
                     <Button
@@ -607,7 +636,9 @@ export function PosTerminal() {
                       >
                         <MinusIcon />
                       </Button>
-                      <span className="w-8 text-center text-sm font-medium 4xl:w-10 4xl:text-base">{line.qty}</span>
+                      <span className="w-8 text-center text-sm font-medium 4xl:w-10 4xl:text-base">
+                        {line.qty}
+                      </span>
                       <Button
                         variant="outline"
                         size="icon-sm"
@@ -618,7 +649,16 @@ export function PosTerminal() {
                       </Button>
                     </div>
                     <span className="text-sm font-semibold 4xl:text-base">
-                      {formatRupiah(round2(line.qty * line.unitPrice - lineDiscount(line.discountType, line.discountValue, round2(line.qty * line.unitPrice))))}
+                      {formatRupiah(
+                        round2(
+                          line.qty * line.unitPrice -
+                            lineDiscount(
+                              line.discountType,
+                              line.discountValue,
+                              round2(line.qty * line.unitPrice)
+                            )
+                        )
+                      )}
                     </span>
                   </div>
                   {line.discountType !== "NONE" && line.discountValue > 0 && (
@@ -637,7 +677,9 @@ export function PosTerminal() {
 
         <div className="space-y-3 border-t p-4 3xl:p-5 4xl:space-y-4 4xl:p-6">
           <div className="grid gap-1">
-            <Label className="text-xs text-muted-foreground 4xl:text-sm">Diskon Nota</Label>
+            <Label className="text-xs text-muted-foreground 4xl:text-sm">
+              Diskon Nota
+            </Label>
             <div className="flex gap-1">
               <select
                 value={discountType}
@@ -669,7 +711,9 @@ export function PosTerminal() {
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Diskon</span>
-              <span>-{formatRupiah(totals.itemDiscount + totals.invoiceDiscount)}</span>
+              <span>
+                -{formatRupiah(totals.itemDiscount + totals.invoiceDiscount)}
+              </span>
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>DPP</span>
@@ -730,5 +774,5 @@ export function PosTerminal() {
 
       <ReceiptDialog sale={receipt} onClose={() => setReceipt(null)} />
     </div>
-  )
+  );
 }

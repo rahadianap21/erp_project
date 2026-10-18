@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
-import * as React from "react"
-import { CreditCardIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import { toast } from "sonner"
+import * as React from "react";
+import { CreditCardIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,20 +16,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 interface PaymentMethod {
-  id: number
-  code: string
-  name: string
-  channel: string
-  account_id?: number | null
-  is_cash: boolean
-  sort_order: number
-  is_active: boolean
+  id: number;
+  code: string;
+  name: string;
+  channel: string;
+  account_id?: number | null;
+  is_cash: boolean;
+  sort_order: number;
+  is_active: boolean;
 }
 
-const CHANNELS = ["CASH", "BANK", "EWALLET", "CREDIT"]
+const CHANNELS = ["CASH", "BANK", "EWALLET", "CREDIT"];
 
 const emptyForm = {
   code: "",
@@ -39,41 +39,42 @@ const emptyForm = {
   is_cash: false,
   sort_order: 0,
   is_active: true,
-}
+};
 
 export function PaymentMethodsView() {
-
-  const [methods, setMethods] = React.useState<PaymentMethod[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [editing, setEditing] = React.useState<PaymentMethod | null>(null)
-  const [form, setForm] = React.useState(emptyForm)
-  const [saving, setSaving] = React.useState(false)
+  const [methods, setMethods] = React.useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<PaymentMethod | null>(null);
+  const [form, setForm] = React.useState(emptyForm);
+  const [saving, setSaving] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const body = await apiGet<PaymentMethod[]>(`/api/payment-methods`)
-      setMethods(body.data ?? [])
+      const body = await apiGet<PaymentMethod[]>(`/api/payment-methods`);
+      setMethods(body.data ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat metode pembayaran")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memuat metode pembayaran"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   React.useEffect(() => {
-    load()
-  }, [load])
+    load();
+  }, [load]);
 
   const openCreate = () => {
-    setEditing(null)
-    setForm(emptyForm)
-    setDialogOpen(true)
-  }
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
+  };
 
   const openEdit = (m: PaymentMethod) => {
-    setEditing(m)
+    setEditing(m);
     setForm({
       code: m.code,
       name: m.name,
@@ -82,16 +83,16 @@ export function PaymentMethodsView() {
       is_cash: m.is_cash,
       sort_order: m.sort_order,
       is_active: m.is_active,
-    })
-    setDialogOpen(true)
-  }
+    });
+    setDialogOpen(true);
+  };
 
   const save = async () => {
     if (!form.code.trim() || !form.name.trim()) {
-      toast.error("Kode dan nama wajib diisi")
-      return
+      toast.error("Kode dan nama wajib diisi");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
       const payload = {
         code: form.code,
@@ -101,38 +102,43 @@ export function PaymentMethodsView() {
         is_cash: form.is_cash,
         sort_order: form.sort_order,
         is_active: form.is_active,
-      }
+      };
       const url = editing
         ? `/api/payment-methods?id=${editing.id}`
-        : `/api/payment-methods`
-      await (editing ? apiPut(url, payload) : apiPost(url, payload))
-      toast.success(editing ? "Metode diperbarui" : "Metode ditambahkan")
-      setDialogOpen(false)
-      load()
+        : `/api/payment-methods`;
+      await (editing ? apiPut(url, payload) : apiPost(url, payload));
+      toast.success(editing ? "Metode diperbarui" : "Metode ditambahkan");
+      setDialogOpen(false);
+      load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan metode pembayaran")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menyimpan metode pembayaran"
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const remove = async (m: PaymentMethod) => {
-    if (!window.confirm(`Hapus metode ${m.name}?`)) return
+    if (!window.confirm(`Hapus metode ${m.name}?`)) return;
     try {
-      await apiDelete(`/api/payment-methods?id=${m.id}`)
-      toast.success("Metode dihapus")
-      load()
+      await apiDelete(`/api/payment-methods?id=${m.id}`);
+      toast.success("Metode dihapus");
+      load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menghapus metode")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menghapus metode"
+      );
     }
-  }
+  };
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
       <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <CreditCardIcon className="size-5 text-blue-600" /> Metode Pembayaran
+            <CreditCardIcon className="size-5 text-blue-600" /> Metode
+            Pembayaran
           </h1>
           <p className="text-xs text-muted-foreground">
             Kanal pembayaran POS dan akun kas/bank/E-wallet tujuannya.
@@ -159,13 +165,19 @@ export function PaymentMethodsView() {
           <tbody>
             {loading && methods.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Memuat...
                 </td>
               </tr>
             ) : methods.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Belum ada metode pembayaran.
                 </td>
               </tr>
@@ -177,7 +189,9 @@ export function PaymentMethodsView() {
                   <td className="px-3 py-2">
                     <Badge variant="outline">{m.channel}</Badge>
                   </td>
-                  <td className="px-3 py-2 text-right">{m.account_id ?? "-"}</td>
+                  <td className="px-3 py-2 text-right">
+                    {m.account_id ?? "-"}
+                  </td>
                   <td className="px-3 py-2 text-right">{m.sort_order}</td>
                   <td className="px-3 py-2">
                     {m.is_active ? (
@@ -216,7 +230,9 @@ export function PaymentMethodsView() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Ubah Metode Pembayaran" : "Tambah Metode Pembayaran"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Ubah Metode Pembayaran" : "Tambah Metode Pembayaran"}
+            </DialogTitle>
             <DialogDescription>
               Kanal CREDIT tidak memerlukan akun (sisa menjadi piutang).
             </DialogDescription>
@@ -256,7 +272,9 @@ export function PaymentMethodsView() {
               <Input
                 type="number"
                 value={form.account_id}
-                onChange={(e) => setForm({ ...form, account_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, account_id: e.target.value })
+                }
                 placeholder="Kosongkan untuk kredit"
               />
             </div>
@@ -265,7 +283,9 @@ export function PaymentMethodsView() {
               <Input
                 type="number"
                 value={form.sort_order}
-                onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })}
+                onChange={(e) =>
+                  setForm({ ...form, sort_order: Number(e.target.value) })
+                }
               />
             </div>
             <div className="flex items-end gap-4">
@@ -273,7 +293,9 @@ export function PaymentMethodsView() {
                 <input
                   type="checkbox"
                   checked={form.is_cash}
-                  onChange={(e) => setForm({ ...form, is_cash: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, is_cash: e.target.checked })
+                  }
                 />
                 Kas
               </label>
@@ -281,7 +303,9 @@ export function PaymentMethodsView() {
                 <input
                   type="checkbox"
                   checked={form.is_active}
-                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, is_active: e.target.checked })
+                  }
                 />
                 Aktif
               </label>
@@ -303,5 +327,5 @@ export function PaymentMethodsView() {
         </DialogContent>
       </Dialog>
     </main>
-  )
+  );
 }

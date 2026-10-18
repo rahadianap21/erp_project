@@ -1,13 +1,9 @@
-import { RouteShell } from "@/components/layout/route-shell"
+import { RouteShell } from "@/components/layout/route-shell";
 
 export default async function SalesLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <RouteShell title="Penjualan">
-      {children}
-    </RouteShell>
-  )
+  return <RouteShell title="Penjualan">{children}</RouteShell>;
 }

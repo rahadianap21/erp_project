@@ -1,30 +1,30 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { PrinterIcon } from "lucide-react"
+import * as React from "react";
+import { PrinterIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Badge } from "@/components/ui/badge"
-import { Sale, formatRupiah } from "./types"
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Sale, formatRupiah } from "./types";
 
 interface ReceiptDialogProps {
-  sale: Sale | null
-  onClose: () => void
+  sale: Sale | null;
+  onClose: () => void;
 }
 
 export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
-  if (!sale) return null
+  if (!sale) return null;
 
   const handlePrint = () => {
-    const win = window.open("", "_blank", "width=380,height=640")
-    if (!win) return
+    const win = window.open("", "_blank", "width=380,height=640");
+    if (!win) return;
     const rows = (sale.details ?? [])
       .map(
         (d) => `<tr>
@@ -33,7 +33,7 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
           <td style="text-align:right">${formatRupiah(d.line_total)}</td>
         </tr>`
       )
-      .join("")
+      .join("");
     const payments = (sale.payments ?? [])
       .map(
         (p) =>
@@ -41,9 +41,10 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
             p.amount
           )}</span></div>`
       )
-      .join("")
-    const unpaid = sale.total_amount - sale.paid_amount
-    win.document.write(`<!doctype html><html><head><title>${sale.sale_number}</title>
+      .join("");
+    const unpaid = sale.total_amount - sale.paid_amount;
+    win.document
+      .write(`<!doctype html><html><head><title>${sale.sale_number}</title>
       <style>
         body{font-family:monospace;font-size:12px;margin:8px}
         h2{text-align:center;margin:4px 0}
@@ -96,11 +97,11 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
       }
       <div class="sep"></div>
       <div style="text-align:center">Terima kasih</div>
-      </body></html>`)
-    win.document.close()
-    win.focus()
-    win.print()
-  }
+      </body></html>`);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
 
   return (
     <Dialog open={!!sale} onOpenChange={(open) => !open && onClose()}>
@@ -121,7 +122,8 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
             {(sale.details ?? []).map((d) => (
               <div key={d.id} className="flex justify-between gap-2">
                 <span className="truncate">
-                  {d.product_name} <span className="text-muted-foreground">×{d.qty}</span>
+                  {d.product_name}{" "}
+                  <span className="text-muted-foreground">×{d.qty}</span>
                 </span>
                 <span className="shrink-0">{formatRupiah(d.line_total)}</span>
               </div>
@@ -133,7 +135,9 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
           </div>
           <div className="flex justify-between">
             <span>Diskon</span>
-            <span>-{formatRupiah(sale.item_discount + sale.discount_amount)}</span>
+            <span>
+              -{formatRupiah(sale.item_discount + sale.discount_amount)}
+            </span>
           </div>
           {sale.tax_amount > 0.001 && (
             <>
@@ -182,7 +186,11 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" className="cursor-pointer" onClick={handlePrint}>
+          <Button
+            variant="outline"
+            className="cursor-pointer"
+            onClick={handlePrint}
+          >
             <PrinterIcon /> Cetak
           </Button>
           <Button className="cursor-pointer" onClick={onClose}>
@@ -191,7 +199,7 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function escapeHtml(value: string): string {
@@ -199,5 +207,5 @@ function escapeHtml(value: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
+    .replace(/"/g, "&quot;");
 }

@@ -1,14 +1,21 @@
-"use client"
+"use client";
 
 import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
-import * as React from "react"
-import { HistoryIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon, Users2Icon } from "lucide-react"
-import { toast } from "sonner"
+import * as React from "react";
+import {
+  HistoryIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  Trash2Icon,
+  Users2Icon,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,28 +23,28 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/ui/dialog";
 
 interface Member {
-  id: number
-  code: string
-  name: string
-  phone: string
-  email: string
-  address: string
-  default_term_days: number
-  points: number
-  is_active: boolean
+  id: number;
+  code: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  default_term_days: number;
+  points: number;
+  is_active: boolean;
 }
 
 interface PointEntry {
-  id: number
-  entry_type: string
-  points: number
-  balance_after: number
-  sale_number?: string
-  note: string
-  created_at: string
+  id: number;
+  entry_type: string;
+  points: number;
+  balance_after: number;
+  sale_number?: string;
+  note: string;
+  created_at: string;
 }
 
 const emptyForm = {
@@ -48,7 +55,7 @@ const emptyForm = {
   address: "",
   default_term_days: 0,
   is_active: true,
-}
+};
 
 const POINT_TYPE_LABEL: Record<string, string> = {
   EARN: "Perolehan",
@@ -56,50 +63,49 @@ const POINT_TYPE_LABEL: Record<string, string> = {
   EARN_REVERSAL: "Batal Perolehan",
   REDEEM_REVERSAL: "Batal Tukar",
   ADJUST: "Penyesuaian",
-}
+};
 
 export function MembersView() {
+  const [members, setMembers] = React.useState<Member[]>([]);
+  const [search, setSearch] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState<Member | null>(null);
+  const [form, setForm] = React.useState(emptyForm);
+  const [saving, setSaving] = React.useState(false);
 
-  const [members, setMembers] = React.useState<Member[]>([])
-  const [search, setSearch] = React.useState("")
-  const [loading, setLoading] = React.useState(false)
-  const [dialogOpen, setDialogOpen] = React.useState(false)
-  const [editing, setEditing] = React.useState<Member | null>(null)
-  const [form, setForm] = React.useState(emptyForm)
-  const [saving, setSaving] = React.useState(false)
-
-  const [historyMember, setHistoryMember] = React.useState<Member | null>(null)
-  const [entries, setEntries] = React.useState<PointEntry[]>([])
-  const [loadingHistory, setLoadingHistory] = React.useState(false)
+  const [historyMember, setHistoryMember] = React.useState<Member | null>(null);
+  const [entries, setEntries] = React.useState<PointEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = React.useState(false);
 
   const load = React.useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const params = new URLSearchParams()
-      if (search) params.set("search", search)
-      params.set("limit", "100")
-      const body = await apiGet<Member[]>(`/api/members?${params.toString()}`)
-      setMembers(body.data ?? [])
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      params.set("limit", "100");
+      const body = await apiGet<Member[]>(`/api/members?${params.toString()}`);
+      setMembers(body.data ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat member")
+      toast.error(err instanceof Error ? err.message : "Gagal memuat member");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [search])
+  }, [search]);
 
   React.useEffect(() => {
-    const timer = setTimeout(load, 250)
-    return () => clearTimeout(timer)
-  }, [load])
+    const timer = setTimeout(load, 250);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   const openCreate = () => {
-    setEditing(null)
-    setForm(emptyForm)
-    setDialogOpen(true)
-  }
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
+  };
 
   const openEdit = (m: Member) => {
-    setEditing(m)
+    setEditing(m);
     setForm({
       code: m.code,
       name: m.name,
@@ -108,53 +114,61 @@ export function MembersView() {
       address: m.address,
       default_term_days: m.default_term_days,
       is_active: m.is_active,
-    })
-    setDialogOpen(true)
-  }
+    });
+    setDialogOpen(true);
+  };
 
   const save = async () => {
     if (!form.code.trim() || !form.name.trim()) {
-      toast.error("Kode dan nama wajib diisi")
-      return
+      toast.error("Kode dan nama wajib diisi");
+      return;
     }
-    setSaving(true)
+    setSaving(true);
     try {
-      const url = editing ? `/api/members?id=${editing.id}` : `/api/members`
-      await (editing ? apiPut(url, form) : apiPost(url, form))
-      toast.success(editing ? "Member diperbarui" : "Member ditambahkan")
-      setDialogOpen(false)
-      load()
+      const url = editing ? `/api/members?id=${editing.id}` : `/api/members`;
+      await (editing ? apiPut(url, form) : apiPost(url, form));
+      toast.success(editing ? "Member diperbarui" : "Member ditambahkan");
+      setDialogOpen(false);
+      load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menyimpan member")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menyimpan member"
+      );
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   const remove = async (m: Member) => {
-    if (!window.confirm(`Hapus member ${m.name}?`)) return
+    if (!window.confirm(`Hapus member ${m.name}?`)) return;
     try {
-      await apiDelete(`/api/members?id=${m.id}`)
-      toast.success("Member dihapus")
-      load()
+      await apiDelete(`/api/members?id=${m.id}`);
+      toast.success("Member dihapus");
+      load();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal menghapus member")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal menghapus member"
+      );
     }
-  }
+  };
 
   const openHistory = async (m: Member) => {
-    setHistoryMember(m)
-    setEntries([])
-    setLoadingHistory(true)
+    setHistoryMember(m);
+    setEntries([]);
+    setLoadingHistory(true);
     try {
-      const body = await apiGet<PointEntry[]>(`/api/members/points?id=${m.id}&limit=50`)
-      setEntries(body.data ?? [])
+      const body = await apiGet<PointEntry[]>(
+        `/api/members/points?id=${m.id}&limit=50`
+      );
+      setEntries(body.data ?? []);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Gagal memuat riwayat poin")
+      toast.error(
+        err instanceof Error ? err.message : "Gagal memuat riwayat poin"
+      );
     } finally {
-      setLoadingHistory(false)
+      setLoadingHistory(false);
     }
-  }
+  };
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
@@ -199,13 +213,19 @@ export function MembersView() {
           <tbody>
             {loading && members.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Memuat...
                 </td>
               </tr>
             ) : members.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={7}
+                  className="px-3 py-10 text-center text-muted-foreground"
+                >
                   Belum ada member.
                 </td>
               </tr>
@@ -215,8 +235,12 @@ export function MembersView() {
                   <td className="px-3 py-2 font-medium">{m.code}</td>
                   <td className="px-3 py-2">{m.name}</td>
                   <td className="px-3 py-2">{m.phone || "-"}</td>
-                  <td className="px-3 py-2 text-right font-medium text-amber-700">{m.points}</td>
-                  <td className="px-3 py-2 text-right">{m.default_term_days}</td>
+                  <td className="px-3 py-2 text-right font-medium text-amber-700">
+                    {m.points}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {m.default_term_days}
+                  </td>
                   <td className="px-3 py-2">
                     {m.is_active ? (
                       <Badge variant="secondary">Aktif</Badge>
@@ -263,7 +287,9 @@ export function MembersView() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editing ? "Ubah Member" : "Tambah Member"}</DialogTitle>
+            <DialogTitle>
+              {editing ? "Ubah Member" : "Tambah Member"}
+            </DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="grid gap-1">
@@ -309,7 +335,10 @@ export function MembersView() {
                 min={0}
                 value={form.default_term_days}
                 onChange={(e) =>
-                  setForm({ ...form, default_term_days: Number(e.target.value) })
+                  setForm({
+                    ...form,
+                    default_term_days: Number(e.target.value),
+                  })
                 }
               />
             </div>
@@ -318,7 +347,9 @@ export function MembersView() {
                 <input
                   type="checkbox"
                   checked={form.is_active}
-                  onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                  onChange={(e) =>
+                    setForm({ ...form, is_active: e.target.checked })
+                  }
                 />
                 Aktif
               </label>
@@ -340,7 +371,10 @@ export function MembersView() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!historyMember} onOpenChange={(open) => !open && setHistoryMember(null)}>
+      <Dialog
+        open={!!historyMember}
+        onOpenChange={(open) => !open && setHistoryMember(null)}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Riwayat Poin</DialogTitle>
@@ -350,7 +384,9 @@ export function MembersView() {
           </DialogHeader>
           <div className="max-h-80 space-y-1 overflow-auto">
             {loadingHistory ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">Memuat...</p>
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Memuat...
+              </p>
             ) : entries.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
                 Belum ada transaksi poin.
@@ -362,7 +398,9 @@ export function MembersView() {
                   className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
                 >
                   <div className="min-w-0">
-                    <p className="font-medium">{POINT_TYPE_LABEL[e.entry_type] ?? e.entry_type}</p>
+                    <p className="font-medium">
+                      {POINT_TYPE_LABEL[e.entry_type] ?? e.entry_type}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {new Date(e.created_at).toLocaleString("id-ID")}
                       {e.sale_number ? ` · ${e.sale_number}` : ""}
@@ -370,10 +408,16 @@ export function MembersView() {
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className={e.points >= 0 ? "text-emerald-600" : "text-rose-600"}>
+                    <p
+                      className={
+                        e.points >= 0 ? "text-emerald-600" : "text-rose-600"
+                      }
+                    >
                       {e.points >= 0 ? `+${e.points}` : e.points}
                     </p>
-                    <p className="text-xs text-muted-foreground">saldo {e.balance_after}</p>
+                    <p className="text-xs text-muted-foreground">
+                      saldo {e.balance_after}
+                    </p>
                   </div>
                 </div>
               ))
@@ -382,5 +426,5 @@ export function MembersView() {
         </DialogContent>
       </Dialog>
     </main>
-  )
+  );
 }

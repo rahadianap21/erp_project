@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -26,26 +26,26 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   useSidebar,
-} from "@/components/ui/sidebar"
-import { ChevronRightIcon } from "lucide-react"
-import { motion } from "framer-motion"
-import { useEffect, useState } from "react"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/sidebar";
+import { ChevronRightIcon } from "lucide-react";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 type NavSubItem = {
-  title: string
-  url: string
-  icon?: React.ComponentType<{ className?: string }>
-}
+  title: string;
+  url: string;
+  icon?: React.ComponentType<{ className?: string }>;
+};
 
 type NavItem = {
-  title: string
-  url: string
-  icon?: React.ComponentType<{ className?: string }>
-  isActive?: boolean
-  permission?: string
-  items?: NavSubItem[]
-}
+  title: string;
+  url: string;
+  icon?: React.ComponentType<{ className?: string }>;
+  isActive?: boolean;
+  permission?: string;
+  items?: NavSubItem[];
+};
 
 // NavCollapsible mengelola sendiri status buka/tutup grup menu. State-nya
 // controlled supaya Base UI tidak memperingatkan perubahan `defaultOpen`
@@ -55,16 +55,16 @@ function NavCollapsible({
   isCurrentActive,
   pathname,
 }: {
-  item: NavItem
-  isCurrentActive: boolean
-  pathname: string
+  item: NavItem;
+  isCurrentActive: boolean;
+  pathname: string;
 }) {
-  const Icon = item.icon
-  const [open, setOpen] = useState(isCurrentActive)
+  const Icon = item.icon;
+  const [open, setOpen] = useState(isCurrentActive);
 
   useEffect(() => {
-    setOpen(isCurrentActive)
-  }, [isCurrentActive])
+    setOpen(isCurrentActive);
+  }, [isCurrentActive]);
 
   return (
     <Collapsible
@@ -74,7 +74,9 @@ function NavCollapsible({
       render={<SidebarMenuItem />}
     >
       <CollapsibleTrigger
-        render={<SidebarMenuButton tooltip={item.title} isActive={isCurrentActive} />}
+        render={
+          <SidebarMenuButton tooltip={item.title} isActive={isCurrentActive} />
+        }
       >
         {Icon && <Icon className="h-4 w-4" />}
         <span>{item.title}</span>
@@ -88,12 +90,18 @@ function NavCollapsible({
             animate={{
               height: "auto",
               opacity: 1,
-              transition: { height: { duration: 0.25, ease: "easeOut" }, opacity: { duration: 0.2 } }
+              transition: {
+                height: { duration: 0.25, ease: "easeOut" },
+                opacity: { duration: 0.2 },
+              },
             }}
             exit={{
               height: 0,
               opacity: 0,
-              transition: { height: { duration: 0.2, ease: "easeIn" }, opacity: { duration: 0.15 } }
+              transition: {
+                height: { duration: 0.2, ease: "easeIn" },
+                opacity: { duration: 0.15 },
+              },
             }}
             style={{ overflow: "hidden" }}
           />
@@ -101,8 +109,8 @@ function NavCollapsible({
       >
         <SidebarMenuSub>
           {item.items?.map((subItem) => {
-            const isSubActive = pathname === subItem.url
-            const SubIcon = subItem.icon
+            const isSubActive = pathname === subItem.url;
+            const SubIcon = subItem.icon;
             return (
               <SidebarMenuSubItem key={subItem.title}>
                 <SidebarMenuSubButton
@@ -113,33 +121,30 @@ function NavCollapsible({
                   <span>{subItem.title}</span>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
-            )
+            );
           })}
         </SidebarMenuSub>
       </CollapsibleContent>
     </Collapsible>
-  )
+  );
 }
 
-export function NavMain({
-  items,
-}: {
-  items: NavItem[]
-}) {
-  const pathname = usePathname()
-  const { state, isMobile } = useSidebar()
-  const isCollapsed = state === "collapsed" && !isMobile
+export function NavMain({ items }: { items: NavItem[] }) {
+  const pathname = usePathname();
+  const { state, isMobile } = useSidebar();
+  const isCollapsed = state === "collapsed" && !isMobile;
 
   return (
     <SidebarGroup>
       <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => {
-          const Icon = item.icon
-          const hasSubItems = Boolean(item.items && item.items.length > 0)
+          const Icon = item.icon;
+          const hasSubItems = Boolean(item.items && item.items.length > 0);
           const isCurrentActive =
             item.isActive ??
-            (item.url === pathname || Boolean(item.items?.some((sub) => sub.url === pathname)))
+            (item.url === pathname ||
+              Boolean(item.items?.some((sub) => sub.url === pathname)));
 
           // Jika tidak ada child items, render sebagai link biasa
           if (!hasSubItems) {
@@ -154,7 +159,7 @@ export function NavMain({
                   <span>{item.title}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-            )
+            );
           }
 
           // Ketika sidebar tertutup (collapsed icon mode):
@@ -188,27 +193,30 @@ export function NavMain({
                     <DropdownMenuSeparator className="bg-sidebar-border" />
                     <DropdownMenuGroup>
                       {item.items?.map((subItem) => {
-                        const isSubActive = pathname === subItem.url
-                        const SubIcon = subItem.icon
+                        const isSubActive = pathname === subItem.url;
+                        const SubIcon = subItem.icon;
                         return (
                           <DropdownMenuItem
                             key={subItem.title}
                             render={<Link href={subItem.url} />}
                             className={cn(
                               "cursor-pointer flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors",
-                              isSubActive && "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
+                              isSubActive &&
+                                "bg-sidebar-accent font-medium text-sidebar-accent-foreground"
                             )}
                           >
-                            {SubIcon && <SubIcon className="h-4 w-4 shrink-0" />}
+                            {SubIcon && (
+                              <SubIcon className="h-4 w-4 shrink-0" />
+                            )}
                             <span>{subItem.title}</span>
                           </DropdownMenuItem>
-                        )
+                        );
                       })}
                     </DropdownMenuGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </SidebarMenuItem>
-            )
+            );
           }
 
           // Ketika sidebar terbuka (expanded) atau di mobile:
@@ -220,10 +228,9 @@ export function NavMain({
               isCurrentActive={isCurrentActive}
               pathname={pathname}
             />
-          )
+          );
         })}
       </SidebarMenu>
     </SidebarGroup>
-  )
+  );
 }
-

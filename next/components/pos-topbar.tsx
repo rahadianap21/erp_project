@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import Cookies from "js-cookie"
-import { LogOutIcon } from "lucide-react"
+import Cookies from "js-cookie";
+import { LogOutIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 
 // auth_token tidak ada di sini karena httpOnly: hanya route handler
 // /api/auth/logout yang bisa menghapusnya.
@@ -13,22 +13,22 @@ const SESSION_KEYS = [
   "user_name",
   "user_permissions",
   "user_app",
-]
+];
 
 export function PosTopbar({ user }: { user: { name: string; email: string } }) {
   const handleLogout = async () => {
     for (const key of SESSION_KEYS) {
-      Cookies.remove(key, { path: "/" })
+      Cookies.remove(key, { path: "/" });
     }
 
     try {
-      await fetch("/api/auth/logout", { method: "POST" })
+      await fetch("/api/auth/logout", { method: "POST" });
     } catch (err) {
-      console.error("Gagal logout:", err)
+      console.error("Gagal logout:", err);
     }
 
-    window.location.replace("/")
-  }
+    window.location.replace("/");
+  };
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 4xl:h-16 4xl:px-8">
@@ -53,5 +53,5 @@ export function PosTopbar({ user }: { user: { name: string; email: string } }) {
         </Button>
       </div>
     </header>
-  )
+  );
 }

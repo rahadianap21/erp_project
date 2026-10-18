@@ -19,7 +19,7 @@ describe("buildSessionRefresh", () => {
 
     assert.ok(
       "user_permissions" in refresh,
-      "user_permissions wajib ada, kalau tidak cookie ini hilang 15 menit setelah login",
+      "user_permissions wajib ada, kalau tidak cookie ini hilang 15 menit setelah login"
     );
     assert.equal(refresh.user_permissions, "nilai");
   });
@@ -47,7 +47,7 @@ describe("buildSessionRefresh", () => {
 
   it("melewati nilai kosong", () => {
     const refresh = buildSessionRefresh((key) =>
-      key === "user_email" ? "a@b.c" : "",
+      key === "user_email" ? "a@b.c" : ""
     );
 
     assert.deepEqual(refresh, { user_email: "a@b.c" });
@@ -55,7 +55,7 @@ describe("buildSessionRefresh", () => {
 
   it("melewati nilai undefined", () => {
     const refresh = buildSessionRefresh((key) =>
-      key === "user_permissions" ? undefined : "x",
+      key === "user_permissions" ? undefined : "x"
     );
 
     assert.equal("user_permissions" in refresh, false);
@@ -81,7 +81,7 @@ describe("buildSessionRefresh", () => {
       assert.equal(
         key in refresh,
         false,
-        `${key} sudah tidak dipakai dan harus dibuang`,
+        `${key} sudah tidak dipakai dan harus dibuang`
       );
     }
   });
@@ -89,7 +89,7 @@ describe("buildSessionRefresh", () => {
   it("mengembalikan objek kosong saat tidak ada cookie sama sekali", () => {
     assert.deepEqual(
       buildSessionRefresh(() => undefined),
-      {},
+      {}
     );
   });
 
@@ -100,7 +100,7 @@ describe("buildSessionRefresh", () => {
     assert.notEqual(
       first,
       second,
-      "fungsi harus murni, tidak boleh mengembalikan objek bersama",
+      "fungsi harus murni, tidak boleh mengembalikan objek bersama"
     );
     assert.deepEqual(first, second);
   });
@@ -137,7 +137,7 @@ describe("buildSessionRefresh", () => {
     });
     assert.equal(
       requested.every((key) => key.length > 0),
-      true,
+      true
     );
   });
 });
@@ -148,7 +148,7 @@ describe("SESSION_REFRESH_KEYS", () => {
       assert.equal(
         (SESSION_REFRESH_KEYS as readonly string[]).includes(key),
         false,
-        `${key} tidak boleh ada di daftar refresh`,
+        `${key} tidak boleh ada di daftar refresh`
       );
     }
   });
@@ -174,11 +174,11 @@ describe("sessionCookieOptions", () => {
 
     assert.equal(options.expires, expires);
     assert.equal(options.sameSite, "lax");
-    assert.equal(options.secure, process.env.NODE_ENV === 'production');
+    assert.equal(options.secure, process.env.NODE_ENV === "production");
     assert.equal(
       options.path,
       "/",
-      "path harus eksplisit agar konsisten dengan login-form",
+      "path harus eksplisit agar konsisten dengan login-form"
     );
   });
 });

@@ -1,11 +1,11 @@
-import { RouteShell } from "@/components/layout/route-shell"
-import { Input } from "@/components/ui/input"
-import { SearchIcon } from "lucide-react"
+import { RouteShell } from "@/components/layout/route-shell";
+import { Input } from "@/components/ui/input";
+import { SearchIcon } from "lucide-react";
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <RouteShell
@@ -24,5 +24,5 @@ export default async function DashboardLayout({
     >
       {children}
     </RouteShell>
-  )
+  );
 }

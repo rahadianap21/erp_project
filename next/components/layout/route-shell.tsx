@@ -1,11 +1,11 @@
-import { getSessionData } from "@/lib/session"
-import { AppSidebar } from "@/components/app-sidebar"
+import { getSessionData } from "@/lib/session";
+import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,17 +13,17 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+} from "@/components/ui/breadcrumb";
 
 // RouteShell adalah satu-satunya layout halaman ber-sidebar: sidebar + header
 // sticky + breadcrumb. Halaman cukup meneruskan judul (dan opsional aksi
 // header) alih-alih menyalin komposisi ini.
 interface RouteShellProps {
   /** Label breadcrumb terakhir, mis. "Users Management". */
-  title: string
-  children: React.ReactNode
+  title: string;
+  children: React.ReactNode;
   /** Konten opsional di ujung kanan header (mis. kotak pencarian). */
-  headerActions?: React.ReactNode
+  headerActions?: React.ReactNode;
 }
 
 export async function RouteShell({
@@ -31,7 +31,7 @@ export async function RouteShell({
   children,
   headerActions,
 }: RouteShellProps) {
-  const { permissions, user } = await getSessionData()
+  const { permissions, user } = await getSessionData();
 
   return (
     <SidebarProvider>
@@ -63,5 +63,5 @@ export async function RouteShell({
         {children}
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

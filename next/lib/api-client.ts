@@ -6,66 +6,66 @@
 // membalas ulang body + status apa adanya.
 
 export interface ApiEnvelope<T = unknown> {
-  status: number
-  data: T | null
-  message: string | null
-  ok: boolean
+  status: number;
+  data: T | null;
+  message: string | null;
+  ok: boolean;
   /** Body JSON utuh — dipakai caller yang butuh field lain (mis. `total`). */
-  body: unknown
+  body: unknown;
 }
 
 export class ApiError extends Error {
-  readonly status: number
-  readonly body: unknown
+  readonly status: number;
+  readonly body: unknown;
 
   constructor(status: number, message: string, body?: unknown) {
-    super(message)
-    this.name = "ApiError"
-    this.status = status
-    this.body = body
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
   }
 }
 
 interface RequestOptions extends Omit<RequestInit, "body"> {
   /** Body JSON; otomatis di-stringify. Jangan isi `body` mentah di sini. */
-  json?: unknown
+  json?: unknown;
   /** Set false bila caller ingin menangani 403 sendiri (tanpa redirect). */
-  redirectOn403?: boolean
+  redirectOn403?: boolean;
 }
 
 async function parseBody(res: Response): Promise<unknown> {
-  const text = await res.text()
-  if (!text) return null
+  const text = await res.text();
+  if (!text) return null;
   try {
-    return JSON.parse(text)
+    return JSON.parse(text);
   } catch {
-    return null
+    return null;
   }
 }
 
 function messageFromBody(body: unknown, fallback: string): string {
   if (body && typeof body === "object") {
-    const o = body as { message?: unknown; error?: unknown }
-    if (typeof o.message === "string" && o.message) return o.message
+    const o = body as { message?: unknown; error?: unknown };
+    if (typeof o.message === "string" && o.message) return o.message;
     // Lapisan RBAC lama membalas {"error": ...} tanpa field message.
-    if (typeof o.error === "string" && o.error) return o.error
+    if (typeof o.error === "string" && o.error) return o.error;
   }
-  return fallback
+  return fallback;
 }
 
 function dataFromBody<T>(body: unknown): T | null {
   if (body && typeof body === "object" && "data" in body) {
-    return (body as { data: T }).data
+    return (body as { data: T }).data;
   }
-  return (body as T) ?? null
+  return (body as T) ?? null;
 }
 
 /** Jalur inti semua method HTTP. */
 export async function request<T = unknown>(
   path: string,
-  options: RequestOptions = {},
+  options: RequestOptions = {}
 ): Promise<ApiEnvelope<T>> {
-  const { json, redirectOn403 = true, headers, ...init } = options
+  const { json, redirectOn403 = true, headers, ...init } = options;
   const res = await fetch(`/api/proxy?target=${encodeURIComponent(path)}`, {
     method: init.method ?? "GET",
     credentials: "include",
@@ -76,21 +76,21 @@ export async function request<T = unknown>(
       ...(headers ?? {}),
     },
     ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
-  })
+  });
 
-  const body = await parseBody(res)
+  const body = await parseBody(res);
 
   // 403 dari API berarti izin tidak cukup untuk aksi/halaman ini.
   if (res.status === 403 && redirectOn403 && typeof window !== "undefined") {
-    window.location.href = "/403"
+    window.location.href = "/403";
   }
 
   if (!res.ok) {
     throw new ApiError(
       res.status,
       messageFromBody(body, `Permintaan gagal (HTTP ${res.status})`),
-      body,
-    )
+      body
+    );
   }
 
   return {
@@ -99,31 +99,31 @@ export async function request<T = unknown>(
     data: dataFromBody<T>(body),
     message: messageFromBody(body, ""),
     body,
-  }
+  };
 }
 
 export function apiGet<T = unknown>(path: string, options?: RequestOptions) {
-  return request<T>(path, { ...options, method: "GET" })
+  return request<T>(path, { ...options, method: "GET" });
 }
 
 export function apiPost<T = unknown>(
   path: string,
   json: unknown,
-  options?: RequestOptions,
+  options?: RequestOptions
 ) {
-  return request<T>(path, { ...options, method: "POST", json })
+  return request<T>(path, { ...options, method: "POST", json });
 }
 
 export function apiPut<T = unknown>(
   path: string,
   json: unknown,
-  options?: RequestOptions,
+  options?: RequestOptions
 ) {
-  return request<T>(path, { ...options, method: "PUT", json })
+  return request<T>(path, { ...options, method: "PUT", json });
 }
 
 export function apiDelete<T = unknown>(path: string, options?: RequestOptions) {
-  return request<T>(path, { ...options, method: "DELETE" })
+  return request<T>(path, { ...options, method: "DELETE" });
 }
 
 /**
@@ -132,15 +132,19 @@ export function apiDelete<T = unknown>(path: string, options?: RequestOptions) {
  * bisa membedakan 403 (izin) dari kegagalan lain tanpa redirect otomatis.
  */
 export async function fetchLaporan<T>(
-  path: string,
+  path: string
 ): Promise<{ status: number; data?: T; message?: string }> {
   try {
-    const result = await request<T>(path, { redirectOn403: false })
-    return { status: result.status, data: result.data ?? undefined, message: result.message || undefined }
+    const result = await request<T>(path, { redirectOn403: false });
+    return {
+      status: result.status,
+      data: result.data ?? undefined,
+      message: result.message || undefined,
+    };
   } catch (err) {
     if (err instanceof ApiError) {
-      return { status: err.status, message: err.message }
+      return { status: err.status, message: err.message };
     }
-    return { status: 0, message: "Tidak dapat menghubungi server." }
+    return { status: 0, message: "Tidak dapat menghubungi server." };
   }
 }

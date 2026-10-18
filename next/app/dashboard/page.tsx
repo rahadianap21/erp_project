@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { apiGet } from "@/lib/api-client"
-import { useCallback, useEffect, useState } from "react"
-import Link from "next/link"
+import { apiGet } from "@/lib/api-client";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangleIcon,
   ArrowUpRightIcon,
@@ -13,83 +13,82 @@ import {
   Package,
   PackageCheck,
   TruckIcon,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DashboardStats {
-  total_po_value: number
-  total_po: number
-  po_pending: number
-  po_approved: number
-  po_received: number
-  total_grn: number
-  total_products: number
-  total_suppliers: number
-  low_stock_count: number
+  total_po_value: number;
+  total_po: number;
+  po_pending: number;
+  po_approved: number;
+  po_received: number;
+  total_grn: number;
+  total_products: number;
+  total_suppliers: number;
+  low_stock_count: number;
 }
 
 interface LowStockItem {
-  id: number
-  sku: string
-  name: string
-  current_stock: number
-  min_stock_level: number
-  selling_unit: string
+  id: number;
+  sku: string;
+  name: string;
+  current_stock: number;
+  min_stock_level: number;
+  selling_unit: string;
 }
 
 interface RecentPO {
-  id: number
-  po_number: string
-  supplier_name: string
-  total_amount: number
-  status: string
-  po_date: string
+  id: number;
+  po_number: string;
+  supplier_name: string;
+  total_amount: number;
+  status: string;
+  po_date: string;
 }
 
 interface RecentGRN {
-  id: number
-  grn_number: string
-  po_number: string
-  total_qty: number
-  received_date: string
+  id: number;
+  grn_number: string;
+  po_number: string;
+  total_qty: number;
+  received_date: string;
 }
 
 interface DashboardOverview {
-  stats: DashboardStats
-  low_stock: LowStockItem[]
-  recent_pos: RecentPO[]
-  recent_grns: RecentGRN[]
+  stats: DashboardStats;
+  low_stock: LowStockItem[];
+  recent_pos: RecentPO[];
+  recent_grns: RecentGRN[];
 }
-
 
 function formatIDR(value: number) {
   return new Intl.NumberFormat("id-ID", {
     style: "currency",
     currency: "IDR",
     maximumFractionDigits: 0,
-  }).format(value || 0)
+  }).format(value || 0);
 }
 
 function formatDate(value: string) {
-  if (!value) return "-"
+  if (!value) return "-";
   return new Date(value).toLocaleDateString("id-ID", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  })
+  });
 }
 
 function statusBadge(status: string) {
   switch (status) {
     case "APPROVED":
-      return "bg-blue-500/10 text-blue-600 border-blue-500/20"
+      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
     case "RECEIVED":
-      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
     case "REJECTED":
-      return "bg-rose-500/10 text-rose-600 border-rose-500/20"
+      return "bg-rose-500/10 text-rose-600 border-rose-500/20";
     default:
-      return "bg-amber-500/10 text-amber-600 border-amber-500/20"
+      return "bg-amber-500/10 text-amber-600 border-amber-500/20";
   }
 }
 
@@ -122,35 +121,37 @@ const QUICK_ACTIONS = [
     icon: <TruckIcon className="size-4" />,
     color: "bg-amber-500/10 text-amber-600",
   },
-]
+];
 
 export default function Page() {
-  const [overview, setOverview] = useState<DashboardOverview | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
     try {
-      const res = await apiGet<DashboardOverview>("/api/dashboard")
-      setOverview(res.data)
-      setError(null)
+      const res = await apiGet<DashboardOverview>("/api/dashboard");
+      setOverview(res.data);
+      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gagal memuat data dashboard")
+      setError(
+        err instanceof Error ? err.message : "Gagal memuat data dashboard"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadDashboard()
-  }, [loadDashboard])
+    loadDashboard();
+  }, [loadDashboard]);
 
   const retry = () => {
-    setLoading(true)
-    loadDashboard()
-  }
+    setLoading(true);
+    loadDashboard();
+  };
 
-  const stats = overview?.stats
+  const stats = overview?.stats;
   const statCards = [
     {
       title: "Nilai Purchase Order",
@@ -176,7 +177,7 @@ export default function Page() {
       subtitle: `${stats?.total_suppliers ?? 0} supplier aktif`,
       icon: <BoxesIcon className="size-5 text-emerald-500" />,
     },
-  ]
+  ];
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
@@ -187,7 +188,8 @@ export default function Page() {
             Axion ERP Command Center
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Visibilitas operasional pengadaan, penerimaan barang, dan stok gudang secara real-time.
+            Visibilitas operasional pengadaan, penerimaan barang, dan stok
+            gudang secara real-time.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -202,7 +204,12 @@ export default function Page() {
       {error && (
         <div className="flex items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/5 px-5 py-4">
           <p className="text-sm text-destructive">Gagal memuat data: {error}</p>
-          <Button variant="outline" size="sm" className="h-8 text-xs" onClick={retry}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={retry}
+          >
             Coba Lagi
           </Button>
         </div>
@@ -212,32 +219,38 @@ export default function Page() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl border bg-card p-5 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="size-8 rounded-lg" />
+              <div key={i} className="rounded-xl border bg-card p-5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="size-8 rounded-lg" />
+                </div>
+                <div className="mt-4 space-y-2">
+                  <Skeleton className="h-6 w-28" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
               </div>
-              <div className="mt-4 space-y-2">
-                <Skeleton className="h-6 w-28" />
-                <Skeleton className="h-3 w-32" />
-              </div>
-            </div>
-          ))
+            ))
           : statCards.map((stat, i) => (
-            <div
-              key={i}
-              className="rounded-xl border bg-card p-5 shadow-2xs hover:shadow-sm transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">{stat.title}</span>
-                <div className="p-2 rounded-lg bg-muted/60">{stat.icon}</div>
+              <div
+                key={i}
+                className="rounded-xl border bg-card p-5 shadow-2xs hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {stat.title}
+                  </span>
+                  <div className="p-2 rounded-lg bg-muted/60">{stat.icon}</div>
+                </div>
+                <div className="mt-3">
+                  <div className="text-2xl font-bold tracking-tight text-foreground">
+                    {stat.value}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {stat.subtitle}
+                  </div>
+                </div>
               </div>
-              <div className="mt-3">
-                <div className="text-2xl font-bold tracking-tight text-foreground">{stat.value}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{stat.subtitle}</div>
-              </div>
-            </div>
-          ))}
+            ))}
       </div>
 
       {/* Quick Actions Shortcuts */}
@@ -248,12 +261,18 @@ export default function Page() {
             href={action.href}
             className="flex items-center gap-3 p-3.5 rounded-xl border bg-card hover:bg-muted/50 transition-colors text-left group"
           >
-            <div className={`p-2.5 rounded-lg group-hover:scale-105 transition-transform ${action.color}`}>
+            <div
+              className={`p-2.5 rounded-lg group-hover:scale-105 transition-transform ${action.color}`}
+            >
               {action.icon}
             </div>
             <div>
-              <div className="text-xs font-semibold text-foreground">{action.title}</div>
-              <div className="text-[11px] text-muted-foreground">{action.description}</div>
+              <div className="text-xs font-semibold text-foreground">
+                {action.title}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {action.description}
+              </div>
             </div>
           </Link>
         ))}
@@ -265,7 +284,9 @@ export default function Page() {
         <div className="lg:col-span-2 rounded-xl border bg-card p-5 shadow-2xs">
           <div className="flex items-center justify-between pb-4 border-b">
             <div>
-              <h2 className="text-base font-semibold text-foreground">Purchase Order Terbaru</h2>
+              <h2 className="text-base font-semibold text-foreground">
+                Purchase Order Terbaru
+              </h2>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Dokumen pengadaan terakhir yang tercatat
               </p>
@@ -301,13 +322,20 @@ export default function Page() {
                   ))
                 ) : overview && overview.recent_pos.length > 0 ? (
                   overview.recent_pos.map((po) => (
-                    <tr key={po.id} className="hover:bg-muted/40 transition-colors">
+                    <tr
+                      key={po.id}
+                      className="hover:bg-muted/40 transition-colors"
+                    >
                       <td className="py-3 font-semibold text-foreground whitespace-nowrap">
                         {po.po_number}
                       </td>
                       <td className="py-3">
-                        <div className="font-medium text-foreground">{po.supplier_name}</div>
-                        <div className="text-[11px] text-muted-foreground">{formatDate(po.po_date)}</div>
+                        <div className="font-medium text-foreground">
+                          {po.supplier_name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {formatDate(po.po_date)}
+                        </div>
                       </td>
                       <td className="py-3 font-semibold text-foreground whitespace-nowrap">
                         {formatIDR(po.total_amount)}
@@ -326,7 +354,10 @@ export default function Page() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                    <td
+                      colSpan={5}
+                      className="py-8 text-center text-muted-foreground"
+                    >
                       Belum ada dokumen Purchase Order.
                     </td>
                   </tr>
@@ -343,7 +374,9 @@ export default function Page() {
             <div className="flex items-center justify-between pb-3 border-b">
               <div className="flex items-center gap-2">
                 <AlertTriangleIcon className="size-4 text-amber-500" />
-                <h2 className="text-sm font-semibold text-foreground">Stok Kritis</h2>
+                <h2 className="text-sm font-semibold text-foreground">
+                  Stok Kritis
+                </h2>
               </div>
               <span className="text-xs font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
                 {stats?.low_stock_count ?? 0} item
@@ -362,7 +395,9 @@ export default function Page() {
                     className="flex items-center justify-between p-3 rounded-lg border bg-muted/30"
                   >
                     <div>
-                      <div className="text-xs font-semibold text-foreground">{item.name}</div>
+                      <div className="text-xs font-semibold text-foreground">
+                        {item.name}
+                      </div>
                       <div className="text-[11px] text-muted-foreground">
                         {item.sku} • {item.selling_unit}
                       </div>
@@ -371,12 +406,16 @@ export default function Page() {
                       <span className="text-xs font-bold text-destructive">
                         {item.current_stock} tersisa
                       </span>
-                      <div className="text-[10px] text-muted-foreground">Min: {item.min_stock_level}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Min: {item.min_stock_level}
+                      </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground py-2">Semua stok di atas ambang minimum.</p>
+                <p className="text-xs text-muted-foreground py-2">
+                  Semua stok di atas ambang minimum.
+                </p>
               )}
             </div>
           </div>
@@ -384,8 +423,13 @@ export default function Page() {
           {/* Recent Receipts */}
           <div className="rounded-xl border bg-card p-5 shadow-2xs">
             <div className="flex items-center justify-between pb-3 border-b">
-              <h2 className="text-sm font-semibold text-foreground">Penerimaan Terbaru</h2>
-              <Link href="/goods-receipt-notes" className="text-[11px] text-primary hover:underline">
+              <h2 className="text-sm font-semibold text-foreground">
+                Penerimaan Terbaru
+              </h2>
+              <Link
+                href="/goods-receipt-notes"
+                className="text-[11px] text-primary hover:underline"
+              >
                 Lihat Semua
               </Link>
             </div>
@@ -403,7 +447,9 @@ export default function Page() {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-foreground">{grn.grn_number}</span>
+                        <span className="text-xs font-medium text-foreground">
+                          {grn.grn_number}
+                        </span>
                         <span className="text-[10px] text-muted-foreground">
                           {formatDate(grn.received_date)}
                         </span>
@@ -415,12 +461,14 @@ export default function Page() {
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-muted-foreground py-2">Belum ada penerimaan barang.</p>
+                <p className="text-xs text-muted-foreground py-2">
+                  Belum ada penerimaan barang.
+                </p>
               )}
             </div>
           </div>
         </div>
       </div>
     </main>
-  )
+  );
 }

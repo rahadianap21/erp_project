@@ -1,13 +1,9 @@
-import { RouteShell } from "@/components/layout/route-shell"
+import { RouteShell } from "@/components/layout/route-shell";
 
 export default async function AccountingLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  return (
-    <RouteShell title="Accounting">
-      {children}
-    </RouteShell>
-  )
+  return <RouteShell title="Accounting">{children}</RouteShell>;
 }

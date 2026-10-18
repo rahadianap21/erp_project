@@ -7,140 +7,172 @@ import Cookies from "js-cookie";
 import { toast } from "sonner";
 import { BookOpenCheck } from "lucide-react";
 import { ChartOfAccountForm } from "./components/chart-of-account-form";
-import { ChartOfAccountTable, ChartOfAccount } from "./components/chart-of-account-table";
+import {
+  ChartOfAccountTable,
+  ChartOfAccount,
+} from "./components/chart-of-account-table";
 import { ForbiddenView } from "@/components/forbidden-view";
 import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 
 export default function ChartOfAccountsPage() {
-    const [httpStatus, setHttpStatus] = useState<number>(200);
-    const [permissions, setPermissions] = useState({ create: false, read: false, update: false, delete: false });
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [httpStatus, setHttpStatus] = useState<number>(200);
+  const [permissions, setPermissions] = useState({
+    create: false,
+    read: false,
+    update: false,
+    delete: false,
+  });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    const [accountToDeactivate, setAccountToDeactivate] = useState<ChartOfAccount | null>(null);
-    const [editingAccount, setEditingAccount] = useState<ChartOfAccount | null>(null);
-    const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [accountToDeactivate, setAccountToDeactivate] =
+    useState<ChartOfAccount | null>(null);
+  const [editingAccount, setEditingAccount] = useState<ChartOfAccount | null>(
+    null
+  );
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-    const authToken = Cookies.get("session_active");
+  const authToken = Cookies.get("session_active");
 
-    const loadPermissions = () => {
-        if (!ensureSession()) return;
-        const list = readPermissionList() ?? [];
-        setPermissions({
-            create: list.includes("accounting:create"),
-            read: list.includes("accounting:read"),
-            update: list.includes("accounting:update"),
-            delete: list.includes("accounting:delete"),
-        });
-    };
+  const loadPermissions = () => {
+    if (!ensureSession()) return;
+    const list = readPermissionList() ?? [];
+    setPermissions({
+      create: list.includes("accounting:create"),
+      read: list.includes("accounting:read"),
+      update: list.includes("accounting:update"),
+      delete: list.includes("accounting:delete"),
+    });
+  };
 
-    const handleDeactivateConfirm = async () => {
-        if (!accountToDeactivate) return;
+  const handleDeactivateConfirm = async () => {
+    if (!accountToDeactivate) return;
 
-        setIsProcessing(true);
-        const targetedCode = accountToDeactivate.code;
+    setIsProcessing(true);
+    const targetedCode = accountToDeactivate.code;
 
-        try {
-            await apiDelete(`/api/chart-of-accounts?id=${accountToDeactivate.id}`, { redirectOn403: false });
+    try {
+      await apiDelete(`/api/chart-of-accounts?id=${accountToDeactivate.id}`, {
+        redirectOn403: false,
+      });
 
-            setAccountToDeactivate(null);
-            toast.success("Akun Dinonaktifkan", {
-                description: `Akun ${targetedCode} dikeluarkan dari daftar akun aktif.`,
-                duration: 3000,
-            });
-            setRefreshTrigger((prev) => prev + 1);
-        } catch (error: any) {
-            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
-            toast.error("Operasi Gagal", {
-                description: error.message || "Masalah internal server.",
-            });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-
-    const handleFormSuccess = (message: string) => {
-        setRefreshTrigger((prev) => prev + 1);
-        toast.success(message, { duration: 3000 });
-    };
-
-    useEffect(() => {
-        loadPermissions();
-        window.addEventListener("focus", loadPermissions);
-        return () => window.removeEventListener("focus", loadPermissions);
-    }, []);
-
-    if (httpStatus === 403) {
-        const handleResetForbidden = () => {
-            setHttpStatus(200);
-            loadPermissions();
-            setRefreshTrigger((prev) => prev + 1);
-        };
-        return <ForbiddenView reset={handleResetForbidden} />;
+      setAccountToDeactivate(null);
+      toast.success("Akun Dinonaktifkan", {
+        description: `Akun ${targetedCode} dikeluarkan dari daftar akun aktif.`,
+        duration: 3000,
+      });
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (error: any) {
+      if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
+      toast.error("Operasi Gagal", {
+        description: error.message || "Masalah internal server.",
+      });
+    } finally {
+      setIsProcessing(false);
     }
+  };
 
-    return (
-        <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-            <div className="flex items-center gap-2 border-b pb-4">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-                    <BookOpenCheck className="size-5" />
-                </div>
-                <div>
-                    <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
-                        Bagan Akun (Chart of Accounts)
-                    </h1>
-                    <p className="text-xs text-slate-500">
-                        Fondasi struktur buku besar: aset, kewajiban, ekuitas, pendapatan, dan beban.
-                    </p>
-                </div>
-            </div>
+  const handleFormSuccess = (message: string) => {
+    setRefreshTrigger((prev) => prev + 1);
+    toast.success(message, { duration: 3000 });
+  };
 
-            {permissions.create && (
-                <ChartOfAccountForm
-                    token={authToken}
-                    editingAccount={editingAccount}
-                    onSuccess={handleFormSuccess}
-                    onCancelEdit={() => setEditingAccount(null)}
-                />
-            )}
+  useEffect(() => {
+    loadPermissions();
+    window.addEventListener("focus", loadPermissions);
+    return () => window.removeEventListener("focus", loadPermissions);
+  }, []);
 
-            <ChartOfAccountTable
-                canUpdate={permissions.update}
-                canDelete={permissions.delete}
-                refreshTrigger={refreshTrigger}
-                onEditClick={(acc) => setEditingAccount(acc)}
-                onDeleteClick={(acc) => setAccountToDeactivate(acc)}
-            />
+  if (httpStatus === 403) {
+    const handleResetForbidden = () => {
+      setHttpStatus(200);
+      loadPermissions();
+      setRefreshTrigger((prev) => prev + 1);
+    };
+    return <ForbiddenView reset={handleResetForbidden} />;
+  }
 
-            <AlertDialog open={accountToDeactivate !== null} onOpenChange={(open) => { if (!open && !isProcessing) setAccountToDeactivate(null); }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Nonaktifkan Akun Ini?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Akun berikut dikeluarkan dari daftar aktif sehingga tidak bisa lagi dipakai pada jurnal baru.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
+  return (
+    <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <div className="flex items-center gap-2 border-b pb-4">
+        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+          <BookOpenCheck className="size-5" />
+        </div>
+        <div>
+          <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
+            Bagan Akun (Chart of Accounts)
+          </h1>
+          <p className="text-xs text-slate-500">
+            Fondasi struktur buku besar: aset, kewajiban, ekuitas, pendapatan,
+            dan beban.
+          </p>
+        </div>
+      </div>
 
-                    <div className="my-2 p-3 bg-rose-50 text-rose-700 rounded-md border border-rose-100 font-mono">
-                        <p className="font-bold">{accountToDeactivate?.code}</p>
-                        <p className="text-[11px] mt-0.5">{accountToDeactivate?.name}</p>
-                    </div>
+      {permissions.create && (
+        <ChartOfAccountForm
+          token={authToken}
+          editingAccount={editingAccount}
+          onSuccess={handleFormSuccess}
+          onCancelEdit={() => setEditingAccount(null)}
+        />
+      )}
 
-                    <AlertDialogFooter>
-                        <Button variant="outline" disabled={isProcessing} onClick={() => setAccountToDeactivate(null)} className="text-xs h-8 cursor-pointer">Batal</Button>
-                        <Button variant="destructive" disabled={isProcessing} onClick={handleDeactivateConfirm} className="text-xs h-8 cursor-pointer">
-                            {isProcessing ? "Memproses..." : "Ya, Nonaktifkan"}
-                        </Button>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </main>
-    );
+      <ChartOfAccountTable
+        canUpdate={permissions.update}
+        canDelete={permissions.delete}
+        refreshTrigger={refreshTrigger}
+        onEditClick={(acc) => setEditingAccount(acc)}
+        onDeleteClick={(acc) => setAccountToDeactivate(acc)}
+      />
+
+      <AlertDialog
+        open={accountToDeactivate !== null}
+        onOpenChange={(open) => {
+          if (!open && !isProcessing) setAccountToDeactivate(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Nonaktifkan Akun Ini?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Akun berikut dikeluarkan dari daftar aktif sehingga tidak bisa
+              lagi dipakai pada jurnal baru.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="my-2 p-3 bg-rose-50 text-rose-700 rounded-md border border-rose-100 font-mono">
+            <p className="font-bold">{accountToDeactivate?.code}</p>
+            <p className="text-[11px] mt-0.5">{accountToDeactivate?.name}</p>
+          </div>
+
+          <AlertDialogFooter>
+            <Button
+              variant="outline"
+              disabled={isProcessing}
+              onClick={() => setAccountToDeactivate(null)}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isProcessing}
+              onClick={handleDeactivateConfirm}
+              className="text-xs h-8 cursor-pointer"
+            >
+              {isProcessing ? "Memproses..." : "Ya, Nonaktifkan"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </main>
+  );
 }

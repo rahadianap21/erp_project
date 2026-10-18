@@ -1,30 +1,35 @@
-import { Geist } from 'next/font/google'
-import type { Metadata, Viewport } from 'next'
-import './globals.css'
-import { Toaster } from '@/components/ui/sonner'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import SessionExtender from '@/features/session-extender'
+import { Geist } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import SessionExtender from "@/features/session-extender";
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist' })
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 
 export const metadata: Metadata = {
-  title: 'Axion ERP',
-  description: 'Enterprise Resource Planning & Business Management System',
-  generator: 'v0.app',
-}
+  title: "Axion ERP",
+  description: "Enterprise Resource Planning & Business Management System",
+  generator: "v0.app",
+};
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
+  colorScheme: "light dark",
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f2f5f8' },
-    { media: '(prefers-color-scheme: dark)', color: '#202735' },
+    { media: "(prefers-color-scheme: light)", color: "#f2f5f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#202735" },
   ],
-}
+};
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" className="bg-background" suppressHydrationWarning>
-      <body className={`${geist.variable} antialiased`} suppressHydrationWarning>
+      <body
+        className={`${geist.variable} antialiased`}
+        suppressHydrationWarning
+      >
         <TooltipProvider>
           {children}
           <Toaster richColors position="top-center" />
@@ -32,5 +37,5 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </TooltipProvider>
       </body>
     </html>
-  )
+  );
 }

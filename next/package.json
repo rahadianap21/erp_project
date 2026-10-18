@@ -9,7 +9,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test \"features/**/*.test.ts\"",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "lint:fix": "eslint --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -39,8 +44,9 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "prettier": "^3.6.2",
+    "shadcn": "^4.19.1",
     "tailwindcss": "^4",
-    "typescript": "^5",
-    "shadcn": "^4.19.1"
+    "typescript": "^5"
   }
 }

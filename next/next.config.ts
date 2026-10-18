@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8090";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8090";
 
 const nextConfig: NextConfig = {
   async headers() {
@@ -23,7 +22,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
+        source: "/api/:path*",
         destination: `${API_BASE_URL}/api/:path*`,
       },
     ];
