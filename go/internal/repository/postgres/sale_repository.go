@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
-	"math/big"
 	"time"
 
 	"go_backend/internal/domain"
@@ -15,11 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// numericFromFloat4 mengubah float menjadi NUMERIC 4 desimal (untuk cost_unit).
-func numericFromFloat4(v float64) pgtype.Numeric {
-	return pgtype.Numeric{Int: big.NewInt(int64(math.Round(v * 10000))), Exp: -4, Valid: true}
-}
 
 type sqlSaleRepository struct {
 	pool *pgxpool.Pool

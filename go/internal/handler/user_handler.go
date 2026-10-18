@@ -118,7 +118,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	// 2. Kirim token, nama user, dan daftar hak akses dinamis (permissions) ke Next.js
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"message":     "Login berhasil!",
 		"token":       token,
 		"name":        user.Name,
@@ -157,7 +157,7 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message": "Akses disetujui! Anda berada di area sensitif.",
 		"user_id": auth.UserID,
 		"name":    claims["name"],
@@ -331,7 +331,7 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "User baru berhasil didaftarkan ke sistem",
 			})

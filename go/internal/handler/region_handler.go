@@ -48,12 +48,12 @@ func (h *RegionHandler) HandleRegions(w http.ResponseWriter, r *http.Request) {
 	h.respond(w, data, err)
 }
 
-func (h *RegionHandler) respond(w http.ResponseWriter, data interface{}, err error) {
+func (h *RegionHandler) respond(w http.ResponseWriter, data any, err error) {
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "data": data})
+	_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": data})
 }

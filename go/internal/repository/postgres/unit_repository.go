@@ -66,7 +66,7 @@ func (r *sqlUnitRepository) Create(ctx context.Context, unit *domain.Unit) error
 	return nil
 }
 
-func (r *sqlUnitRepository) interfaceToString(val interface{}) string {
+func (r *sqlUnitRepository) interfaceToString(val any) string {
 	if val == nil {
 		return ""
 	}

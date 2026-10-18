@@ -66,7 +66,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]any{
 					"status":      "success",
 					"data":        result.Roles,
 					"total":       result.Total,
@@ -87,7 +87,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   roles,
 				"total":  total,
@@ -201,7 +201,7 @@ func (h *RoleHandler) GetAllMasterPermissions(w http.ResponseWriter, r *http.Req
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status": "success",
 			"data":   permissions,
 		})

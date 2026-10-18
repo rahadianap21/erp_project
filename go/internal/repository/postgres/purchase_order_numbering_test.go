@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 // Test integrasi untuk penerbitan nomor dokumen Purchase Order.

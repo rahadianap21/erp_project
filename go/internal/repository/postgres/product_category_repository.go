@@ -174,7 +174,7 @@ func (r *sqlProductCategoryRepository) Delete(ctx context.Context, id int32, del
 }
 
 // Helper utilitas internal polimorfisme pemetaan baris data
-func (r *sqlProductCategoryRepository) mapRowToDomain(row interface{}) domain.ProductCategory {
+func (r *sqlProductCategoryRepository) mapRowToDomain(row any) domain.ProductCategory {
 	c := domain.ProductCategory{}
 	switch v := row.(type) {
 	case db.GetProductCategoriesCursorNextRow:
@@ -199,7 +199,7 @@ func (r *sqlProductCategoryRepository) mapRowToDomain(row interface{}) domain.Pr
 	return c
 }
 
-func (r *sqlProductCategoryRepository) interfaceToString(val interface{}) string {
+func (r *sqlProductCategoryRepository) interfaceToString(val any) string {
 	if val == nil {
 		return ""
 	}
@@ -218,7 +218,7 @@ func (r *sqlProductCategoryRepository) interfaceToString(val interface{}) string
 	return ""
 }
 
-func (r *sqlProductCategoryRepository) interfaceToTime(val interface{}) time.Time {
+func (r *sqlProductCategoryRepository) interfaceToTime(val any) time.Time {
 	if val == nil {
 		return time.Time{}
 	}
@@ -237,7 +237,7 @@ func (r *sqlProductCategoryRepository) interfaceToTime(val interface{}) time.Tim
 	return time.Time{}
 }
 
-func (r *sqlProductCategoryRepository) interfaceToInt32Ptr(val interface{}) *int32 {
+func (r *sqlProductCategoryRepository) interfaceToInt32Ptr(val any) *int32 {
 	if val == nil {
 		return nil
 	}

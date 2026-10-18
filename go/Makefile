@@ -11,3 +11,12 @@ migrateforceup:
 
 seed:
 	go run ./cmd/seeder
+
+test:
+	go build ./... && go vet ./... && go test -count=1 ./...
+
+test-integration:
+	go vet -tags=integration ./... && go test -tags=integration -count=1 ./...
+
+lint:
+	golangci-lint run

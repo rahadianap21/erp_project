@@ -1,4 +1,6 @@
-package usecase
+//go:build integration
+
+package postgres
 
 // Test full-stack untuk penerbitan nomor dokumen Purchase Order.
 //
@@ -31,7 +33,7 @@ import (
 	"time"
 
 	"go_backend/internal/domain"
-	"go_backend/internal/repository/postgres"
+	"go_backend/internal/usecase"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,7 +43,7 @@ import (
 // Test ini tidak butuh supplier khusus: dokumen uji dibersihkan berdasarkan nomor
 // PO yang benar-benar terbit, bukan berdasarkan supplier atau prefiks
 // tanggal, sehingga supplier asli tidak pernah tersentuh.
-func supplierUji(t *testing.T, pool *pgxpool.Pool) int64 {
+func supplierUjiPO(t *testing.T, pool *pgxpool.Pool) int64 {
 	t.Helper()
 	var id int64
 	if err := pool.QueryRow(context.Background(),
@@ -51,7 +53,7 @@ func supplierUji(t *testing.T, pool *pgxpool.Pool) int64 {
 	return id
 }
 
-func produkSiapBeli(t *testing.T, pool *pgxpool.Pool) int64 {
+func produkSiapBeliPO(t *testing.T, pool *pgxpool.Pool) int64 {
 	t.Helper()
 	var id int64
 	if err := pool.QueryRow(context.Background(), `
@@ -63,7 +65,7 @@ func produkSiapBeli(t *testing.T, pool *pgxpool.Pool) int64 {
 	return id
 }
 
-func poolUji(t *testing.T) *pgxpool.Pool {
+func poolUjiPO(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
@@ -83,7 +85,7 @@ func poolUji(t *testing.T) *pgxpool.Pool {
 }
 
 // hapusPOUji menghapus hanya PO dengan nomor yang dikumpulkan test.
-func hapusPOUji(t *testing.T, pool *pgxpool.Pool, nomor []string) {
+func hapusPOUjiNomer(t *testing.T, pool *pgxpool.Pool, nomor []string) {
 	t.Helper()
 	if len(nomor) == 0 {
 		return
@@ -95,7 +97,7 @@ func hapusPOUji(t *testing.T, pool *pgxpool.Pool, nomor []string) {
 	_, _ = pool.Exec(ctx, `DELETE FROM t_purchase_orders WHERE po_number = ANY($1)`, nomor)
 }
 
-func poUji(supplierID, productID int64) *domain.PurchaseOrder {
+func poPayloadUji(supplierID, productID int64) *domain.PurchaseOrder {
 	return &domain.PurchaseOrder{
 		SupplierID: supplierID,
 		TaxType:    "NON_PPN",
@@ -109,21 +111,21 @@ func poUji(supplierID, productID int64) *domain.PurchaseOrder {
 // Versi lama menghitung nomor dari baris yang belum dihapus, jadi percobaan kedua
 // meminta nomor pertama dan gagal. Versi baru harus menerbitkan nomor baru.
 func TestCreatePO_NomorTidakDipakaiUlangSetelahSoftDelete(t *testing.T) {
-	pool := poolUji(t)
+	pool := poolUjiPO(t)
 	ctx := context.Background()
-	supplierID := supplierUji(t, pool)
-	productID := produkSiapBeli(t, pool)
-	u := NewPurchaseOrderUsecase(
-		postgres.NewSQLPurchaseOrderRepository(pool),
-		postgres.NewSQLProductRepository(pool),
+	supplierID := supplierUjiPO(t, pool)
+	productID := produkSiapBeliPO(t, pool)
+	u := usecase.NewPurchaseOrderUsecase(
+		NewSQLPurchaseOrderRepository(pool),
+		NewSQLProductRepository(pool),
 	)
 
 	// PO pertama.
-	pertama := poUji(supplierID, productID)
+	pertama := poPayloadUji(supplierID, productID)
 	if err := u.CreatePO(ctx, pertama); err != nil {
 		t.Fatalf("create pertama gagal: %v", err)
 	}
-	t.Cleanup(func() { hapusPOUji(t, pool, []string{pertama.PoNumber}) })
+	t.Cleanup(func() { hapusPOUjiNomer(t, pool, []string{pertama.PoNumber}) })
 
 	if pertama.PoNumber == "" {
 		t.Fatal("nomor PO pertama harus terbit")
@@ -136,11 +138,11 @@ func TestCreatePO_NomorTidakDipakaiUlangSetelahSoftDelete(t *testing.T) {
 	}
 
 	// PO kedua, setelah dokumen pertama dihapus.
-	kedua := poUji(supplierID, productID)
+	kedua := poPayloadUji(supplierID, productID)
 	if err := u.CreatePO(ctx, kedua); err != nil {
 		t.Fatalf("create setelah soft delete harus berhasil, dapat error: %v", err)
 	}
-	t.Cleanup(func() { hapusPOUji(t, pool, []string{kedua.PoNumber}) })
+	t.Cleanup(func() { hapusPOUjiNomer(t, pool, []string{kedua.PoNumber}) })
 
 	if kedua.PoNumber == pertama.PoNumber {
 		t.Fatalf("nomor dipakai ulang setelah soft delete: %s", kedua.PoNumber)
@@ -165,13 +167,13 @@ func TestCreatePO_NomorTidakDipakaiUlangSetelahSoftDelete(t *testing.T) {
 func TestCreatePO_ParalelSemuaBerhasilAdalahIntiRace(t *testing.T) {
 	const worker = 8
 
-	pool := poolUji(t)
+	pool := poolUjiPO(t)
 	ctx := context.Background()
-	supplierID := supplierUji(t, pool)
-	productID := produkSiapBeli(t, pool)
-	u := NewPurchaseOrderUsecase(
-		postgres.NewSQLPurchaseOrderRepository(pool),
-		postgres.NewSQLProductRepository(pool),
+	supplierID := supplierUjiPO(t, pool)
+	productID := produkSiapBeliPO(t, pool)
+	u := usecase.NewPurchaseOrderUsecase(
+		NewSQLPurchaseOrderRepository(pool),
+		NewSQLProductRepository(pool),
 	)
 
 	var (
@@ -187,7 +189,7 @@ func TestCreatePO_ParalelSemuaBerhasilAdalahIntiRace(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			po := poUji(supplierID, productID)
+			po := poPayloadUji(supplierID, productID)
 			err := u.CreatePO(ctx, po)
 			mu.Lock()
 			defer mu.Unlock()
@@ -207,7 +209,7 @@ func TestCreatePO_ParalelSemuaBerhasilAdalahIntiRace(t *testing.T) {
 	for n := range nomor {
 		terbit = append(terbit, n)
 	}
-	t.Cleanup(func() { hapusPOUji(t, pool, terbit) })
+	t.Cleanup(func() { hapusPOUjiNomer(t, pool, terbit) })
 
 	for _, e := range errs {
 		if strings.Contains(e.Error(), "duplicate key") || strings.Contains(e.Error(), "23505") {

@@ -52,7 +52,7 @@ func (h *AccountingHandler) HandleBalanceSheet(w http.ResponseWriter, r *http.Re
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
+		respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": report})
 	})(w, r)
 }
 
@@ -75,7 +75,7 @@ func (h *AccountingHandler) HandleIncomeStatement(w http.ResponseWriter, r *http
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
+		respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": report})
 	})(w, r)
 }
 
@@ -98,7 +98,7 @@ func (h *AccountingHandler) HandleTrialBalance(w http.ResponseWriter, r *http.Re
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
+		respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": report})
 	})(w, r)
 }
 
@@ -126,6 +126,6 @@ func (h *AccountingHandler) HandleGeneralLedger(w http.ResponseWriter, r *http.R
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": report})
+		respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": report})
 	})(w, r)
 }

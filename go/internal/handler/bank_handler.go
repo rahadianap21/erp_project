@@ -39,7 +39,7 @@ func (h *BankHandler) HandleGetBanks(w http.ResponseWriter, r *http.Request) {
 
 	// Kirim data dengan format bungkus standar ERP Axion
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"status": "success",
 		"data":   banks,
 	})

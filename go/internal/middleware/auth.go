@@ -41,60 +41,6 @@ func EnableCORS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// JWTMiddleware menghadang request untuk validasi token
-func JWTMiddleware(cfg *config.Config, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Batasi total pembacaan body hanya maksimal 1MB
-		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
-
-		// 1. Ambil header Authorization
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Akses ditolak: token tidak ditemukan"})
-			return
-		}
-
-		// 2. Format harus berupa: "Bearer <token_string>"
-		bearerToken := strings.Split(authHeader, " ")
-		if len(bearerToken) != 2 || strings.ToLower(bearerToken[0]) != "bearer" {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Format token tidak valid (wajib Bearer)"})
-			return
-		}
-
-		tokenString := bearerToken[1]
-
-		// 3. Parse dan verifikasi tanda tangan token menggunakan Secret Key kita
-		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-			// Pastikan metode algoritma yang digunakan adalah HS256
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("metode enkripsi tidak sesuai: %v", t.Header["alg"])
-			}
-			return []byte(cfg.JWTSecret), nil
-		})
-
-		// 4. Cek apakah token valid atau sudah expired
-		if err != nil || !token.Valid {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Token tidak valid atau telah kedaluwarsa"})
-			return
-		}
-
-		// 5. Ekstrak data klaim (payload) dari JWT
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Gagal membaca data otorisasi"})
-			return
-		}
-
-		// 6. Simpan claims ke dalam Context dan teruskan request ke handler tujuan
-		ctx := context.WithValue(r.Context(), UserContextKey, claims)
-		next(w, r.WithContext(ctx))
-	}
-}
-
 // =========================================================================
 // RequireRole membatasi akses hanya untuk daftar Role ID tertentu yang diizinkan.
 //
@@ -275,7 +221,7 @@ func tokenCandidates(r *http.Request) []string {
 // parseClaims memvalidasi satu kandidat token dan mengembalikan klaimnya.
 // Fungsi ini tidak menulis response; pemanggil yang memutuskan status error.
 func parseClaims(cfg *config.Config, tokenString string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("metode enkripsi tidak sesuai: %v", t.Header["alg"])
 		}

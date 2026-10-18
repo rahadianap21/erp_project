@@ -32,7 +32,7 @@ func (h *LookupHandler) HandleLookupSuppliers(w http.ResponseWriter, r *http.Req
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   data,
 			})
@@ -65,7 +65,7 @@ func (h *LookupHandler) HandleLookupProducts(w http.ResponseWriter, r *http.Requ
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   data,
 			})

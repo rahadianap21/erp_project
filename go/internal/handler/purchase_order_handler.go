@@ -64,10 +64,10 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "Dokumen Purchase Order berhasil diterbitkan otomatis",
-				"data": map[string]interface{}{
+				"data": map[string]any{
 					"id":        newPO.ID,
 					"po_number": newPO.PoNumber,
 					"dpp":       newPO.DppAmount,
@@ -103,7 +103,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 				}
 
 				w.WriteHeader(http.StatusOK)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]any{
 					"status": "success",
 					"data":   singlePO, // Mengembalikan objek PurchaseOrder lengkap berserta .Items
 				})
@@ -132,7 +132,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   list,
 				"total":  total,
@@ -189,7 +189,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "Dokumen Purchase Order berhasil dikoreksi",
 			})
@@ -216,7 +216,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "Dokumen Purchase Order berhasil dicabut dari daftar aktif",
 			})
@@ -251,7 +251,7 @@ func (h *PurchaseOrderHandler) HandleApprovePO(w http.ResponseWriter, r *http.Re
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status":  "success",
 			"message": "Dokumen Purchase Order berhasil disetujui dan Dismbuskan ke vendor",
 		})
@@ -287,7 +287,7 @@ func (h *PurchaseOrderHandler) HandleCancelPO(w http.ResponseWriter, r *http.Req
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status":  "success",
 			"message": "Dokumen Purchase Order berhasil dibatalkan",
 		})
@@ -327,7 +327,7 @@ func (h *PurchaseOrderHandler) HandleRejectPO(w http.ResponseWriter, r *http.Req
 		}
 
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]any{
 			"status":  "success",
 			"message": "Dokumen Purchase Order berhasil ditolak",
 		})

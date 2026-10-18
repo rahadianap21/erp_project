@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 // Test integrasi jurnal penutup (Fase 2D).

@@ -217,7 +217,7 @@ func (r *sqlProductRepository) Delete(ctx context.Context, id int64, deletedBy i
 // 🔒 UTILITY HELPERS: PENYELESAI AKURASI AKUNTANSI DAN NIL-SAFETY
 // =========================================================================
 
-func (r *sqlProductRepository) mapRowToDomain(row interface{}) domain.Product {
+func (r *sqlProductRepository) mapRowToDomain(row any) domain.Product {
 	p := domain.Product{}
 	switch v := row.(type) {
 	case db.GetProductsCursorNextRow:
@@ -321,7 +321,7 @@ func (r *sqlProductRepository) numericToFloat64(num pgtype.Numeric) float64 {
 	return f
 }
 
-func (r *sqlProductRepository) interfaceToString(val interface{}) string {
+func (r *sqlProductRepository) interfaceToString(val any) string {
 	if val == nil {
 		return ""
 	}
@@ -340,7 +340,7 @@ func (r *sqlProductRepository) interfaceToString(val interface{}) string {
 	return ""
 }
 
-func (r *sqlProductRepository) interfaceToTime(val interface{}) time.Time {
+func (r *sqlProductRepository) interfaceToTime(val any) time.Time {
 	if val == nil {
 		return time.Time{}
 	}

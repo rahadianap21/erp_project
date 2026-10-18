@@ -17,7 +17,7 @@ import (
 // menjadi satu-satunya tempat pemetaan error → status HTTP.
 
 // respondJSON menulis payload JSON dengan status yang diberikan.
-func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
+func respondJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
@@ -184,7 +184,7 @@ func parsePOID(r *http.Request) (int64, error) {
 
 // decodeJSONBody membaca body JSON request. Bila gagal, sudah menulis 400 ke w
 // dan mengembalikan false supaya pemanggil cukup return.
-func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) bool {
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"message": "body tidak valid: " + err.Error()})
 		return false

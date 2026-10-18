@@ -28,7 +28,7 @@ func (h *UnitHandler) HandleGetUnits(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   data,
 			})
@@ -70,10 +70,10 @@ func (h *UnitHandler) HandleGetUnits(w http.ResponseWriter, r *http.Request) {
 
 			// Mengembalikan respons sukses dengan ID asli dari sequence database serial
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "Master satuan baru berhasil didaftarkan kilat ke basis data",
-				"data": map[string]interface{}{
+				"data": map[string]any{
 					"id":          newUnit.ID, // ✨ Mengembalikan ID fisik ril hasil INSERT PostgreSQL
 					"kode":        newUnit.Kode,
 					"name":        newUnit.Name,

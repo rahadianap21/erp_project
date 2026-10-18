@@ -42,7 +42,7 @@ func (h *SaleHandler) HandleSales(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "penjualan berhasil dibuat", "data": sale})
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "penjualan berhasil dibuat", "data": sale})
 		}))
 		protected(w, r)
 		return
@@ -67,7 +67,7 @@ func (h *SaleHandler) HandleSales(w http.ResponseWriter, r *http.Request) {
 					_ = json.NewEncoder(w).Encode(map[string]string{"message": "penjualan tidak ditemukan"})
 					return
 				}
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": sale})
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": sale})
 				return
 			}
 			limit, _ := strconv.Atoi(q.Get("limit"))
@@ -83,7 +83,7 @@ func (h *SaleHandler) HandleSales(w http.ResponseWriter, r *http.Request) {
 				WriteError(w, err)
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items, "total": total})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": items, "total": total})
 		}))
 		protected(w, r)
 		return
@@ -140,7 +140,7 @@ func (h *SaleHandler) HandlePOSBootstrap(w http.ResponseWriter, r *http.Request)
 			WriteError(w, err)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": data})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": data})
 	}))
 	protected(w, r)
 }
@@ -161,7 +161,7 @@ func (h *SaleHandler) HandlePOSProducts(w http.ResponseWriter, r *http.Request) 
 			WriteError(w, err)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": items})
 	}))
 	protected(w, r)
 }
@@ -181,7 +181,7 @@ func (h *SaleHandler) HandlePOSMembers(w http.ResponseWriter, r *http.Request) {
 			WriteError(w, err)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": items})
 	}))
 	protected(w, r)
 }

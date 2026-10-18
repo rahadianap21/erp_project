@@ -56,11 +56,11 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   data,
 				"total":  total,
-				"pagination": map[string]interface{}{
+				"pagination": map[string]any{
 					"next_cursor": nextCursor,
 					"prev_cursor": prevCursor,
 					"has_more":    len(data) >= limit,
@@ -102,7 +102,7 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "success", "message": "Kategori produk baru berhasil ditambahkan"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "message": "Kategori produk baru berhasil ditambahkan"})
 		})(w, r)
 		return
 	}

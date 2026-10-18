@@ -42,7 +42,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 					_ = json.NewEncoder(w).Encode(map[string]string{"message": "metode pembayaran tidak ditemukan"})
 					return
 				}
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": pm})
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": pm})
 				return
 			}
 			items, err := h.uc.ListAll(r.Context())
@@ -51,7 +51,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": items})
 		}))
 		protected(w, r)
 		return
@@ -69,7 +69,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "metode pembayaran berhasil dibuat", "data": pm})
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "metode pembayaran berhasil dibuat", "data": pm})
 		}))
 		protected(w, r)
 		return

@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 // Test integrasi laporan keuangan (Fase 2C).

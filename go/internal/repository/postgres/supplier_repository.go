@@ -226,7 +226,7 @@ func (r *sqlSupplierRepository) Delete(ctx context.Context, id, deletedBy int64)
 // 🔒 UTILITY REFACTORING: REFLECTION MAPPER UNTUK NEXT & PREV ROW DATA
 // =========================================================================
 
-func (r *sqlSupplierRepository) mapRowToDomain(row interface{}) domain.Supplier {
+func (r *sqlSupplierRepository) mapRowToDomain(row any) domain.Supplier {
 	// 🌟 FIX UTAMA: Gunakan runtime reflection map. sqlc memproduksi struct NextRow dan PrevRow berbeda.
 	// Jika row.BankName melahirkan error undefined, helper ini mengisolasi penamaan secara dinamis.
 
@@ -295,7 +295,7 @@ func (r *sqlSupplierRepository) mapRowToDomain(row interface{}) domain.Supplier 
 // 🔒 UTILITAS PENYELESAI EROR KETIDAKSESUAIAN DATA (NIL-SAFETY HELPERS)
 // =========================================================================
 
-func (r *sqlSupplierRepository) interfaceToString(val interface{}) string {
+func (r *sqlSupplierRepository) interfaceToString(val any) string {
 	if val == nil {
 		return ""
 	}
@@ -318,7 +318,7 @@ func (r *sqlSupplierRepository) interfaceToString(val interface{}) string {
 	return ""
 }
 
-func (r *sqlSupplierRepository) interfaceToTime(val interface{}) time.Time {
+func (r *sqlSupplierRepository) interfaceToTime(val any) time.Time {
 	if val == nil {
 		return time.Time{}
 	}
@@ -341,7 +341,7 @@ func (r *sqlSupplierRepository) interfaceToTime(val interface{}) time.Time {
 	return time.Time{}
 }
 
-func (r *sqlSupplierRepository) interfaceToInt32Ptr(val interface{}) *int32 {
+func (r *sqlSupplierRepository) interfaceToInt32Ptr(val any) *int32 {
 	if val == nil {
 		return nil
 	}

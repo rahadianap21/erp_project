@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 // Test integrasi untuk compare-and-swap status Purchase Order.

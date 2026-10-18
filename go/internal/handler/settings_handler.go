@@ -30,7 +30,7 @@ func (h *SettingsHandler) HandleSettings(w http.ResponseWriter, r *http.Request)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": view})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": view})
 		}))
 		protected(w, r)
 		return
@@ -47,7 +47,7 @@ func (h *SettingsHandler) HandleSettings(w http.ResponseWriter, r *http.Request)
 				WriteError(w, err)
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "pengaturan berhasil disimpan", "data": view})
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "pengaturan berhasil disimpan", "data": view})
 		}))
 		protected(w, r)
 		return

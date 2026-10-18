@@ -72,11 +72,11 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 			}
 
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status": "success",
 				"data":   suppliers,
 				"total":  total,
-				"pagination": map[string]interface{}{
+				"pagination": map[string]any{
 					"next_cursor": nextCursor,
 					"prev_cursor": prevCursor,
 					"has_more":    len(suppliers) >= limit,
@@ -132,7 +132,7 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "Mitra supplier baru berhasil didaftarkan bersama rekening finansial",
 				"data":    newSupplier,

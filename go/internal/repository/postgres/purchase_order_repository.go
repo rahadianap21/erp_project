@@ -5,9 +5,6 @@ import (
 	"fmt"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
-	"math"
-	"math/big"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,22 +19,6 @@ type sqlPurchaseOrderRepository struct {
 // NewSQLPurchaseOrderRepository menginisialisasi implementasi PO berbasis pgxpool
 func NewSQLPurchaseOrderRepository(pool *pgxpool.Pool) domain.PurchaseOrderRepository {
 	return &sqlPurchaseOrderRepository{pool: pool, q: db.New(pool)}
-}
-
-// 🌟 TRANSAKSIONAL IDENTIK MURNI: Menggunakan pool.Begin() bawaan native pgx driver
-func convertPgInt64(v pgtype.Int8) *int64 {
-	if !v.Valid {
-		return nil
-	}
-	val := v.Int64
-	return &val
-}
-func convertPgTime(v pgtype.Timestamp) *time.Time {
-	if !v.Valid {
-		return nil
-	}
-	val := v.Time
-	return &val
 }
 
 func (r *sqlPurchaseOrderRepository) Create(ctx context.Context, po *domain.PurchaseOrder) error {
@@ -415,18 +396,4 @@ func (r *sqlPurchaseOrderRepository) SoftDelete(ctx context.Context, id int64, d
 		UpdatedBy: updatedByPg,
 		ID:        id,
 	})
-}
-
-// numericFromFloat mengubah float64 menjadi NUMERIC 2 desimal tanpa pembulatan
-// floating point. Numerik uang di SQLite/Postgres tidak boleh lewat float.
-func numericFromFloat(v float64) pgtype.Numeric {
-	return pgtype.Numeric{Int: big.NewInt(int64(math.Round(v * 100))), Exp: -2, Valid: true}
-}
-
-// nullableInt8 mengubah *int64 menjadi pgtype.Int8; nil berarti NULL.
-func nullableInt8(v *int64) pgtype.Int8 {
-	if v == nil {
-		return pgtype.Int8{Valid: false}
-	}
-	return pgtype.Int8{Int64: *v, Valid: true}
 }

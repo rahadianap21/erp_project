@@ -43,7 +43,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 					_ = json.NewEncoder(w).Encode(map[string]string{"message": "member tidak ditemukan"})
 					return
 				}
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": m})
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": m})
 				return
 			}
 			limit, _ := strconv.Atoi(q.Get("limit"))
@@ -54,7 +54,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 				return
 			}
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items, "total": total})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": items, "total": total})
 		}))
 		protected(w, r)
 		return
@@ -72,7 +72,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"message": "member berhasil dibuat", "data": m})
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "member berhasil dibuat", "data": m})
 		}))
 		protected(w, r)
 		return
@@ -147,7 +147,7 @@ func (h *MemberHandler) MembersPointsHandler(w http.ResponseWriter, r *http.Requ
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 			return
 		}
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"data": items})
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": items})
 	}))
 	protected(w, r)
 }

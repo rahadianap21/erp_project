@@ -43,7 +43,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]interface{}{"message": "grn berhasil dibuat", "data": grn})
+			json.NewEncoder(w).Encode(map[string]any{"message": "grn berhasil dibuat", "data": grn})
 		}))
 		protected(w, r)
 		return
@@ -70,7 +70,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 					return
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(map[string]interface{}{"data": g})
+				json.NewEncoder(w).Encode(map[string]any{"data": g})
 				return
 			}
 			search := strings.TrimSpace(q.Get("search"))
@@ -87,7 +87,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{"data": items, "total": total})
+			json.NewEncoder(w).Encode(map[string]any{"data": items, "total": total})
 		}))
 		protected(w, r)
 		return

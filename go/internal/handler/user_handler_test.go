@@ -38,7 +38,7 @@ func (s *stubUserUsecase) UpdateUser(ctx context.Context, actor domain.Actor, id
 }
 
 func claimsFor(permissions ...string) jwt.MapClaims {
-	asInterfaces := make([]interface{}, len(permissions))
+	asInterfaces := make([]any, len(permissions))
 	for i, p := range permissions {
 		asInterfaces[i] = p
 	}
@@ -52,7 +52,7 @@ func claimsFor(permissions ...string) jwt.MapClaims {
 func withAuth(r *http.Request, claims jwt.MapClaims) *http.Request {
 	ctx := context.WithValue(r.Context(), middleware.UserContextKey, claims)
 	var perms []string
-	if raw, ok := claims["permissions"].([]interface{}); ok {
+	if raw, ok := claims["permissions"].([]any); ok {
 		for _, p := range raw {
 			if s, ok := p.(string); ok {
 				perms = append(perms, s)

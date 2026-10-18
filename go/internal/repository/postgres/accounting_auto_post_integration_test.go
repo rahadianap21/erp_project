@@ -1,3 +1,5 @@
+//go:build integration
+
 package postgres
 
 // Test integrasi auto-posting akuntansi dari penerimaan barang (GRN).

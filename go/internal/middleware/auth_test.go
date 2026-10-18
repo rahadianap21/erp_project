@@ -252,7 +252,9 @@ func TestCurrentUserIDviaJWTMiddlewareTanpaPermission(t *testing.T) {
 }
 
 // TestCurrentUserIDTokenTidakValid memastikan token rusak ditolak 401 dan
-// handler tidak pernah dipanggil.
+// handler tidak pernah dipanggil. Jalur yang diuji adalah
+// JWTMiddlewareWithResolver — satu-satunya middleware autentikasi yang dipakai
+// router (JWTMiddleware lama sudah dihapus sebagai dead code).
 func TestCurrentUserIDTokenTidakValid(t *testing.T) {
 	dipanggil := false
 	next := func(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +262,8 @@ func TestCurrentUserIDTokenTidakValid(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	mw := JWTMiddleware(testCfg, next)
+	resolver := &resolverPalsu{}
+	mw := JWTMiddlewareWithResolver(testCfg, resolver, next)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer token-garbage")

@@ -75,7 +75,7 @@ func (r *sqlLookupRepository) numericToFloat64(num pgtype.Numeric) float64 {
 	return f
 }
 
-func (r *sqlLookupRepository) interfaceToString(val interface{}) string {
+func (r *sqlLookupRepository) interfaceToString(val any) string {
 	if val == nil {
 		return ""
 	}

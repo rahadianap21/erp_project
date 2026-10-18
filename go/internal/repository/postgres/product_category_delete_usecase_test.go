@@ -1,4 +1,6 @@
-package usecase
+//go:build integration
+
+package postgres
 
 import (
 	"context"
@@ -6,7 +8,7 @@ import (
 	"testing"
 
 	"go_backend/internal/domain"
-	"go_backend/internal/repository/postgres"
+	"go_backend/internal/usecase"
 )
 
 // TestDeleteCategory_0BarisMemunculkanErrKategoriTidakDitemukan menjaga perbaikan
@@ -22,9 +24,9 @@ import (
 //
 // Test butuh PostgreSQL nyata; dilewati bila DATABASE_URL tidak tersedia.
 func TestDeleteCategory_0BarisMemunculkanErrKategoriTidakDitemukan(t *testing.T) {
-	pool := poolUji(t)
+	pool := newTestPool(t)
 	ctx := context.Background()
-	uc := NewProductCategoryUsecase(postgres.NewSQLProductCategoryRepository(pool))
+	uc := usecase.NewProductCategoryUsecase(NewSQLProductCategoryRepository(pool))
 
 	cat := &domain.ProductCategory{Name: "Kategori Uji Hapus", Slug: "kategori-uji-hapus"}
 	if err := uc.CreateCategory(ctx, cat); err != nil {

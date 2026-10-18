@@ -46,7 +46,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 					WriteError(w, err)
 					return
 				}
-				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": acc})
+				respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": acc})
 				return
 			}
 			cursorID, _ := parseInt64Param(r, "cursor_id")
@@ -64,7 +64,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list, "total": total})
+			respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": list, "total": total})
 		})(w, r)
 
 	case http.MethodPost:
@@ -94,7 +94,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusCreated, map[string]interface{}{
+			respondJSON(w, http.StatusCreated, map[string]any{
 				"status": "success", "message": "Akun berhasil dibuat", "data": acc,
 			})
 		})(w, r)
@@ -134,7 +134,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusOK, map[string]interface{}{
+			respondJSON(w, http.StatusOK, map[string]any{
 				"status": "success", "message": "Akun berhasil dikoreksi",
 			})
 		})(w, r)
@@ -151,7 +151,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusOK, map[string]interface{}{
+			respondJSON(w, http.StatusOK, map[string]any{
 				"status": "success", "message": "Akun berhasil dihapus dari daftar aktif",
 			})
 		})(w, r)
@@ -175,7 +175,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 					WriteError(w, err)
 					return
 				}
-				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": period})
+				respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": period})
 				return
 			}
 			limitVal, _ := parseInt64Param(r, "limit")
@@ -184,7 +184,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list})
+			respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": list})
 		})(w, r)
 
 	case http.MethodPost:
@@ -202,7 +202,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusCreated, map[string]interface{}{
+			respondJSON(w, http.StatusCreated, map[string]any{
 				"status": "success", "message": "Periode fiskal dibuka", "data": period,
 			})
 		})(w, r)
@@ -228,7 +228,7 @@ func (h *AccountingHandler) HandleClosePeriod(w http.ResponseWriter, r *http.Req
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"status": "success", "message": "Periode fiskal ditutup",
 		})
 	})(w, r)
@@ -250,7 +250,7 @@ func (h *AccountingHandler) HandleReopenPeriod(w http.ResponseWriter, r *http.Re
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"status": "success", "message": "Periode fiskal dibuka kembali",
 		})
 	})(w, r)
@@ -269,7 +269,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 					WriteError(w, err)
 					return
 				}
-				respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": entry})
+				respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": entry})
 				return
 			}
 			cursorID, _ := parseInt64Param(r, "cursor_id")
@@ -288,7 +288,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusOK, map[string]interface{}{"status": "success", "data": list, "total": total})
+			respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": list, "total": total})
 		})(w, r)
 
 	case http.MethodPost:
@@ -329,7 +329,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 				WriteError(w, err)
 				return
 			}
-			respondJSON(w, http.StatusCreated, map[string]interface{}{
+			respondJSON(w, http.StatusCreated, map[string]any{
 				"status": "success", "message": "Jurnal berhasil dibuat (DRAFT)", "data": entry,
 			})
 		})(w, r)
@@ -354,7 +354,7 @@ func (h *AccountingHandler) HandlePostJournal(w http.ResponseWriter, r *http.Req
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"status": "success", "message": "Jurnal berhasil diposting",
 		})
 	})(w, r)
@@ -379,7 +379,7 @@ func (h *AccountingHandler) HandleVoidJournal(w http.ResponseWriter, r *http.Req
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"status": "success", "message": "Jurnal DRAFT dibatalkan",
 		})
 	})(w, r)
@@ -404,7 +404,7 @@ func (h *AccountingHandler) HandleReverseJournal(w http.ResponseWriter, r *http.
 			WriteError(w, err)
 			return
 		}
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		respondJSON(w, http.StatusOK, map[string]any{
 			"status": "success", "message": "Jurnal pembalik berhasil diterbitkan",
 		})
 	})(w, r)
