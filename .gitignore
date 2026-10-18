@@ -11,6 +11,7 @@ next-env.d.ts
 # Go build artifacts
 go/tmp/
 go/api
+go/seeder
 go/cmd/**/main
 *.test
 *.out
