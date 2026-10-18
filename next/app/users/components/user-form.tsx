@@ -1,6 +1,7 @@
 'use client';
 
 
+import { apiPost, apiPut } from "@/lib/api-client";
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, AlertTriangle, Eye, EyeOff } from 'lucide-react';
@@ -83,8 +84,6 @@ export default function UserForm({ roleOptions, editingUser, onSuccess, onCancel
 
         const isEditMode = editingUser !== null;
         const targetPath = isEditMode ? `/api/users?id=${editingUser.id}` : `/api/users`;
-        const url = `/api/proxy?target=${encodeURIComponent(targetPath)}`;
-        const method = isEditMode ? 'PUT' : 'POST';
 
         const payload: Record<string, any> = {
             name,
@@ -97,17 +96,8 @@ export default function UserForm({ roleOptions, editingUser, onSuccess, onCancel
         }
 
         try {
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify(payload),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(errorData.message || errorData.error || 'Gagal memproses data akun pengguna.');
-            }
+            if (isEditMode) await apiPut(targetPath, payload);
+            else await apiPost(targetPath, payload);
 
             resetForm();
             setIsExpanded(false);

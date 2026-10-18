@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, apiGet } from "@/lib/api-client";
 import { Edit2, Trash2, FolderTree, Link2, Search, ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -46,15 +47,16 @@ export function ProductCategoryTable({ canUpdate, canDelete, refreshTrigger, onD
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/categories?limit=1000`, {
-                    headers: { "Authorization": `Bearer ${authToken}` },
-                    cache: "no-store",
-                });
-                if (res.status === 403) {
-                    onForbiddenRef.current?.();
-                    return;
+                let result;
+                try {
+                    result = await apiGet<ProductCategory[]>(`/api/categories?limit=1000`, { redirectOn403: false });
+                } catch (err) {
+                    if (err instanceof ApiError && err.status === 403) {
+                        onForbiddenRef.current?.();
+                        return;
+                    }
+                    throw err;
                 }
-                const result = await res.json();
                 const rows: ProductCategory[] = Array.isArray(result.data) ? result.data : [];
                 setCategories(rows);
             } catch (err) {

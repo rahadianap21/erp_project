@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Loader2, MapPin, Building2, User, Phone, Mail, CreditCard } from "lucide-react";
@@ -131,11 +132,8 @@ export default function SupplierForm({ token, editingSupplier, onSuccess, onCanc
 
     const fetchRegions = async (query: string, setter: Function) => {
         try {
-            const res = await fetch(`/api/regions${query}`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const result = await res.json();
-            if (res.ok && result.data) setter(result.data);
+            const result = await apiGet<unknown[]>(`/api/regions${query}`);
+            if (result.data) setter(result.data);
         } catch (err) {
             console.error("Gagal memuat data regional:", err);
         }
@@ -150,11 +148,8 @@ export default function SupplierForm({ token, editingSupplier, onSuccess, onCanc
 
     const fetchMasterBanks = async () => {
         try {
-            const res = await fetch(`/api/banks`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const result = await res.json();
-            if (res.ok && result.data) setBankOptions(result.data);
+            const result = await apiGet<BankOption[]>(`/api/banks`);
+            if (result.data) setBankOptions(result.data);
         } catch (err) {
             console.error("Gagal memuat master bank:", err);
         }
@@ -201,23 +196,15 @@ export default function SupplierForm({ token, editingSupplier, onSuccess, onCanc
         const method = isEditMode ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name, pic_name: picName, phone, email, address,
-                    village_id: selectedVillage, is_active: isActive,
-                    bank_id: selectedBank ? Number(selectedBank) : null, // 🌟 Kirim Bank ID
-                    account_number: accountNumber || null,               // 🌟 Kirim No Rekening
-                    account_name: accountName || null
-                }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(errorData.message || errorData.error || 'Gagal memproses data supplier.');
+            const payload = {
+                name, pic_name: picName, phone, email, address,
+                village_id: selectedVillage, is_active: isActive,
+                bank_id: selectedBank ? Number(selectedBank) : null, // 🌟 Kirim Bank ID
+                account_number: accountNumber || null,               // 🌟 Kirim No Rekening
+                account_name: accountName || null
+            };
+            if (isEditMode) await apiPut(url, payload);
+            else await apiPost(url, payload);
 
             resetForm();
             onSuccess(isEditMode ? 'update' : 'create', name);

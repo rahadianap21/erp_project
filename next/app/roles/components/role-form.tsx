@@ -1,5 +1,6 @@
 'use client';
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Folder, KeyRound, Loader2 } from 'lucide-react';
@@ -37,13 +38,7 @@ export default function RoleForm({ token, roleOptions, editingRole, onSuccess, o
         const fetchMasterPermissions = async () => {
             setLoadingFetch(true);
             try {
-                const response = await fetch(`/api/permissions`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                const result = await response.json();
+                const result = await apiGet<string[]>(`/api/permissions`);
                 setMasterPermissions(Array.isArray(result.data) ? result.data : []);
             } catch (err) {
                 console.error("Gagal mengambil master permissions:", err);
@@ -113,22 +108,9 @@ export default function RoleForm({ token, roleOptions, editingRole, onSuccess, o
         const method = isEditMode ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}` // Sertakan token otentikasi
-                },
-                body: JSON.stringify({
-                    name,
-                    permissions: selectedPermissions,
-                }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                throw new Error(errorData.message || errorData.error || 'Gagal menyimpan data pengguna.');
-            }
+            const payload = { name, permissions: selectedPermissions };
+            if (isEditMode) await apiPut(url, payload);
+            else await apiPost(url, payload);
 
             resetForm();
             setIsExpanded(false);

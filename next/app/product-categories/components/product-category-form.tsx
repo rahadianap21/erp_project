@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Loader2, FolderTree, FileText, Link2 } from "lucide-react";
@@ -36,11 +37,8 @@ export function ProductCategoryForm({ token, editingCategory, onSuccess, onCance
     // Ambil daftar kategori induk untuk pilihan dropdown
     const fetchParentOptions = async () => {
         try {
-            const res = await fetch(`/api/categories?limit=100`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const result = await res.json();
-            if (res.ok && result.data) {
+            const result = await apiGet<ProductCategory[]>(`/api/categories?limit=100`);
+            if (result.data) {
                 // Saring agar kategori yang sedang diedit tidak bisa memilih dirinya sendiri sebagai induk
                 const options = editingCategory
                     ? result.data.filter((c: ProductCategory) => c.id !== editingCategory.id)
@@ -82,23 +80,15 @@ export function ProductCategoryForm({ token, editingCategory, onSuccess, onCance
         const method = isEditMode ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    name,
-                    slug: slug || undefined, // Kosongkan agar backend meng-generate otomatis lewat usecase Go
-                    description,
-                    parent_id: parentId ? Number(parentId) : null,
-                    is_active: isActive
-                }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(errorData.message || 'Gagal memproses data kategori.');
+            const payload = {
+                name,
+                slug: slug || undefined, // Kosongkan agar backend meng-generate otomatis lewat usecase Go
+                description,
+                parent_id: parentId ? Number(parentId) : null,
+                is_active: isActive
+            };
+            if (isEditMode) await apiPut(url, payload);
+            else await apiPost(url, payload);
 
             resetForm();
             setIsExpanded(false);

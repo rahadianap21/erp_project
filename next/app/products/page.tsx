@@ -1,5 +1,6 @@
 "use client";
 
+import { apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -79,18 +80,7 @@ export default function MasterProductsCRUDPage() {
         const targetedName = productToDelete.name;
 
         try {
-            const response = await fetch(`/api/products?id=${productToDelete.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Gagal mencabut barang dari gudang.');
-            }
+            await apiDelete(`/api/products?id=${productToDelete.id}`);
 
             setProductToDelete(null);
             setTimeout(() => {

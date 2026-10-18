@@ -1,5 +1,6 @@
 "use client";
 
+import { apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -60,16 +61,7 @@ export default function UsersCRUDPage() {
         const targetedName = userToDelete.name;
         
         try {
-            const response = await fetch(`/api/proxy?target=${encodeURIComponent(`/api/users?id=${userToDelete.id}`)}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Gagal menghapus pengguna');
-            }
+            await apiDelete(`/api/users?id=${userToDelete.id}`);
 
             setUserToDelete(null);
             setTimeout(() => {

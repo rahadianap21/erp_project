@@ -1,5 +1,6 @@
 "use client";
 
+import { apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -48,18 +49,7 @@ export default function RolesCRUDPage() {
         setIsDeleting(true);
         const targetedName = roleToDelete.name;
         try {
-            const response = await fetch(`/api/roles?id=${roleToDelete.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.message || 'Gagal menghapus peran');
-            }
+            await apiDelete(`/api/roles?id=${roleToDelete.id}`);
 
             setRoleToDelete(null);
             setTimeout(() => {

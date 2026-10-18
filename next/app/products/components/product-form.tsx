@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Loader2, Package, Tag, Building2, Layers, DollarSign, AlertCircle } from "lucide-react";
@@ -84,21 +85,15 @@ export function ProductForm({ token, editingProduct, onSuccess, onCancelEdit }: 
     // Mengambil Opsi Relasional dari API Kategori, Supplier, & Master Satuan Baru
     const fetchRelations = async () => {
         try {
-            const [resCat, resSup, resUnit] = await Promise.all([
-                fetch(`/api/categories?limit=100`, { headers: { "Authorization": `Bearer ${token}` } }),
-                fetch(`/api/suppliers?limit=100`, { headers: { "Authorization": `Bearer ${token}` } }),
-                fetch(`/api/units?limit=100`, { headers: { "Authorization": `Bearer ${token}` } })
-            ]);
-
             const [catData, supData, unitData] = await Promise.all([
-                resCat.json(),
-                resSup.json(),
-                resUnit.json()
+                apiGet<Category[]>(`/api/categories?limit=100`),
+                apiGet<Supplier[]>(`/api/suppliers?limit=100`),
+                apiGet<Unit[]>(`/api/units?limit=100`)
             ]);
 
-            if (resCat.ok && catData.data) setCategories(catData.data);
-            if (resSup.ok && supData.data) setSuppliers(supData.data);
-            if (resUnit.ok && unitData.data) setUnits(unitData.data);
+            if (catData.data) setCategories(catData.data);
+            if (supData.data) setSuppliers(supData.data);
+            if (unitData.data) setUnits(unitData.data);
         } catch (err) {
             console.error("Gagal memuat data opsi relasi:", err);
         }
@@ -214,20 +209,11 @@ export function ProductForm({ token, editingProduct, onSuccess, onCancelEdit }: 
         try {
 
             // Tembak endpoint API master unit Go Anda
-            const res = await fetch(`/api/units`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    kode: cleanKode,
-                    name: `${cleanKode} (BUATAN KILAT)` // Penanda nama default buatan on the fly
-                })
+            const result = await apiPost<unknown>(`/api/units`, {
+                kode: cleanKode,
+                name: `${cleanKode} (BUATAN KILAT)` // Penanda nama default buatan on the fly
             });
-
-            const result = await res.json();
-            if (res.ok) {
+            {
                 toast.success("Master Satuan Berhasil Dibuat", {
                     id: toastId,
                     description: `Satuan ${cleanKode} kini siap dipakai.`
@@ -243,12 +229,11 @@ export function ProductForm({ token, editingProduct, onSuccess, onCancelEdit }: 
                 }
 
                 // Otomatis pilih satuan yang baru saja dibuat ke dalam form state
-                if (result.data?.id) {
-                    setSellingUnitId(String(result.data.id));
-                    setPurchaseUnitId(String(result.data.id));
+                if (result.data && typeof result.data === "object" && "id" in result.data) {
+                    const createdId = (result.data as { id: number }).id;
+                    setSellingUnitId(String(createdId));
+                    setPurchaseUnitId(String(createdId));
                 }
-            } else {
-                throw new Error(result.message || "Gagal menyimpan satuan.");
             }
         } catch (err: any) {
             toast.error("Gagal Membuat Satuan", { id: toastId, description: err.message });
@@ -293,34 +278,26 @@ export function ProductForm({ token, editingProduct, onSuccess, onCancelEdit }: 
         const method = isEditMode ? 'PUT' : 'POST';
 
         try {
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    sku: sku || undefined,
-                    barcode: barcode || null,
-                    name, description,
-                    category_id: Number(categoryId),
-                    supplier_id: Number(supplierId),
-                    selling_unit_id: Number(sellingUnitId),
-                    purchase_unit_id: Number(purchaseUnitId),
-                    conversion_rate: Number(conversionRate),
-                    purchase_price: Number(purchasePrice),
-                    selling_price: Number(sellingPrice),
-                    min_stock_level: Number(minStock),
-                    current_stock: Number(currentStock),
-                    discount_type: discountType,
-                    discount_value: discountType === "NONE" ? 0 : Number(discountValue),
-                    is_taxable: isTaxable,
-                    is_active: isActive
-                }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(errorData.message || 'Gagal memproses spesifikasi barang.');
+            const payload = {
+                sku: sku || undefined,
+                barcode: barcode || null,
+                name, description,
+                category_id: Number(categoryId),
+                supplier_id: Number(supplierId),
+                selling_unit_id: Number(sellingUnitId),
+                purchase_unit_id: Number(purchaseUnitId),
+                conversion_rate: Number(conversionRate),
+                purchase_price: Number(purchasePrice),
+                selling_price: Number(sellingPrice),
+                min_stock_level: Number(minStock),
+                current_stock: Number(currentStock),
+                discount_type: discountType,
+                discount_value: discountType === "NONE" ? 0 : Number(discountValue),
+                is_taxable: isTaxable,
+                is_active: isActive
+            };
+            if (isEditMode) await apiPut(url, payload);
+            else await apiPost(url, payload);
 
             resetForm();
             setIsExpanded(false);
