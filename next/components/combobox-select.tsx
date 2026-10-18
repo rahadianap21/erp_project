@@ -120,7 +120,7 @@ export function ComboboxSelect({
     return effectiveOptions.find((opt) => opt.value === value) ?? null;
   }, [effectiveOptions, value]);
 
-  const fetchModalParentCategories = async () => {
+  const fetchModalParentCategories = React.useCallback(async () => {
     if (!authToken || !permissionCode?.startsWith("categories")) return;
     try {
       const result = await apiGet<{ id: number | string; name: string }[]>(
@@ -133,7 +133,7 @@ export function ComboboxSelect({
     } catch (err) {
       console.error("Gagal memuat opsi induk kategori di dalam modal:", err);
     }
-  };
+  }, [authToken, permissionCode]);
 
   // Evaluasi Otorisasi Mandiri Level Komponen (Self-Contained RBAC Guard)
   React.useEffect(() => {
@@ -188,7 +188,7 @@ export function ComboboxSelect({
     if (isModalOpen && permissionCode?.startsWith("categories")) {
       fetchModalParentCategories(); // <-- Pastikan baris pemicu ini aktif & tidak terhapus!
     }
-  }, [isModalOpen, permissionCode]);
+  }, [isModalOpen, permissionCode, fetchModalParentCategories]);
 
   // EKSEKUSI PENYIMPANAN DATA TRANSAKSIONAL KE GO BACKEND
   const handleDynamicQuickSubmit = async (e: React.SyntheticEvent) => {

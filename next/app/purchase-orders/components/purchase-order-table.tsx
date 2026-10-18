@@ -547,7 +547,7 @@ export function PurchaseOrderTable({
                                   <strong className="text-blue-700 uppercase text-[9px] tracking-wide block mb-0.5">
                                     Memo Instruksi Pengiriman:
                                   </strong>
-                                  "{po.notes}"
+                                  &quot;{po.notes}&quot;
                                 </div>
                               )}
                             </div>

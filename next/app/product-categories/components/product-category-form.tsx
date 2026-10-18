@@ -1,7 +1,7 @@
 "use client";
 
 import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
@@ -47,7 +47,7 @@ export function ProductCategoryForm({
   const [isActive, setIsActive] = useState<boolean>(true);
 
   // Ambil daftar kategori induk untuk pilihan dropdown
-  const fetchParentOptions = async () => {
+  const fetchParentOptions = useCallback(async () => {
     try {
       const result = await apiGet<ProductCategory[]>(
         `/api/categories?limit=100`
@@ -64,11 +64,11 @@ export function ProductCategoryForm({
     } catch (err) {
       console.error("Gagal memuat opsi induk kategori:", err);
     }
-  };
+  }, [editingCategory]);
 
   useEffect(() => {
     if (token) fetchParentOptions();
-  }, [token, editingCategory]);
+  }, [token, fetchParentOptions]);
 
   useEffect(() => {
     if (editingCategory) {

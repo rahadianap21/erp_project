@@ -1,7 +1,7 @@
 "use client";
 
 import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Plus,
@@ -220,15 +220,13 @@ export function PurchaseOrderForm({
 
   // Helper: endpoint lookup PO memakai gate 'po:read', bukan 'suppliers:read' /
   // 'products:read', jadi user PO bisa memakai form ini tanpa akses master.
-  const lookupUrl = (path: string) => `${path}`;
-
-  const lookupFetch = async <T,>(path: string): Promise<T[]> => {
-    const body = await apiGet<T[]>(lookupUrl(path));
+  const lookupFetch = useCallback(async <T,>(path: string): Promise<T[]> => {
+    const body = await apiGet<T[]>(path);
     return Array.isArray(body.data) ? body.data : [];
-  };
+  }, []);
 
   // Ambil daftar supplier (dipakai untuk mode create dan edit alike)
-  const fetchFormSuppliers = async () => {
+  const fetchFormSuppliers = useCallback(async () => {
     if (!token) return;
     setIsLoadingRelations(true);
     try {
@@ -250,41 +248,44 @@ export function PurchaseOrderForm({
     } finally {
       setIsLoadingRelations(false); // 🌟 Nyatakan master data katalog resmi siap dikonsumsi
     }
-  };
+  }, [token, lookupFetch]);
 
   // Ambil barang milik supplier terpilih (hanya saat form sudah Create/Edit)
-  const fetchFormProducts = async (targetSupplierId: string) => {
-    if (!token) return;
-    setIsLoadingProducts(true);
-    try {
-      const rows = await lookupFetch<Product>(
-        `/api/po-lookup/products?supplier_id=${targetSupplierId}`
-      );
-      setProducts(
-        rows.map((p) => ({
-          id: p.id,
-          sku: p.sku,
-          name: p.name,
-          supplier_id: p.supplier_id,
-          purchase_price: p.purchase_price,
-          purchase_unit_kode: p.purchase_unit_kode,
-        }))
-      );
-    } catch (err) {
-      console.error("Gagal memuat daftar barang PO:", err);
-      setProducts([]);
-      toast.warning("Daftar barang tidak termuat", {
-        description:
-          "Baris yang sedang disunting tetap menampilkan nama dari data PO, namun menambah baris baru butuh daftar barang.",
-      });
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
+  const fetchFormProducts = useCallback(
+    async (targetSupplierId: string) => {
+      if (!token) return;
+      setIsLoadingProducts(true);
+      try {
+        const rows = await lookupFetch<Product>(
+          `/api/po-lookup/products?supplier_id=${targetSupplierId}`
+        );
+        setProducts(
+          rows.map((p) => ({
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            supplier_id: p.supplier_id,
+            purchase_price: p.purchase_price,
+            purchase_unit_kode: p.purchase_unit_kode,
+          }))
+        );
+      } catch (err) {
+        console.error("Gagal memuat daftar barang PO:", err);
+        setProducts([]);
+        toast.warning("Daftar barang tidak termuat", {
+          description:
+            "Baris yang sedang disunting tetap menampilkan nama dari data PO, namun menambah baris baru butuh daftar barang.",
+        });
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    },
+    [token, lookupFetch]
+  );
 
   useEffect(() => {
     if (token) fetchFormSuppliers();
-  }, [token]);
+  }, [token, fetchFormSuppliers]);
 
   // Katalog barang mengikuti supplier yang aktif. Sengaja tidak menunggu detail PO:
   // baris bawaan record membawa labelnya sendiri, jadi tidak ada ketergantungan.
@@ -292,7 +293,7 @@ export function PurchaseOrderForm({
   // supplierId, jadi data basi tidak akan tampil dan tidak perlu di-reset di sini.
   useEffect(() => {
     if (supplierId) fetchFormProducts(supplierId);
-  }, [supplierId, token]);
+  }, [supplierId, token, fetchFormProducts]);
 
   // 🌟 SINKRONISASI KAKU EDIT MODE: Tunggu katalog selesai unduh baru injeksikan nilai lama
   useEffect(() => {

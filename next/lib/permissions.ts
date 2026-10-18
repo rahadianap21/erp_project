@@ -62,6 +62,6 @@ export function ensureSession(): boolean {
     description: "Silakan lakukan login ulang untuk mengamankan sesi Anda.",
     duration: 4000,
   });
-  window.location.href = "/";
+  window.location.replace("/");
   return false;
 }

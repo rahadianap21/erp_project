@@ -66,10 +66,10 @@ export default function SuppliersCRUDPage() {
   const authToken = Cookies.get("session_active");
 
   // Memuat izin fitur modular berdasarkan kuki penugasan JWT
-  const loadPermissions = () => {
+  const loadPermissions = React.useCallback(() => {
     if (!ensureSession()) return;
     setPermissions(readPermissionFlags("suppliers"));
-  };
+  }, []);
 
   // Eksekusi Konfirmasi Penghapusan Data Soft-Delete
   const handleDeleteConfirm = async () => {
@@ -136,7 +136,7 @@ export default function SuppliersCRUDPage() {
       clearInterval(hmrGuardInterval);
       window.removeEventListener("focus", loadPermissions);
     };
-  }, [refreshTrigger]);
+  }, [refreshTrigger, permissions.create, permissions.update, loadPermissions]);
 
   if (httpStatus === 403) {
     const handleReset = () => {

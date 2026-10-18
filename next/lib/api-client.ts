@@ -88,7 +88,7 @@ export async function request<T = unknown>(
 
   // 403 dari API berarti izin tidak cukup untuk aksi/halaman ini.
   if (res.status === 403 && redirectOn403 && typeof window !== "undefined") {
-    window.location.href = "/403";
+    window.location.replace("/403");
   }
 
   if (!res.ok) {

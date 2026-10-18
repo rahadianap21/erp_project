@@ -148,9 +148,12 @@ export default function SupplierForm({
     else setPostalCode("");
   }, [selectedVillage, villages]);
 
-  const fetchRegions = async (query: string, setter: Function) => {
+  const fetchRegions = async <T,>(
+    query: string,
+    setter: (data: T[]) => void
+  ) => {
     try {
-      const result = await apiGet<unknown[]>(`/api/regions${query}`);
+      const result = await apiGet<T[]>(`/api/regions${query}`);
       if (result.data) setter(result.data);
     } catch (err) {
       console.error("Gagal memuat data regional:", err);

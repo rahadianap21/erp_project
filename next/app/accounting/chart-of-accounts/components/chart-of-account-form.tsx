@@ -1,7 +1,7 @@
 "use client";
 
 import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
@@ -54,7 +54,7 @@ export function ChartOfAccountForm({
   const [isHeader, setIsHeader] = useState<boolean>(false);
   const [isActive, setIsActive] = useState<boolean>(true);
 
-  const fetchParentOptions = async () => {
+  const fetchParentOptions = useCallback(async () => {
     try {
       const result = await apiGet<ChartOfAccount[]>(
         `/api/chart-of-accounts?limit=500`
@@ -72,11 +72,11 @@ export function ChartOfAccountForm({
     } catch (err) {
       console.error("Gagal memuat opsi induk CoA:", err);
     }
-  };
+  }, [editingAccount]);
 
   useEffect(() => {
     if (token) fetchParentOptions();
-  }, [token, editingAccount]);
+  }, [token, fetchParentOptions]);
 
   useEffect(() => {
     if (editingAccount) {

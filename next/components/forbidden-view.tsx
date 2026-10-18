@@ -58,7 +58,7 @@ export function ForbiddenView({
           <Button
             onClick={() => {
               if (isGlobalError) {
-                window.location.href = "/dashboard";
+                router.replace("/dashboard");
               } else {
                 router.push("/dashboard");
               }
