@@ -80,7 +80,7 @@ type PurchaseOrderRepository interface {
 	// saat itu masih memenuhi allowFrom (dan tidak ada di forbidFrom).
 	//
 	// Syarat WAJIB dievaluasi di dalam statement SQL yang sama dengan penulisan
-	// status baru. Kalau syarat hanya dicek di aplikasi, dua request paralel bisa
+	// status baru. Kalau syarat hanya dicek di aplikasi, dua request bersamaan bisa
 	// sama-sama membaca status lama lalu sama-sama menuliskannya, dan dokumen
 	// berakhir pada status hasil penulisan terakhir tanpa ada yang menyadarikan.
 	//

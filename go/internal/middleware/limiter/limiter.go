@@ -72,7 +72,7 @@ func (l *IPRateLimiter) Middleware(next http.HandlerFunc) http.HandlerFunc {
 		if !lim.Allow() {
 			w.Header().Set("Retry-After", "1")
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"Terlalu banyak percobaan login. Coba beberapa detik lagi."}`))
+			_, _ = w.Write([]byte(`{"error":"Terlalu banyak percobaan login. Coba beberapa detik lagi."}`))
 			return
 		}
 		next(w, r)

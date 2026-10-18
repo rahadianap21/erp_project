@@ -16,7 +16,7 @@ type sqlPurchaseOrderRepository struct {
 	q    *db.Queries
 }
 
-// NewSQLPurchaseOrderRepository menginisialisasi implementasi PO berbasis pgxpool
+// NewSQLPurchaseOrderRepository menginisialisasi PO berbasis pgxpool
 func NewSQLPurchaseOrderRepository(pool *pgxpool.Pool) domain.PurchaseOrderRepository {
 	return &sqlPurchaseOrderRepository{pool: pool, q: db.New(pool)}
 }
@@ -27,7 +27,7 @@ func (r *sqlPurchaseOrderRepository) Create(ctx context.Context, po *domain.Purc
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	// Injeksi scope transaksi pgx murni ke Queries SQLC
 	qtx := r.q.WithTx(tx)
@@ -138,7 +138,7 @@ func (r *sqlPurchaseOrderRepository) GetListCursor(ctx context.Context, param do
 
 			SupplierID: v.PoSupplierID, // 🌟 KUNCI: Wajib disalurkan agar frontend edit mode bisa mengenali supplier
 
-			// 🌟 PASTIKAN VARIABEL BARU INI DISALURKAN KE OBJECT DOMAIN
+			// 🌟 PASTIKAN NILAI BARU INI DISALURKAN KE OBJECT DOMAIN
 			TaxType:   v.TaxType,
 			DppAmount: dppAmt,
 			TaxAmount: taxAmt,
@@ -265,7 +265,7 @@ func (r *sqlPurchaseOrderRepository) GetByID(ctx context.Context, id int64) (*do
 //
 // allowFrom dan forbidFrom disatukan sebagai syarat di dalam SQL, lalu
 // RowsAffected dipakai sebagai sinyal konflik. Inilah penjaga race approve/cancel:
-// tanpa ini, dua request paralel bisa sama-sama membaca status lama lalu
+// tanpa ini, dua request bersamaan bisa sama-sama membaca status lama lalu
 // sama-sama menulis status baru, dan dokumen hanya berakhir pada status dari
 // penulisan terakhir tanpa ada yang menyadari.
 func (r *sqlPurchaseOrderRepository) TransitionStatus(ctx context.Context, id int64, allowFrom, forbidFrom []string, status string, updatedBy int64, reason string) (int64, error) {
@@ -335,7 +335,7 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 

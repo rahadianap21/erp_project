@@ -15,7 +15,7 @@ type sqlProductCategoryRepository struct {
 	q *db.Queries
 }
 
-// NewSQLProductCategoryRepository menginisialisasi implementasi repository kategori produk
+// NewSQLProductCategoryRepository menginisialisasi repository kategori produk
 func NewSQLProductCategoryRepository(pool *pgxpool.Pool) domain.ProductCategoryRepository {
 	return &sqlProductCategoryRepository{q: db.New(pool)}
 }

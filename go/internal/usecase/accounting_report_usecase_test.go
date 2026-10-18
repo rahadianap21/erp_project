@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -255,16 +256,16 @@ func TestGeneralLedgerSaldoBerjalanAkunKredit(t *testing.T) {
 func TestLaporanMenolakRentangTanggalTerbalik(t *testing.T) {
 	uc := NewAccountingReportUsecase(&fakeReportRepo{}, &fakeReportCOA{})
 
-	if _, err := uc.IncomeStatement(context.Background(), date(2026, time.December, 31), date(2026, time.January, 1)); err != domain.ErrRentangTanggalInvalid {
+	if _, err := uc.IncomeStatement(context.Background(), date(2026, time.December, 31), date(2026, time.January, 1)); !errors.Is(err, domain.ErrRentangTanggalInvalid) {
 		t.Errorf("IncomeStatement err = %v, ingin ErrRentangTanggalInvalid", err)
 	}
-	if _, err := uc.TrialBalance(context.Background(), date(2026, time.December, 31), date(2026, time.January, 1)); err != domain.ErrRentangTanggalInvalid {
+	if _, err := uc.TrialBalance(context.Background(), date(2026, time.December, 31), date(2026, time.January, 1)); !errors.Is(err, domain.ErrRentangTanggalInvalid) {
 		t.Errorf("TrialBalance err = %v, ingin ErrRentangTanggalInvalid", err)
 	}
-	if _, err := uc.GeneralLedger(context.Background(), 11, date(2026, time.December, 31), date(2026, time.January, 1)); err != domain.ErrRentangTanggalInvalid {
+	if _, err := uc.GeneralLedger(context.Background(), 11, date(2026, time.December, 31), date(2026, time.January, 1)); !errors.Is(err, domain.ErrRentangTanggalInvalid) {
 		t.Errorf("GeneralLedger err = %v, ingin ErrRentangTanggalInvalid", err)
 	}
-	if _, err := uc.BalanceSheet(context.Background(), time.Time{}); err != domain.ErrRentangTanggalInvalid {
+	if _, err := uc.BalanceSheet(context.Background(), time.Time{}); !errors.Is(err, domain.ErrRentangTanggalInvalid) {
 		t.Errorf("BalanceSheet err = %v, ingin ErrRentangTanggalInvalid", err)
 	}
 }
@@ -272,10 +273,10 @@ func TestLaporanMenolakRentangTanggalTerbalik(t *testing.T) {
 func TestGeneralLedgerAkunTidakDitemukan(t *testing.T) {
 	uc := NewAccountingReportUsecase(&fakeReportRepo{}, &fakeReportCOA{})
 
-	if _, err := uc.GeneralLedger(context.Background(), 0, date(2026, time.January, 1), date(2026, time.December, 31)); err != domain.ErrAccountNotFound {
+	if _, err := uc.GeneralLedger(context.Background(), 0, date(2026, time.January, 1), date(2026, time.December, 31)); !errors.Is(err, domain.ErrAccountNotFound) {
 		t.Errorf("GeneralLedger id 0 err = %v, ingin ErrAccountNotFound", err)
 	}
-	if _, err := uc.GeneralLedger(context.Background(), 999, date(2026, time.January, 1), date(2026, time.December, 31)); err != domain.ErrAccountNotFound {
+	if _, err := uc.GeneralLedger(context.Background(), 999, date(2026, time.January, 1), date(2026, time.December, 31)); !errors.Is(err, domain.ErrAccountNotFound) {
 		t.Errorf("GeneralLedger akun tak ada err = %v, ingin ErrAccountNotFound", err)
 	}
 }

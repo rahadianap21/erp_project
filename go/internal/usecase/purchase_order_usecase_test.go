@@ -623,7 +623,7 @@ func TestApprovePO_HappyPath(t *testing.T) {
 
 func TestApprovePO_KalahBalapanDenganPermintaanLain(t *testing.T) {
 	u, poRepo, _ := newUsecase(poStatusPending, 0)
-	// GetByID masih melaporkan PENDING (meniru request paralel yang menang
+	// GetByID masih melaporkan PENDING (meniru request bersamaan yang menang
 	// selang beberapa milidetik sebelum UPDATE dieksekusi).
 	poRepo.transitionRows = 0
 
@@ -676,7 +676,7 @@ func TestCancelPO_HappyPath(t *testing.T) {
 		t.Errorf("status tujuan harus %s, dapat %s", poStatusCancelled, poRepo.transitionStatus)
 	}
 	// APPROVED dan RECEIVED harus dilarang di dalam SQL supaya pembatalan tidak
-	// bisa menimpa dokumen yang baru saja disetujui oleh request paralel.
+	// bisa menimpa dokumen yang baru saja disetujui oleh request bersamaan.
 	if len(poRepo.transitionForbidFrom) != 2 ||
 		poRepo.transitionForbidFrom[0] != poStatusApproved ||
 		poRepo.transitionForbidFrom[1] != poStatusReceived {

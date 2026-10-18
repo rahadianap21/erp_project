@@ -67,7 +67,7 @@ func (r *sqlJournalRepository) CreateDraft(ctx context.Context, entry *domain.Jo
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
@@ -199,7 +199,7 @@ func (r *sqlJournalRepository) Void(ctx context.Context, id, actorID int64, reas
 //  2. memastikan akun barisnya masih layak posting & periode masih OPEN;
 //  3. membuat jurnal pembalik (debit↔kredit) lalu mempostingnya → CAS;
 //  4. menandai jurnal asli sebagai sudah dibalik → CAS (jaga dua pembalikan
-//     paralel agar hanya satu yang menang).
+//     bersamaan agar hanya satu yang menang).
 //
 // Bila langkah mana pun gagal, seluruh transaksi digulung termasuk penghitung
 // nomor jurnal yang tadi dimajukan.
@@ -208,7 +208,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
@@ -387,7 +387,7 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 

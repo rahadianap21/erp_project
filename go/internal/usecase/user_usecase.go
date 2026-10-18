@@ -195,7 +195,7 @@ func (u *userUsecase) GetAllUsers(ctx context.Context, search, role string, page
 	// 1. Hitung nilai offset untuk pagination database
 	offset := (page - 1) * limit
 
-	// 2. Ambil data dengan menyediakan 3 variabel penampung (users, total, err) melalui One-Trip Query
+	// 2. Ambil data dengan menyediakan 3 penampung (users, total, err) melalui One-Trip Query
 	users, total, err := u.userRepo.GetAllUsers(ctx, search, role, offset, limit)
 	if err != nil {
 		return nil, 0, nil, err

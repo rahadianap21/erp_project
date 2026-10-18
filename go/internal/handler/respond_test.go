@@ -10,7 +10,7 @@ import (
 )
 
 // TestStatusForError memastikan seluruh kategori error domain terpetakan ke
-// status HTTP yang benar lewat SATU fungsi, bukan lima implementasi berbeda
+// status HTTP yang benar lewat SATU fungsi, bukan lima cara berbeda
 // seperti sebelumnya.
 func TestStatusForError(t *testing.T) {
 	cases := []struct {

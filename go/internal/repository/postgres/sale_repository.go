@@ -254,12 +254,12 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
 	// Kunci seluruh produk yang dijual supaya validasi stok final tidak bisa
-	// dilewati oleh penjualan paralel produk yang sama.
+	// dilewati oleh penjualan bersamaan produk yang sama.
 	ids := uniqueProductIDs(sale.Details)
 	locks, err := qtx.LockProductsForSale(ctx, ids)
 	if err != nil {
@@ -412,7 +412,7 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 

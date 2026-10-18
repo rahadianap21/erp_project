@@ -171,10 +171,6 @@ func (u *journalUsecase) PlanSaleReversal(ctx context.Context, sale *domain.Sale
 		})
 	}
 
-	desc := reason
-	if desc == "" {
-		desc = fmt.Sprintf("Pembatalan penjualan %s", sale.SaleNumber)
-	}
 	reversalOf := sale.JournalEntryID
 	return u.finalizeSaleJournalPlan(ctx, sale, entryDate, lines, reversalOf, actorID)
 }

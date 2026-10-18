@@ -18,7 +18,7 @@ type sqlProductRepository struct {
 	q    *db.Queries
 }
 
-// NewSQLProductRepository menginisialisasi implementasi ProductRepository berbasis pgxpool
+// NewSQLProductRepository menginisialisasi ProductRepository berbasis pgxpool
 func NewSQLProductRepository(pool *pgxpool.Pool) domain.ProductRepository {
 	return &sqlProductRepository{
 		pool: pool,

@@ -10,7 +10,7 @@ import (
 	"go_backend/internal/domain"
 )
 
-// repoPalsu adalah implementasi UserRepository berbasis slice, cukup untuk
+// repoPalsu adalah tiruan UserRepository berbasis slice, cukup untuk
 // menguji logika wewenang tanpa database.
 type repoPalsu struct {
 	users      map[string]domain.User // keyed by email

@@ -9,7 +9,7 @@ type bankUsecase struct {
 	bankRepo domain.BankRepository
 }
 
-// NewBankUsecase menginisialisasi implementasi BankUsecase terpusat
+// NewBankUsecase menginisialisasi BankUsecase terpusat yang terpusat
 func NewBankUsecase(repo domain.BankRepository) domain.BankUsecase {
 	return &bankUsecase{bankRepo: repo}
 }

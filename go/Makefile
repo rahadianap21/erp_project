@@ -20,3 +20,15 @@ test-integration:
 
 lint:
 	golangci-lint run
+
+fmt:
+	gofmt -s -w . && golangci-lint fmt ./...
+
+build:
+	go build ./...
+
+sqlc:
+	sqlc generate
+
+run:
+	go run ./cmd/api

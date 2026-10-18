@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/golang-jwt/jwt/v5"
 	"go_backend/internal/domain"
 	"go_backend/internal/middleware"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // stubGRNUsecase merekam input CreateGRN supaya test bisa memeriksa hasil decode.

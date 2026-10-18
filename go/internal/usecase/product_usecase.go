@@ -5,21 +5,19 @@ import (
 	"fmt"
 	"go_backend/internal/domain"
 	"math/rand"
-	"time"
 )
 
 type productUsecase struct {
 	productRepo domain.ProductRepository
 }
 
-// NewProductUsecase menginisialisasi implementasi bisnis logis Master Produk
+// NewProductUsecase menginisialisasi bisnis logis Master Produk
 func NewProductUsecase(repo domain.ProductRepository) domain.ProductUsecase {
 	return &productUsecase{productRepo: repo}
 }
 
 // Generator SKU Otomatis Berbasis Kategori dan Acak Unik Penanda Barang
 func (u *productUsecase) generateAutoSKU(categoryID int32) string {
-	rand.Seed(time.Now().UnixNano())
 	randomNum := rand.Intn(899999) + 100000 // Menghasilkan 6 digit angka acak (100000 - 999999)
 	return fmt.Sprintf("SKU-CAT%02d-%d", categoryID, randomNum)
 }

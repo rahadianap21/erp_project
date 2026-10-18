@@ -111,14 +111,14 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
 	// 2. Kirim token, nama user, dan daftar hak akses dinamis (permissions) ke Next.js
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]any{
+	_ = json.NewEncoder(w).Encode(map[string]any{
 		"message":     "Login berhasil!",
 		"token":       token,
 		"name":        user.Name,
@@ -177,13 +177,13 @@ func (h *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal memproses logout"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Gagal memproses logout"})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	_ = json.NewEncoder(w).Encode(map[string]string{
 		"message": "Logout berhasil!",
 	})
 }
@@ -238,7 +238,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil data pengguna: " + err.Error()})
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil data pengguna: " + err.Error()})
 			return
 		}
 
@@ -253,7 +253,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(GetUsersResponse{
+		_ = json.NewEncoder(w).Encode(GetUsersResponse{
 			Data:        dataResponse,
 			Total:       result.Total,
 			RoleOptions: result.RoleOptions,
@@ -269,7 +269,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	users, total, roleOptions, err := h.UserUsecase.GetAllUsers(r.Context(), search, role, page, limit)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil data pengguna: " + err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Gagal mengambil data pengguna: " + err.Error()})
 		return
 	}
 
@@ -284,7 +284,7 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(GetUsersResponse{
+	_ = json.NewEncoder(w).Encode(GetUsersResponse{
 		Data:        dataResponse,
 		Total:       total,
 		RoleOptions: roleOptions,
@@ -307,13 +307,13 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Format request tidak valid: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Format request tidak valid: " + err.Error()})
 				return
 			}
 
 			if err := validate.Struct(req); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": pesanValidasi(err)})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": pesanValidasi(err)})
 				return
 			}
 
@@ -322,16 +322,16 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 				var authErr *domain.AuthorizationError
 				if errors.As(err, &authErr) {
 					w.WriteHeader(http.StatusForbidden)
-					json.NewEncoder(w).Encode(map[string]string{"message": authErr.Reason})
+					_ = json.NewEncoder(w).Encode(map[string]string{"message": authErr.Reason})
 					return
 				}
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Gagal Menyimpan Data: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Gagal Menyimpan Data: " + err.Error()})
 				return
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]any{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"status":  "success",
 				"message": "User baru berhasil didaftarkan ke sistem",
 			})
@@ -344,14 +344,14 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 			idStr := r.URL.Query().Get("id")
 			if idStr == "" {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "ID pengguna wajib disertakan"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "ID pengguna wajib disertakan"})
 				return
 			}
 
 			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Format ID pengguna tidak valid"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Format ID pengguna tidak valid"})
 				return
 			}
 
@@ -359,13 +359,13 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Format request tidak valid: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Format request tidak valid: " + err.Error()})
 				return
 			}
 
 			if err := validate.Struct(req); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": pesanValidasi(err)})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": pesanValidasi(err)})
 				return
 			}
 
@@ -373,16 +373,16 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 				var authErr *domain.AuthorizationError
 				if errors.As(err, &authErr) {
 					w.WriteHeader(http.StatusForbidden)
-					json.NewEncoder(w).Encode(map[string]string{"message": authErr.Reason})
+					_ = json.NewEncoder(w).Encode(map[string]string{"message": authErr.Reason})
 					return
 				}
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Gagal memperbarui pengguna: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Gagal memperbarui pengguna: " + err.Error()})
 				return
 			}
 
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"status":  "success",
 				"message": "Data pengguna berhasil diperbarui",
 			})
@@ -395,25 +395,25 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 			idStr := r.URL.Query().Get("id")
 			if idStr == "" {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "ID user wajib disertakan"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "ID user wajib disertakan"})
 				return
 			}
 
 			id, err := strconv.ParseInt(idStr, 10, 64)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Format ID user tidak valid"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Format ID user tidak valid"})
 				return
 			}
 
 			if err := h.UserUsecase.DeleteUser(r.Context(), id); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{"message": "Gagal menghapus user: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "Gagal menghapus user: " + err.Error()})
 				return
 			}
 
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{
+			_ = json.NewEncoder(w).Encode(map[string]string{
 				"status":  "success",
 				"message": "User berhasil dihapus dari sistem",
 			})
@@ -421,6 +421,6 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Metode HTTP tidak diizinkan"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "Metode HTTP tidak diizinkan"})
 	}
 }

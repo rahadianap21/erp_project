@@ -166,7 +166,7 @@ func (r *sqlRoleRepository) CreateRoleWithPermissions(ctx context.Context, name 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
@@ -202,7 +202,7 @@ func (r *sqlRoleRepository) UpdateRoleWithPermissions(ctx context.Context, id in
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
@@ -243,7 +243,7 @@ func (r *sqlRoleRepository) DeleteRoleWithPermissions(ctx context.Context, id in
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 

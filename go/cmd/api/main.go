@@ -19,7 +19,7 @@ import (
 
 func main() {
 	// Muat .env supaya `go run ./cmd/api` langsung jalan tanpa export manual.
-	// Variabel yang sudah ada di environment selalu menang, jadi in container
+	// Nilai yang sudah ada di environment selalu menang, jadi in container
 	// production override tetap bekerja.
 	if err := godotenv.Load(); err != nil {
 		log.Printf("Peringatan: file .env tidak terbaca (%v), memakai environment yang ada\n", err)

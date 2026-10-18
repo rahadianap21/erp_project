@@ -74,7 +74,7 @@ func TestLoadConfigGagalSaatKeduanyaKosong(t *testing.T) {
 	// errors.Join harus menggabungkan semua masalah, bukan hanya yang pertama.
 	msg := err.Error()
 	if !strings.Contains(msg, "DATABASE_URL") || !strings.Contains(msg, "JWT_SECRET") {
-		t.Fatalf("pesan error harus menyebut kedua variabel, dapat: %v", err)
+		t.Fatalf("pesan error harus menyebut DATABASE_URL dan JWT_SECRET, dapat: %v", err)
 	}
 }
 

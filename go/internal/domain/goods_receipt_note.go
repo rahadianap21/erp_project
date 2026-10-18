@@ -111,7 +111,7 @@ type GoodsReceiptNoteRepository interface {
 }
 
 // GRNJournalPoster menerbitkan jurnal otomatis dari satu GRN (auto-posting).
-// Implementasi wajib idempoten: GRN yang sudah punya jurnal POSTED tidak boleh
+// Penerapan wajib idempoten: GRN yang sudah punya jurnal POSTED tidak boleh
 // menghasilkan jurnal kedua, supaya penutupan penerimaan yang diulang tidak pernah
 // mencatat persediaan dua kali.
 type GRNJournalPoster interface {

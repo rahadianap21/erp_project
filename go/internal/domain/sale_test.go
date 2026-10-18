@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"math"
 	"testing"
 )
@@ -264,7 +265,7 @@ func TestCalculateSaleTolakPembayaranKurang(t *testing.T) {
 			{PaymentMethodID: 1, Amount: 9000},
 		},
 	}, produkUji(), cfgInclusive())
-	if err != ErrSalePaymentKurang {
+	if !errors.Is(err, ErrSalePaymentKurang) {
 		t.Fatalf("harus ErrSalePaymentKurang, dapat %v", err)
 	}
 }
@@ -276,7 +277,7 @@ func TestCalculateSaleTolakTanpaPembayaran(t *testing.T) {
 			{ProductID: 3, Qty: 1, UnitPrice: 10000},
 		},
 	}, produkUji(), cfgInclusive())
-	if err != ErrSalePaymentInvalid {
+	if !errors.Is(err, ErrSalePaymentInvalid) {
 		t.Fatalf("harus ErrSalePaymentInvalid, dapat %v", err)
 	}
 }
@@ -292,7 +293,7 @@ func TestCalculateSaleTolakMetodePembayaranGanda(t *testing.T) {
 			{PaymentMethodID: 2, Amount: 10000},
 		},
 	}, produkUji(), cfgInclusive())
-	if err != ErrSaleMetodeGanda {
+	if !errors.Is(err, ErrSaleMetodeGanda) {
 		t.Fatalf("harus ErrSaleMetodeGanda, dapat %v", err)
 	}
 }
@@ -408,7 +409,7 @@ func TestCalculateSaleTolakRedeemTanpaMember(t *testing.T) {
 			{PaymentMethodID: 1, Amount: 9000},
 		},
 	}, produkUji(), cfgInclusive())
-	if err != ErrSaleRedeemTanpaMember {
+	if !errors.Is(err, ErrSaleRedeemTanpaMember) {
 		t.Fatalf("harus ErrSaleRedeemTanpaMember, dapat %v", err)
 	}
 }

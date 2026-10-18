@@ -73,7 +73,6 @@ type fakeReceivePORepo struct {
 	po             *domain.PurchaseOrder
 	getErr         error
 	transition     int
-	transitionTo   string
 	transitionRows int64
 	transitionErr  error
 	lastAllowFrom  []string

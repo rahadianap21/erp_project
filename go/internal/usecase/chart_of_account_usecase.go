@@ -82,7 +82,7 @@ func (u *chartOfAccountUsecase) CreateAccount(ctx context.Context, acc *domain.C
 		if err != nil {
 			return notFoundAs(err, domain.ErrIndukAkunNotFound)
 		}
-		if parent.IsHeader == false {
+		if !parent.IsHeader {
 			return domain.NewBusinessRuleError("akun induk harus akun bertipe header")
 		}
 	} else {

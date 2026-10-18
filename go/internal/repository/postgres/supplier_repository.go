@@ -16,7 +16,7 @@ type sqlSupplierRepository struct {
 	q *db.Queries
 }
 
-// NewSQLSupplierRepository menginisialisasi implementasi SupplierRepository berbasis pgxpool
+// NewSQLSupplierRepository menginisialisasi SupplierRepository berbasis pgxpool
 func NewSQLSupplierRepository(pool *pgxpool.Pool) domain.SupplierRepository {
 	return &sqlSupplierRepository{q: db.New(pool)}
 }

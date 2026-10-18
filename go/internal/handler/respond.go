@@ -177,7 +177,7 @@ func parsePOID(r *http.Request) (int64, error) {
 	idStr := r.URL.Query().Get("id")
 	poID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || poID <= 0 {
-		return 0, errors.New("Parameter ID dokumen PO tidak valid")
+		return 0, errors.New("parameter ID dokumen PO tidak valid")
 	}
 	return poID, nil
 }

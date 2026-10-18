@@ -27,13 +27,13 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 			var in domain.CreateGRNInput
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
-				json.NewEncoder(w).Encode(map[string]string{"message": "body tidak valid: " + err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "body tidak valid: " + err.Error()})
 				return
 			}
 			uid := middleware.CurrentUserID(r)
 			if uid <= 0 {
 				w.WriteHeader(http.StatusUnauthorized)
-				json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
 				return
 			}
 			in.CreatedBy = uid
@@ -43,7 +43,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 				return
 			}
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(map[string]any{"message": "grn berhasil dibuat", "data": grn})
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "grn berhasil dibuat", "data": grn})
 		}))
 		protected(w, r)
 		return
@@ -55,22 +55,22 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 				id, err := strconv.ParseInt(idStr, 10, 64)
 				if err != nil || id <= 0 {
 					w.WriteHeader(http.StatusBadRequest)
-					json.NewEncoder(w).Encode(map[string]string{"message": "id grn tidak valid"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"message": "id grn tidak valid"})
 					return
 				}
 				g, err := h.uc.GetByID(r.Context(), id)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
-					json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+					_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 					return
 				}
 				if g == nil {
 					w.WriteHeader(http.StatusNotFound)
-					json.NewEncoder(w).Encode(map[string]string{"message": "grn tidak ditemukan"})
+					_ = json.NewEncoder(w).Encode(map[string]string{"message": "grn tidak ditemukan"})
 					return
 				}
 				w.WriteHeader(http.StatusOK)
-				json.NewEncoder(w).Encode(map[string]any{"data": g})
+				_ = json.NewEncoder(w).Encode(map[string]any{"data": g})
 				return
 			}
 			search := strings.TrimSpace(q.Get("search"))
@@ -83,11 +83,11 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 			items, total, err := h.uc.GetAll(r.Context(), search, cursor, limit, dir)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
+				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]any{"data": items, "total": total})
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": items, "total": total})
 		}))
 		protected(w, r)
 		return
@@ -109,14 +109,14 @@ func (h *GoodsReceiptNoteHandler) HandleFinishReceiving(w http.ResponseWriter, r
 		id, err := strconv.ParseInt(q.Get("id"), 10, 64)
 		if err != nil || id <= 0 {
 			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"message": "id po tidak valid"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "id po tidak valid"})
 			return
 		}
 		allowPartial := strings.ToLower(q.Get("allow_partial")) == "true" || q.Get("allow_partial") == "1"
 		uid := middleware.CurrentUserID(r)
 		if uid <= 0 {
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
+			_ = json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
 			return
 		}
 		if err := h.uc.FinishReceiving(r.Context(), id, allowPartial, uid); err != nil {
@@ -124,7 +124,7 @@ func (h *GoodsReceiptNoteHandler) HandleFinishReceiving(w http.ResponseWriter, r
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"message": "po berhasil diterima"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "po berhasil diterima"})
 	}))
 	protected(w, r)
 }

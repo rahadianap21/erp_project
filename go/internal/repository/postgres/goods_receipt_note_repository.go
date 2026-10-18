@@ -43,10 +43,10 @@ type poLine struct {
 // mengikuti conversion_rate. Pair lain ditolak karena tidak ada faktor konversi
 // yang bisa dittrusted.
 func sellingRate(l poLine) (int32, error) {
-	switch {
-	case l.PurchaseUnitID == l.ProductSellingUnitID:
+	switch l.PurchaseUnitID {
+	case l.ProductSellingUnitID:
 		return 1, nil
-	case l.PurchaseUnitID == l.ProductPurchaseUnitID:
+	case l.ProductPurchaseUnitID:
 		if l.ConversionRate < 1 {
 			return 1, nil
 		}
@@ -61,7 +61,7 @@ func (r *sqlGRNRepository) CreateGRN(ctx context.Context, in domain.CreateGRNInp
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
@@ -135,7 +135,7 @@ func (r *sqlGRNRepository) CreateGRN(ctx context.Context, in domain.CreateGRNInp
 	grnNumber := fmt.Sprintf("GRN/%s/%04d", datePrefix, nextSeq)
 
 	receivedDate := now
-	if in.ReceivedDate != nil && !in.ReceivedDate.Time.IsZero() {
+	if in.ReceivedDate != nil && !in.ReceivedDate.IsZero() {
 		receivedDate = in.ReceivedDate.Time
 	}
 	var notesPg pgtype.Text
@@ -215,7 +215,7 @@ func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, upda
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 
 	qtx := r.q.WithTx(tx)
 
