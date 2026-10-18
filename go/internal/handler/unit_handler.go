@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 	"net/http"
 	"strings"
 )
@@ -19,7 +20,7 @@ func (h *UnitHandler) HandleGetUnits(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// 🌟 1. JALUR BACA DATA (GET)
 	if r.Method == http.MethodGet {
-		RequirePermission("units:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("units:read", func(w http.ResponseWriter, r *http.Request) {
 			data, err := h.UnitUsecase.GetAllUnits(r.Context())
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -38,8 +39,8 @@ func (h *UnitHandler) HandleGetUnits(w http.ResponseWriter, r *http.Request) {
 
 	// 🌟 2. JALUR BUAT DATA BARU (POST) - MENYELAMATKAN DARI EROR 405
 	if r.Method == http.MethodPost {
-		RequirePermission("units:create", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("units:create", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Kode        string `json:"kode"`

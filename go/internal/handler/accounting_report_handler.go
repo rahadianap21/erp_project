@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 // parseTanggalLaporan membaca parameter tanggal (format YYYY-MM-DD). Nilai
@@ -32,7 +33,7 @@ func withReportRead(body func(w http.ResponseWriter, r *http.Request)) http.Hand
 			respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 			return
 		}
-		RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
 			body(w, r)
 		})(w, r)
 	}

@@ -10,6 +10,7 @@ import (
 	"go_backend/internal/config"
 	"go_backend/internal/handler"
 	"go_backend/internal/repository/postgres"
+	"go_backend/internal/router"
 	"go_backend/internal/usecase"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -120,7 +121,7 @@ func main() {
 	paymentMethodHandler := handler.NewPaymentMethodHandler(paymentMethodUsecase)
 	settingsHandler := handler.NewSettingsHandler(settingsUsecase)
 
-	handler.RegisterRoutes(cfg, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, settingsHandler)
+	router.RegisterRoutes(cfg, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, settingsHandler)
 
 	fmt.Printf("Server produksi siap melayani di http://localhost:%s\n", cfg.Port)
 	server := &http.Server{

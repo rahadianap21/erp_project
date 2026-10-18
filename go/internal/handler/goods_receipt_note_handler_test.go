@@ -9,6 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 // stubGRNUsecase merekam input CreateGRN supaya test bisa memeriksa hasil decode.
@@ -35,12 +36,12 @@ func TestCreateGRNMenerimaTanggalDateOnly(t *testing.T) {
 	}`
 
 	r := httptest.NewRequest(http.MethodPost, "/api/goods-receipt-notes", strings.NewReader(body))
-	r = r.WithContext(context.WithValue(r.Context(), authKey, requestAuth{
+	r = middleware.WithRequestAuth(r, middleware.RequestAuth{
 		UserID:      9,
 		Permissions: []string{"grn:create"},
-	}))
-	// CurrentUserID membaca klaim JWT di UserContextKey, bukan requestAuth.
-	r = r.WithContext(context.WithValue(r.Context(), UserContextKey, jwt.MapClaims{"user_id": float64(9)}))
+	})
+	// CurrentUserID membaca klaim JWT di middleware.UserContextKey, bukan requestAuth.
+	r = r.WithContext(context.WithValue(r.Context(), middleware.UserContextKey, jwt.MapClaims{"user_id": float64(9)}))
 	w := httptest.NewRecorder()
 	NewGoodsReceiptNoteHandler(uc).HandleGRNs(w, r)
 

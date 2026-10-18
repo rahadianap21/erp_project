@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type RoleHandler struct {
@@ -23,7 +24,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 🌟 1. JALUR READ DATA PERAN (METHOD GET)
 	if r.Method == http.MethodGet {
-		RequirePermission("roles:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("roles:read", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
 			// Tangkap parameter query dari URL
@@ -97,7 +98,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 🌟 2. JALUR CREATE DATA PERAN (METHOD POST)
 	if r.Method == http.MethodPost {
-		RequirePermission("roles:create", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("roles:create", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Name        string   `json:"name"`
 				Permissions []string `json:"permissions"`
@@ -135,7 +136,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 🌟 3. JALUR UPDATE DATA PERAN (METHOD PUT)
 	if r.Method == http.MethodPut {
-		RequirePermission("roles:update", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("roles:update", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Name        string   `json:"name"`
 				Permissions []string `json:"permissions"`
@@ -162,7 +163,7 @@ func (h *RoleHandler) RolesCRUDHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 🌟 4. JALUR DELETE DATA PERAN (METHOD DELETE)
 	if r.Method == http.MethodDelete {
-		RequirePermission("roles:delete", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("roles:delete", func(w http.ResponseWriter, r *http.Request) {
 			err := h.RoleUsecase.DeleteRoleWithPermissions(r.Context(), roleID)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -189,7 +190,7 @@ func (h *RoleHandler) GetAllMasterPermissions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	RequirePermission("roles:read", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("roles:read", func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
 		permissions, err := h.RoleUsecase.GetAllMasterPermissions(ctx)

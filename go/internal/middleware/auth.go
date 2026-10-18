@@ -1,5 +1,5 @@
-// internal/handler/auth_middleware.go
-package handler
+// internal/middleware/auth.go
+package middleware
 
 import (
 	"context"
@@ -105,7 +105,7 @@ func RequireRole(allowedRoles []int32, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1048576)
 
-		auth, ok := getRequestAuth(r)
+		auth, ok := GetRequestAuth(r)
 		if !ok {
 			w.WriteHeader(http.StatusForbidden)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Akses ditolak: gagal memvalidasi identitas"})
@@ -139,7 +139,7 @@ func RequireRole(allowedRoles []int32, next http.HandlerFunc) http.HandlerFunc {
 // =========================================================================
 func RequirePermission(requiredPermission string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		auth, ok := getRequestAuth(r)
+		auth, ok := GetRequestAuth(r)
 		if !ok {
 			w.WriteHeader(http.StatusForbidden)
 			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Akses ditolak, sesi otorisasi tidak ditemukan"})
@@ -225,7 +225,7 @@ func CurrentUserID(r *http.Request) int64 {
 // dari database ketika setiap request autentikasi melewati JWTMiddlewareWithResolver.
 // Ini memastikan pencabutan permission atau penonaktifan akun langsung berlaku
 // pada request berikutnya (token JWT bisa berlaku 24 jam).
-type requestAuth struct {
+type RequestAuth struct {
 	UserID      int64
 	RoleID      int32
 	App         string
@@ -237,9 +237,15 @@ type authContextKey string
 const authKey authContextKey = "request_auth"
 
 // getRequestAuth mengambil otorisasi yang sudah divalidasi dari context.
-func getRequestAuth(r *http.Request) (requestAuth, bool) {
-	auth, ok := r.Context().Value(authKey).(requestAuth)
+func GetRequestAuth(r *http.Request) (RequestAuth, bool) {
+	auth, ok := r.Context().Value(authKey).(RequestAuth)
 	return auth, ok
+}
+
+// WithRequestAuth menyuntikkan RequestAuth ke context request.
+// Dipakai oleh handler test untuk meniru hasil middleware tanpa membangun token JWT.
+func WithRequestAuth(r *http.Request, auth RequestAuth) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), authKey, auth))
 }
 
 // tokenCandidates mengembalikan kandidat token JWT untuk dicoba berurutan.
@@ -336,7 +342,7 @@ func JWTMiddlewareWithResolver(cfg *config.Config, resolver domain.PermissionRes
 			return
 		}
 
-		auth := requestAuth{
+		auth := RequestAuth{
 			UserID:      otorisasi.UserID,
 			RoleID:      otorisasi.RoleID,
 			App:         otorisasi.App,

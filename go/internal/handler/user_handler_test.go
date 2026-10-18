@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -49,7 +50,7 @@ func claimsFor(permissions ...string) jwt.MapClaims {
 
 // withAuth menyuntikkan requestAuth ke context, meniru hasil JWTMiddlewareWithResolver.
 func withAuth(r *http.Request, claims jwt.MapClaims) *http.Request {
-	ctx := context.WithValue(r.Context(), UserContextKey, claims)
+	ctx := context.WithValue(r.Context(), middleware.UserContextKey, claims)
 	var perms []string
 	if raw, ok := claims["permissions"].([]interface{}); ok {
 		for _, p := range raw {
@@ -58,8 +59,7 @@ func withAuth(r *http.Request, claims jwt.MapClaims) *http.Request {
 			}
 		}
 	}
-	auth := requestAuth{UserID: 26, Permissions: perms}
-	return r.WithContext(context.WithValue(ctx, authKey, auth))
+	return middleware.WithRequestAuth(r.WithContext(ctx), middleware.RequestAuth{UserID: 26, Permissions: perms})
 }
 
 func postJSON(t *testing.T, uc domain.UserUsecase, claims jwt.MapClaims, body string) *httptest.ResponseRecorder {
@@ -147,7 +147,7 @@ func TestErrorValidasiTetap400(t *testing.T) {
 	}
 }
 
-// TestHandlerMeneruskanActorKeUsecase memastikan wiring CurrentActor(r) benar:
+// TestHandlerMeneruskanActorKeUsecase memastikan wiring middleware.CurrentActor(r) benar:
 // usecase harus menerima UserID dari JWT, bukan 0.
 func TestHandlerMeneruskanActorKeUsecase(t *testing.T) {
 	uc := &stubUserUsecase{}

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type ProductHandler struct {
@@ -23,7 +24,7 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 
 	// 🌟 1. JALUR BACA DATA (METHOD GET - CURSOR PAGINATION MULTI-JOIN)
 	if r.Method == http.MethodGet {
-		RequirePermission("products:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("products:read", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
 			search := r.URL.Query().Get("search")
@@ -81,8 +82,8 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 
 	// 🌟 2. JALUR BUAT DATA BARU (METHOD POST)
 	if r.Method == http.MethodPost {
-		RequirePermission("products:create", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("products:create", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Sku            string  `json:"sku"`
@@ -161,8 +162,8 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 
 	// 🌟 3. JALUR UBAH REKOR DATA (METHOD PUT)
 	if r.Method == http.MethodPut {
-		RequirePermission("products:update", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("products:update", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Sku            string  `json:"sku"`
@@ -228,8 +229,8 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 
 	// 🌟 4. JALUR PENGHAPUSAN SOFT-DELETE (METHOD DELETE)
 	if r.Method == http.MethodDelete {
-		RequirePermission("products:delete", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("products:delete", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			if err := h.ProductUsecase.DeleteProduct(r.Context(), idConverted, userID); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type SaleHandler struct {
@@ -69,12 +70,12 @@ func (h *SaleHandler) HandleSales(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodPost:
-		protected := RequirePermission("sales:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("sales:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var in domain.CreateSaleInput
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if uid <= 0 {
 				w.WriteHeader(http.StatusUnauthorized)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
@@ -93,7 +94,7 @@ func (h *SaleHandler) HandleSales(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case http.MethodGet:
-		protected := RequirePermission("sales:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("sales:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 			if idStr := q.Get("id"); idStr != "" {
 				id, err := strconv.ParseInt(idStr, 10, 64)
@@ -146,14 +147,14 @@ func (h *SaleHandler) HandleSaleVoid(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("sales:void", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("sales:void", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 		if err != nil || id <= 0 {
 			w.WriteHeader(http.StatusBadRequest)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "id penjualan tidak valid"})
 			return
 		}
-		uid := CurrentUserID(r)
+		uid := middleware.CurrentUserID(r)
 		if uid <= 0 {
 			w.WriteHeader(http.StatusUnauthorized)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
@@ -179,7 +180,7 @@ func (h *SaleHandler) HandlePOSBootstrap(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		data, err := h.posUC.Bootstrap(r.Context())
 		if err != nil {
 			writeSaleError(w, err)
@@ -197,7 +198,7 @@ func (h *SaleHandler) HandlePOSProducts(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		category, _ := strconv.Atoi(q.Get("category_id"))
@@ -218,7 +219,7 @@ func (h *SaleHandler) HandlePOSMembers(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("pos:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		limit, _ := strconv.Atoi(q.Get("limit"))
 		items, err := h.posUC.SearchMembers(r.Context(), q.Get("search"), limit)

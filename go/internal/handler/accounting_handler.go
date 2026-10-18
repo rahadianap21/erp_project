@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 // AccountingHandler mengelompokkan endpoint modul akuntansi: bagan akun,
@@ -101,7 +102,7 @@ func parseInt64Param(r *http.Request, key string) (int64, bool) {
 func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
 			if id, ok := parseInt64Param(r, "id"); ok && id > 0 {
 				acc, err := h.CoaUsecase.FindAccountByID(r.Context(), id)
 				if err != nil {
@@ -130,7 +131,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 		})(w, r)
 
 	case http.MethodPost:
-		RequirePermission("accounting:create", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:create", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Code          string `json:"code"`
 				Name          string `json:"name"`
@@ -143,7 +144,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Format payload JSON tidak valid"})
 				return
 			}
-			userID := CurrentUserID(r)
+			userID := middleware.CurrentUserID(r)
 			acc := &domain.ChartOfAccount{
 				Code:          req.Code,
 				Name:          req.Name,
@@ -162,7 +163,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 		})(w, r)
 
 	case http.MethodPut:
-		RequirePermission("accounting:update", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:update", func(w http.ResponseWriter, r *http.Request) {
 			id, ok := parseInt64Param(r, "id")
 			if !ok || id <= 0 {
 				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter ID akun tidak valid"})
@@ -181,7 +182,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Format payload JSON tidak valid"})
 				return
 			}
-			userID := CurrentUserID(r)
+			userID := middleware.CurrentUserID(r)
 			acc := &domain.ChartOfAccount{
 				ID:            id,
 				Code:          req.Code,
@@ -202,13 +203,13 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 		})(w, r)
 
 	case http.MethodDelete:
-		RequirePermission("accounting:delete", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:delete", func(w http.ResponseWriter, r *http.Request) {
 			id, ok := parseInt64Param(r, "id")
 			if !ok || id <= 0 {
 				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter ID akun tidak valid"})
 				return
 			}
-			userID := CurrentUserID(r)
+			userID := middleware.CurrentUserID(r)
 			if err := h.CoaUsecase.DeleteAccount(r.Context(), id, userID); err != nil {
 				respondError(w, err)
 				return
@@ -229,7 +230,7 @@ func (h *AccountingHandler) AccountsCRUDHandler(w http.ResponseWriter, r *http.R
 func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
 			if y, ok := parseInt64Param(r, "year"); ok {
 				m, _ := parseInt64Param(r, "month")
 				period, err := h.PeriodUsecase.GetPeriod(r.Context(), y, m)
@@ -250,7 +251,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 		})(w, r)
 
 	case http.MethodPost:
-		RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				Year  int64 `json:"year"`
 				Month int64 `json:"month"`
@@ -259,7 +260,7 @@ func (h *AccountingHandler) PeriodsCRUDHandler(w http.ResponseWriter, r *http.Re
 				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Format payload JSON tidak valid"})
 				return
 			}
-			period, err := h.PeriodUsecase.OpenPeriod(r.Context(), req.Year, req.Month, CurrentUserID(r))
+			period, err := h.PeriodUsecase.OpenPeriod(r.Context(), req.Year, req.Month, middleware.CurrentUserID(r))
 			if err != nil {
 				respondError(w, err)
 				return
@@ -279,14 +280,14 @@ func (h *AccountingHandler) HandleClosePeriod(w http.ResponseWriter, r *http.Req
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 		return
 	}
-	RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
 		y, okY := parseInt64Param(r, "year")
 		m, okM := parseInt64Param(r, "month")
 		if !okY || !okM {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter tahun/bulan tidak valid"})
 			return
 		}
-		if err := h.PeriodUsecase.ClosePeriod(r.Context(), y, m, CurrentUserID(r)); err != nil {
+		if err := h.PeriodUsecase.ClosePeriod(r.Context(), y, m, middleware.CurrentUserID(r)); err != nil {
 			respondError(w, err)
 			return
 		}
@@ -301,14 +302,14 @@ func (h *AccountingHandler) HandleReopenPeriod(w http.ResponseWriter, r *http.Re
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 		return
 	}
-	RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("accounting:close-period", func(w http.ResponseWriter, r *http.Request) {
 		y, okY := parseInt64Param(r, "year")
 		m, okM := parseInt64Param(r, "month")
 		if !okY || !okM {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter tahun/bulan tidak valid"})
 			return
 		}
-		if err := h.PeriodUsecase.ReopenPeriod(r.Context(), int(y), int(m), CurrentUserID(r)); err != nil {
+		if err := h.PeriodUsecase.ReopenPeriod(r.Context(), int(y), int(m), middleware.CurrentUserID(r)); err != nil {
 			respondError(w, err)
 			return
 		}
@@ -324,7 +325,7 @@ func (h *AccountingHandler) HandleReopenPeriod(w http.ResponseWriter, r *http.Re
 func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
 			if id, ok := parseInt64Param(r, "id"); ok && id > 0 {
 				entry, err := h.JournalUsecase.FindJournalByID(r.Context(), id)
 				if err != nil {
@@ -354,7 +355,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 		})(w, r)
 
 	case http.MethodPost:
-		RequirePermission("accounting:create", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("accounting:create", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				EntryDate   string `json:"entry_date"`
 				Description string `json:"description"`
@@ -386,7 +387,7 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 					Credit:      l.Credit,
 				})
 			}
-			entry, err := h.JournalUsecase.CreateJournal(r.Context(), input, CurrentUserID(r))
+			entry, err := h.JournalUsecase.CreateJournal(r.Context(), input, middleware.CurrentUserID(r))
 			if err != nil {
 				respondError(w, err)
 				return
@@ -406,13 +407,13 @@ func (h *AccountingHandler) HandlePostJournal(w http.ResponseWriter, r *http.Req
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 		return
 	}
-	RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseInt64Param(r, "id")
 		if !ok || id <= 0 {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter ID jurnal tidak valid"})
 			return
 		}
-		if err := h.JournalUsecase.PostJournal(r.Context(), id, CurrentUserID(r)); err != nil {
+		if err := h.JournalUsecase.PostJournal(r.Context(), id, middleware.CurrentUserID(r)); err != nil {
 			respondError(w, err)
 			return
 		}
@@ -427,7 +428,7 @@ func (h *AccountingHandler) HandleVoidJournal(w http.ResponseWriter, r *http.Req
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 		return
 	}
-	RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseInt64Param(r, "id")
 		if !ok || id <= 0 {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter ID jurnal tidak valid"})
@@ -437,7 +438,7 @@ func (h *AccountingHandler) HandleVoidJournal(w http.ResponseWriter, r *http.Req
 			Reason string `json:"reason"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&payload)
-		if err := h.JournalUsecase.VoidJournal(r.Context(), id, CurrentUserID(r), payload.Reason); err != nil {
+		if err := h.JournalUsecase.VoidJournal(r.Context(), id, middleware.CurrentUserID(r), payload.Reason); err != nil {
 			respondError(w, err)
 			return
 		}
@@ -452,7 +453,7 @@ func (h *AccountingHandler) HandleReverseJournal(w http.ResponseWriter, r *http.
 		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
 		return
 	}
-	RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("accounting:post", func(w http.ResponseWriter, r *http.Request) {
 		id, ok := parseInt64Param(r, "id")
 		if !ok || id <= 0 {
 			respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Parameter ID jurnal tidak valid"})
@@ -462,7 +463,7 @@ func (h *AccountingHandler) HandleReverseJournal(w http.ResponseWriter, r *http.
 			Reason string `json:"reason"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&payload)
-		if err := h.JournalUsecase.ReverseJournal(r.Context(), id, CurrentUserID(r), payload.Reason); err != nil {
+		if err := h.JournalUsecase.ReverseJournal(r.Context(), id, middleware.CurrentUserID(r), payload.Reason); err != nil {
 			respondError(w, err)
 			return
 		}

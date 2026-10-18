@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 // stubProductUsecase hanya merekam produk yang diteruskan handler; cukup untuk
@@ -34,10 +35,10 @@ func callProduct(t *testing.T, method, permission, body string) (*httptest.Respo
 	t.Helper()
 	uc := &stubProductUsecase{}
 	r := httptest.NewRequest(method, "/api/products?id=5", strings.NewReader(body))
-	r = r.WithContext(context.WithValue(r.Context(), authKey, requestAuth{
+	r = middleware.WithRequestAuth(r, middleware.RequestAuth{
 		UserID:      9,
 		Permissions: []string{permission},
-	}))
+	})
 	w := httptest.NewRecorder()
 	NewProductHandler(uc).ProductsCRUDHandler(w, r)
 	return w, uc

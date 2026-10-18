@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type SupplierHandler struct {
@@ -23,7 +24,7 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 
 	// 🌟 1. JALUR READ DATA SUPPLIER (METHOD GET - CURSOR PAGINATION & BANK LEFT JOIN)
 	if r.Method == http.MethodGet {
-		RequirePermission("suppliers:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("suppliers:read", func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
 			search := r.URL.Query().Get("search")
@@ -87,9 +88,9 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 
 	// 🌟 2. JALUR CREATE DATA SUPPLIER (METHOD POST)
 	if r.Method == http.MethodPost {
-		RequirePermission("suppliers:create", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("suppliers:create", func(w http.ResponseWriter, r *http.Request) {
 			// Ambil user_id aktif dari context JWT untuk kebutuhan Audit Trail database
-			userID := CurrentUserID(r)
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Name          string `json:"name"`
@@ -151,8 +152,8 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 
 	// 🌟 3. JALUR UPDATE DATA SUPPLIER (METHOD PUT)
 	if r.Method == http.MethodPut {
-		RequirePermission("suppliers:update", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("suppliers:update", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Name          string `json:"name"`
@@ -202,8 +203,8 @@ func (h *SupplierHandler) SuppliersCRUDHandler(w http.ResponseWriter, r *http.Re
 
 	// 🌟 4. JALUR DELETE DATA SUPPLIER (METHOD DELETE)
 	if r.Method == http.MethodDelete {
-		RequirePermission("suppliers:delete", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("suppliers:delete", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			err := h.SupplierUsecase.DeleteSupplier(r.Context(), idConverted, userID)
 			if err != nil {

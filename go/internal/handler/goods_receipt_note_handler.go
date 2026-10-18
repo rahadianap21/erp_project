@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type GoodsReceiptNoteHandler struct {
@@ -22,14 +23,14 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 
 	switch r.Method {
 	case http.MethodPost:
-		protected := RequirePermission("grn:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("grn:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var in domain.CreateGRNInput
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				json.NewEncoder(w).Encode(map[string]string{"message": "body tidak valid: " + err.Error()})
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if uid <= 0 {
 				w.WriteHeader(http.StatusUnauthorized)
 				json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})
@@ -54,7 +55,7 @@ func (h *GoodsReceiptNoteHandler) HandleGRNs(w http.ResponseWriter, r *http.Requ
 		return
 
 	case http.MethodGet:
-		protected := RequirePermission("grn:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("grn:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 			if idStr := q.Get("id"); idStr != "" {
 				id, err := strconv.ParseInt(idStr, 10, 64)
@@ -109,7 +110,7 @@ func (h *GoodsReceiptNoteHandler) HandleFinishReceiving(w http.ResponseWriter, r
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("po:receive", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("po:receive", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		id, err := strconv.ParseInt(q.Get("id"), 10, 64)
 		if err != nil || id <= 0 {
@@ -118,7 +119,7 @@ func (h *GoodsReceiptNoteHandler) HandleFinishReceiving(w http.ResponseWriter, r
 			return
 		}
 		allowPartial := strings.ToLower(q.Get("allow_partial")) == "true" || q.Get("allow_partial") == "1"
-		uid := CurrentUserID(r)
+		uid := middleware.CurrentUserID(r)
 		if uid <= 0 {
 			w.WriteHeader(http.StatusUnauthorized)
 			json.NewEncoder(w).Encode(map[string]string{"message": "tidak terautentikasi"})

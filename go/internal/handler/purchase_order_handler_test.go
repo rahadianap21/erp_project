@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 // stubPOUsecase hanya mengimplementasikan ApprovePO dan CancelPO; dua metode itu
@@ -40,10 +41,10 @@ func wrapErr(err error) error {
 func callPO(t *testing.T, permission string, handler func(http.ResponseWriter, *http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	r := httptest.NewRequest(http.MethodPut, "/api/purchase-orders/approve?id=77", nil)
-	r = r.WithContext(context.WithValue(r.Context(), authKey, requestAuth{
+	r = middleware.WithRequestAuth(r, middleware.RequestAuth{
 		UserID:      9,
 		Permissions: []string{permission},
-	}))
+	})
 	w := httptest.NewRecorder()
 	handler(w, r)
 	return w

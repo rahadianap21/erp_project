@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type ProductCategoryHandler struct {
@@ -22,7 +23,7 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 
 	// 1. JALUR GET DATA (CURSOR PAGINATION BASED)
 	if r.Method == http.MethodGet {
-		RequirePermission("categories:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("categories:read", func(w http.ResponseWriter, r *http.Request) {
 			search := r.URL.Query().Get("search")
 
 			var cursorID int32 = 0
@@ -71,8 +72,8 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 
 	// 2. JALUR CREATE DATA (POST)
 	if r.Method == http.MethodPost {
-		RequirePermission("categories:create", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("categories:create", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Name        string `json:"name"`
@@ -124,8 +125,8 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 
 	// 3. JALUR UPDATE DATA (PUT)
 	if r.Method == http.MethodPut {
-		RequirePermission("categories:update", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("categories:update", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			var req struct {
 				Name        string `json:"name"`
@@ -163,8 +164,8 @@ func (h *ProductCategoryHandler) CategoriesCRUDHandler(w http.ResponseWriter, r 
 
 	// 4. JALUR DELETE DATA (DELETE)
 	if r.Method == http.MethodDelete {
-		RequirePermission("categories:delete", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("categories:delete", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			if err := h.Usecase.DeleteCategory(r.Context(), int32(idConverted), userID); err != nil {
 				if errors.Is(err, domain.ErrKategoriTidakDitemukan) {

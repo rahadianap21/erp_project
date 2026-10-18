@@ -1,4 +1,4 @@
-package handler
+package middleware
 
 import (
 	"context"
@@ -200,14 +200,14 @@ func TestCurrentUserIDviaJWTMiddleware(t *testing.T) {
 
 	// Bungkus handler dengan RequirePermission supaya alurnya sama dengan
 	// router sungguhan: JWT dicek dulu, permission dibaca dari DB, lalu handler.
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 
-	handler(rec, req)
+	testJWTMW(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d (body: %s)", rec.Code, http.StatusOK, rec.Body.String())
@@ -234,14 +234,14 @@ func TestCurrentUserIDviaJWTMiddlewareTanpaPermission(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
 
-	handler(rec, req)
+	testJWTMW(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
@@ -260,13 +260,13 @@ func TestCurrentUserIDTokenTidakValid(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}
 
-	handler := JWTMiddleware(testCfg, next)
+	mw := JWTMiddleware(testCfg, next)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer token-garbage")
 	rec := httptest.NewRecorder()
 
-	handler(rec, req)
+	mw(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -305,14 +305,14 @@ func TestPermissionDicabutBerlakuLangsungTanpaTokenBaru(t *testing.T) {
 		dipanggil++
 		w.WriteHeader(http.StatusOK)
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	kirim := func() int {
 		req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		rec := httptest.NewRecorder()
-		handler(rec, req)
+		testJWTMW(rec, req)
 		return rec.Code
 	}
 
@@ -345,13 +345,13 @@ func TestPermissionBaruLangsungBerlaku(t *testing.T) {
 	next := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("po:approve", next))
 
 	req := httptest.NewRequest(http.MethodPut, "/api/purchase-orders/approve?id=1", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
-	handler(rec, req)
+	testJWTMW(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("permission belum ada, harus 403, dapat %d", rec.Code)
 	}
@@ -361,7 +361,7 @@ func TestPermissionBaruLangsungBerlaku(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodPut, "/api/purchase-orders/approve?id=1", nil)
 	req2.Header.Set("Authorization", "Bearer "+token)
 	rec2 := httptest.NewRecorder()
-	handler(rec2, req2)
+	testJWTMW(rec2, req2)
 	if rec2.Code != http.StatusOK {
 		t.Fatalf("permission baru harus langsung berlaku, dapat %d", rec2.Code)
 	}
@@ -382,13 +382,13 @@ func TestRolePindahLangsungBerlaku(t *testing.T) {
 	next := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequireRole([]int32{1}, next))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/dashboard", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
-	handler(rec, req)
+	testJWTMW(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("role di DB masih Super Admin, harus 200, dapat %d", rec.Code)
 	}
@@ -399,7 +399,7 @@ func TestRolePindahLangsungBerlaku(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "/api/admin/dashboard", nil)
 	req2.Header.Set("Authorization", "Bearer "+token)
 	rec2 := httptest.NewRecorder()
-	handler(rec2, req2)
+	testJWTMW(rec2, req2)
 	if rec2.Code != http.StatusForbidden {
 		t.Fatalf("role sudah dipindah, harus 403, dapat %d", rec2.Code)
 	}
@@ -423,13 +423,13 @@ func TestAkunNonAktifDitolakSetiapEndpoint(t *testing.T) {
 		dipanggil = true
 		w.WriteHeader(http.StatusOK)
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
-	handler(rec, req)
+	testJWTMW(rec, req)
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("akun nonaktif harus 403, dapat %d", rec.Code)
@@ -454,13 +454,13 @@ func TestKegagalanDatabaseMenjadi500(t *testing.T) {
 	next := func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler tidak boleh jalan ketika database gagal")
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
-	handler(rec, req)
+	testJWTMW(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("kegagalan database harus 500, dapat %d", rec.Code)
@@ -479,13 +479,13 @@ func TestTokenTanpaUserIDDitolak(t *testing.T) {
 	next := func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler tidak boleh jalan untuk token tanpa user id")
 	}
-	handler := JWTMiddlewareWithResolver(testCfg, resolver,
+	testJWTMW := JWTMiddlewareWithResolver(testCfg, resolver,
 		RequirePermission("products:delete", next))
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/products?id=6", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
-	handler(rec, req)
+	testJWTMW(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("token tanpa user id harus 401, dapat %d", rec.Code)

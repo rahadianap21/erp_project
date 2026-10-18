@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
-	"time"
 	"math"
 	"math/big"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -229,14 +229,14 @@ func (r *sqlPurchaseOrderRepository) GetByID(ctx context.Context, id int64) (*do
 		TaxAmount:   taxAmt,
 		TotalAmount: totalAmt,
 
-		Status:        row.Status,
-		Notes:         row.Notes.String,
-		ApprovedBy:    convertPgInt64(row.ApprovedBy),
-		ApprovedAt:    convertPgTime(row.ApprovedAt),
-		RejectedBy:    convertPgInt64(row.RejectedBy),
-		RejectedAt:    convertPgTime(row.RejectedAt),
-		RejectReason:  row.RejectReason.String,
-		CreatedAt:     row.CreatedAt.Time,
+		Status:       row.Status,
+		Notes:        row.Notes.String,
+		ApprovedBy:   convertPgInt64(row.ApprovedBy),
+		ApprovedAt:   convertPgTime(row.ApprovedAt),
+		RejectedBy:   convertPgInt64(row.RejectedBy),
+		RejectedAt:   convertPgTime(row.RejectedAt),
+		RejectReason: row.RejectReason.String,
+		CreatedAt:    row.CreatedAt.Time,
 	}
 
 	items, err := r.q.GetPurchaseOrderDetailItems(ctx, id)

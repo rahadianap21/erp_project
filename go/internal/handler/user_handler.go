@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 	"net/http"
 	"strconv"
 
@@ -141,14 +142,14 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	// bukan dari klaim JWT. Kalau sebuah role baru saja diubah, profil harus
 	// langsung menunjukkan role terbaru — bukan role yang tertanam di token
 	// berumur 24 jam.
-	auth, ok := getRequestAuth(r)
+	auth, ok := middleware.GetRequestAuth(r)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Sesi otorisasi tidak ditemukan"})
 		return
 	}
 
-	claims, ok := r.Context().Value(UserContextKey).(jwt.MapClaims)
+	claims, ok := r.Context().Value(middleware.UserContextKey).(jwt.MapClaims)
 	if !ok {
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Gagal memuat konteks pengguna"})
@@ -294,12 +295,12 @@ func (h *UserHandler) GetAllUsers(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		RequirePermission("users:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("users:read", func(w http.ResponseWriter, r *http.Request) {
 			h.GetAllUsers(w, r)
 		})(w, r)
 
 	case http.MethodPost:
-		RequirePermission("users:create", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("users:create", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 
 			var req createUserRequest
@@ -317,7 +318,7 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Panggil layer usecase CreateUser yang menangani pemilihan role dan hashing password
-			if err := h.UserUsecase.CreateUser(r.Context(), CurrentActor(r), req.Name, req.Email, req.Password, req.RoleName); err != nil {
+			if err := h.UserUsecase.CreateUser(r.Context(), middleware.CurrentActor(r), req.Name, req.Email, req.Password, req.RoleName); err != nil {
 				var authErr *domain.AuthorizationError
 				if errors.As(err, &authErr) {
 					w.WriteHeader(http.StatusForbidden)
@@ -337,7 +338,7 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 		})(w, r)
 
 	case http.MethodPut:
-		RequirePermission("users:update", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("users:update", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 
 			idStr := r.URL.Query().Get("id")
@@ -368,7 +369,7 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			if err := h.UserUsecase.UpdateUser(r.Context(), CurrentActor(r), id, req.Name, req.Email, req.RoleName); err != nil {
+			if err := h.UserUsecase.UpdateUser(r.Context(), middleware.CurrentActor(r), id, req.Name, req.Email, req.RoleName); err != nil {
 				var authErr *domain.AuthorizationError
 				if errors.As(err, &authErr) {
 					w.WriteHeader(http.StatusForbidden)
@@ -388,7 +389,7 @@ func (h *UserHandler) UsersCRUDHandler(w http.ResponseWriter, r *http.Request) {
 		})(w, r)
 
 	case http.MethodDelete:
-		RequirePermission("users:delete", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("users:delete", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 
 			idStr := r.URL.Query().Get("id")

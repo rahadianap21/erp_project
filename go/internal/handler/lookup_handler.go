@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 	"net/http"
 	"strconv"
 )
@@ -22,7 +23,7 @@ func (h *LookupHandler) HandleLookupSuppliers(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodGet {
-		RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
 			data, err := h.LookupUsecase.GetSuppliersForPO(r.Context())
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -48,7 +49,7 @@ func (h *LookupHandler) HandleLookupProducts(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method == http.MethodGet {
-		RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
 			supplierID := int64(0)
 			if s := r.URL.Query().Get("supplier_id"); s != "" && s != "undefined" {
 				if parsed, err := strconv.ParseInt(s, 10, 64); err == nil && parsed > 0 {

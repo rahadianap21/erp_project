@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type MemberHandler struct {
@@ -32,7 +33,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 
 	switch r.Method {
 	case http.MethodGet:
-		protected := RequirePermission("members:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("members:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 			if idStr := q.Get("id"); idStr != "" {
 				id, err := strconv.ParseInt(idStr, 10, 64)
@@ -69,12 +70,12 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 		return
 
 	case http.MethodPost:
-		protected := RequirePermission("members:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("members:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var in domain.MemberInput
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			m, err := h.uc.Create(r.Context(), in, uid)
 			if err != nil {
 				writeMemberError(w, err)
@@ -87,7 +88,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 		return
 
 	case http.MethodPut:
-		protected := RequirePermission("members:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("members:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 			if err != nil || id <= 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -98,7 +99,7 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if err := h.uc.Update(r.Context(), id, in, uid); err != nil {
 				writeMemberError(w, err)
 				return
@@ -109,14 +110,14 @@ func (h *MemberHandler) MembersCRUDHandler(w http.ResponseWriter, r *http.Reques
 		return
 
 	case http.MethodDelete:
-		protected := RequirePermission("members:delete", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("members:delete", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 			if err != nil || id <= 0 {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": "id member tidak valid"})
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if err := h.uc.Delete(r.Context(), id, uid); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})
@@ -141,7 +142,7 @@ func (h *MemberHandler) MembersPointsHandler(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	protected := RequirePermission("members:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protected := middleware.RequirePermission("members:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		id, err := strconv.ParseInt(q.Get("id"), 10, 64)
 		if err != nil || id <= 0 {

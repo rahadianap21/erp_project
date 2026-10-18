@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type SettingsHandler struct {
@@ -23,7 +24,7 @@ func (h *SettingsHandler) HandleSettings(w http.ResponseWriter, r *http.Request)
 
 	switch r.Method {
 	case http.MethodGet:
-		protected := RequirePermission("settings:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("settings:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			view, err := h.uc.GetAll(r.Context())
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
@@ -36,12 +37,12 @@ func (h *SettingsHandler) HandleSettings(w http.ResponseWriter, r *http.Request)
 		return
 
 	case http.MethodPut:
-		protected := RequirePermission("settings:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("settings:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var in domain.UpdateSettingsInput
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			view, err := h.uc.Update(r.Context(), in, uid)
 			if err != nil {
 				status := http.StatusInternalServerError

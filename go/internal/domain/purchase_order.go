@@ -37,7 +37,7 @@ type PurchaseOrder struct {
 	ApprovedAt    *time.Time            `json:"approved_at,omitempty"`
 	RejectedBy    *int64                `json:"rejected_by,omitempty"`
 	RejectedAt    *time.Time            `json:"rejected_at,omitempty"`
-	RejectReason  string                 `json:"reject_reason,omitempty"`
+	RejectReason  string                `json:"reject_reason,omitempty"`
 	Items         []PurchaseOrderDetail `json:"items,omitempty"` // Komoditas barang bersarang
 }
 

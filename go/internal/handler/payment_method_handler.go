@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 )
 
 type PaymentMethodHandler struct {
@@ -32,7 +33,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 
 	switch r.Method {
 	case http.MethodGet:
-		protected := RequirePermission("payment-methods:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("payment-methods:read", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if idStr := r.URL.Query().Get("id"); idStr != "" {
 				id, err := strconv.ParseInt(idStr, 10, 64)
 				if err != nil || id <= 0 {
@@ -66,12 +67,12 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 		return
 
 	case http.MethodPost:
-		protected := RequirePermission("payment-methods:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("payment-methods:create", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var in domain.PaymentMethodInput
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			pm, err := h.uc.Create(r.Context(), in, uid)
 			if err != nil {
 				writePaymentMethodError(w, err)
@@ -84,7 +85,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 		return
 
 	case http.MethodPut:
-		protected := RequirePermission("payment-methods:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("payment-methods:update", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 			if err != nil || id <= 0 {
 				w.WriteHeader(http.StatusBadRequest)
@@ -95,7 +96,7 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 			if !decodeJSONBody(w, r, &in) {
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if err := h.uc.Update(r.Context(), id, in, uid); err != nil {
 				writePaymentMethodError(w, err)
 				return
@@ -106,14 +107,14 @@ func (h *PaymentMethodHandler) PaymentMethodsCRUDHandler(w http.ResponseWriter, 
 		return
 
 	case http.MethodDelete:
-		protected := RequirePermission("payment-methods:delete", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		protected := middleware.RequirePermission("payment-methods:delete", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			id, err := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
 			if err != nil || id <= 0 {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": "id metode pembayaran tidak valid"})
 				return
 			}
-			uid := CurrentUserID(r)
+			uid := middleware.CurrentUserID(r)
 			if err := h.uc.Delete(r.Context(), id, uid); err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				_ = json.NewEncoder(w).Encode(map[string]string{"message": err.Error()})

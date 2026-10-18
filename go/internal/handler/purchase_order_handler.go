@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"go_backend/internal/domain"
+	"go_backend/internal/middleware"
 	"net/http"
 	"strconv"
 	"strings"
@@ -23,8 +24,8 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 
 	// 🌟 1. JALUR AMAN CREATION DATA (POST)
 	if r.Method == http.MethodPost {
-		RequirePermission("po:create", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("po:create", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			// Parsing Payload request perluasan parameter pajak dari Next.js klien
 			var req struct {
@@ -84,7 +85,7 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 
 	// 🌟 2. JALUR DAFTAR DATA DENGAN CURSOR PAGINATION (GET)
 	if r.Method == http.MethodGet {
-		RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
+		middleware.RequirePermission("po:read", func(w http.ResponseWriter, r *http.Request) {
 			q := r.URL.Query()
 
 			// 1. ✨ SEKRUP PENYELAMAT: Periksa apakah frontend meminta detail item tunggal via ?id=
@@ -155,8 +156,8 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			return
 		}
 
-		RequirePermission("po:update", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("po:update", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			// Sengaja TIDAK ada field harga di payload. UnitPrice & PurchaseUnitID
 			// diturunkan usecase dari master produk supaya harga PO tidak bisa
@@ -219,8 +220,8 @@ func (h *PurchaseOrderHandler) HandlePurchaseOrders(w http.ResponseWriter, r *ht
 			return
 		}
 
-		RequirePermission("po:delete", func(w http.ResponseWriter, r *http.Request) {
-			userID := CurrentUserID(r)
+		middleware.RequirePermission("po:delete", func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.CurrentUserID(r)
 
 			if err := h.PoUsecase.DeletePO(r.Context(), poID, userID); err != nil {
 				status := http.StatusInternalServerError
@@ -299,7 +300,7 @@ func (h *PurchaseOrderHandler) HandleApprovePO(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	RequirePermission("po:approve", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("po:approve", func(w http.ResponseWriter, r *http.Request) {
 		poID, err := parsePOID(r)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -307,7 +308,7 @@ func (h *PurchaseOrderHandler) HandleApprovePO(w http.ResponseWriter, r *http.Re
 			return
 		}
 
-		userID := CurrentUserID(r)
+		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.ApprovePO(r.Context(), poID, userID); err != nil {
 			status := statusUntukErrorPO(err)
 			w.WriteHeader(status)
@@ -337,7 +338,7 @@ func (h *PurchaseOrderHandler) HandleCancelPO(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	RequirePermission("po:reject", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("po:reject", func(w http.ResponseWriter, r *http.Request) {
 		poID, err := parsePOID(r)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -345,7 +346,7 @@ func (h *PurchaseOrderHandler) HandleCancelPO(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		userID := CurrentUserID(r)
+		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.CancelPO(r.Context(), poID, userID); err != nil {
 			status := statusUntukErrorPO(err)
 			w.WriteHeader(status)
@@ -369,6 +370,7 @@ func parsePOID(r *http.Request) (int64, error) {
 	}
 	return poID, nil
 }
+
 // HandleRejectPO melayani penolakan dokumen PO (PUT /api/purchase-orders/reject?id=)
 func (h *PurchaseOrderHandler) HandleRejectPO(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -378,7 +380,7 @@ func (h *PurchaseOrderHandler) HandleRejectPO(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	RequirePermission("po:reject", func(w http.ResponseWriter, r *http.Request) {
+	middleware.RequirePermission("po:reject", func(w http.ResponseWriter, r *http.Request) {
 		poID, err := parsePOID(r)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -395,7 +397,7 @@ func (h *PurchaseOrderHandler) HandleRejectPO(w http.ResponseWriter, r *http.Req
 			return
 		}
 
-		userID := CurrentUserID(r)
+		userID := middleware.CurrentUserID(r)
 		if err := h.PoUsecase.RejectPO(r.Context(), poID, userID, payload.Reason); err != nil {
 			status := statusUntukErrorPO(err)
 			w.WriteHeader(status)
