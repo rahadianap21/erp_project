@@ -32,3 +32,8 @@ playwright/.cache/
 
 # OS / editor
 .DS_Store
+
+# Dokumentasi internal — jangan di-commit/di-push (kecuali README).
+# Disimpan lokal saja. Lihat daftar di README bila perlu.
+*.md
+!README.md

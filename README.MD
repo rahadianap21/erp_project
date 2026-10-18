@@ -134,5 +134,5 @@ Workflow ada di `.github/workflows/ci.yml`:
 - **next** — `lint` + `typecheck` + `test` + `build`.
 - **playwright** — e2e (butuh backend + DB).
 
-Dokumen lain: `RENCANA-REFORMASI-STRUKTUR.md` (rencana/status reformasi struktur),
-`RENCANA-PERBAIKAN.md` (perbaikan fungsional), `MANUAL-PENGGUNA.md` (panduan pengguna).
+Catatan: dokumentasi internal (rencana reformasi/perbaikan, panduan pengguna, serta
+berkas instruksi agen) sengaja tidak dipublikasikan di repo ini dan hanya disimpan lokal.
