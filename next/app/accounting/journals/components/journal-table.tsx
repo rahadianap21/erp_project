@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet } from "@/lib/api-client";
 import { useState } from "react";
 import { Send, Ban, RotateCcw, FileText, ChevronRight, AlertTriangle, Filter } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -90,13 +91,10 @@ export function JournalTable({ token, canPost, canVoidReverse, refreshTrigger, o
 
         setDetailLoading(true);
         try {
-            const res = await fetch(`/api/journals?id=${entry.id}`, {
-                headers: { "Authorization": `Bearer ${token}` },
-                cache: "no-store",
-            });
-            const result = await res.json();
-            if (res.ok && result.data?.lines) {
-                setDetailLines((prev) => ({ ...prev, [entry.id]: result.data.lines }));
+            const result = await apiGet<{ lines?: JournalLine[] }>(`/api/journals?id=${entry.id}`);
+            const lines = result.data?.lines;
+            if (lines) {
+                setDetailLines((prev) => ({ ...prev, [entry.id]: lines }));
             }
         } catch (err) {
             console.error("Gagal memuat rincian jurnal:", err);

@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, apiPut } from "@/lib/api-client";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -53,23 +54,12 @@ export default function JournalsPage() {
         setIsProcessing(true);
 
         try {
-            const response = await fetch(`/api/journals/${action}?id=${entry.id}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 403) setHttpStatus(403);
-                throw new Error(errorData.message || `Gagal melakukan aksi ${action.toUpperCase()}.`);
-            }
+            await apiPut(`/api/journals/${action}?id=${entry.id}`, undefined, { redirectOn403: false });
 
             toast.success(successTitle, { description: successDesc(entry.entry_number), duration: 3500 });
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Gagal", { description: error.message });
         } finally {
             setIsProcessing(false);

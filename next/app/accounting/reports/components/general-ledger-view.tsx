@@ -11,7 +11,7 @@ import {
     awalTahunISO,
     todayISO,
 } from "./report-types";
-import { fetchLaporan } from "@/lib/api-client";
+import { apiGet, fetchLaporan } from "@/lib/api-client";
 import { ChartOfAccount } from "../../chart-of-accounts/components/chart-of-account-table";
 
 interface GeneralLedgerViewProps {
@@ -31,11 +31,8 @@ export function GeneralLedgerView({ token, onForbidden }: GeneralLedgerViewProps
     const fetchAccounts = useCallback(async () => {
         if (!token) return;
         try {
-            const res = await fetch(`/api/chart-of-accounts?limit=500`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const result = await res.json();
-            if (res.ok && result.data) {
+            const result = await apiGet<ChartOfAccount[]>(`/api/chart-of-accounts?limit=500`);
+            if (result.data) {
                 setAccounts(result.data.filter((a: ChartOfAccount) => !a.is_header && a.is_active));
             }
         } catch (err) {

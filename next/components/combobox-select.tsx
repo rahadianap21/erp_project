@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost } from "@/lib/api-client";
 import * as React from "react";
 import {
   Combobox,
@@ -118,11 +119,8 @@ export function ComboboxSelect({
   const fetchModalParentCategories = async () => {
     if (!authToken || !permissionCode?.startsWith("categories")) return;
     try {
-      const res = await fetch(`/api/categories?limit=100`, {
-        headers: { "Authorization": `Bearer ${authToken}` }
-      });
-      const result = await res.json();
-      if (res.ok && result.data) {
+      const result = await apiGet<any[]>(`/api/categories?limit=100`);
+      if (result.data) {
         setParentCategoryOptions(result.data);
         console.log('Parent Category Options:', result.data);
       }
@@ -218,18 +216,9 @@ export function ComboboxSelect({
         };
       }
 
-      const res = await fetch(`${moduleMeta.endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${authToken}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const result = await apiPost<{ id?: number }>(moduleMeta.endpoint, payload, { redirectOn403: false });
 
-      const result = await res.json();
-
-      if (res.ok) {
+      if (result.ok) {
         toast.success(`${moduleMeta.title} Sukses Ditambahkan`, { id: toastId });
 
         // Reset seluruh form buffer ke string kosong
@@ -245,8 +234,6 @@ export function ComboboxSelect({
         if (result.data?.id) {
           onChange(String(result.data.id));
         }
-      } else {
-        throw new Error(result.message || result.error || `Server merespons dengan status ${res.status}`);
       }
     } catch (err: any) {
       toast.error("Gagal Menyimpan data", { id: toastId, description: err.message });

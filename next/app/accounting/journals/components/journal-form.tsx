@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, apiGet, apiPost } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Loader2, FileText, CalendarDays, Plus, Trash2, Equal, ClipboardSignature } from "lucide-react";
@@ -34,11 +35,8 @@ export function JournalForm({ token, onSuccess, onPermissionDenied }: JournalFor
 
     const fetchAccountOptions = async () => {
         try {
-            const res = await fetch(`/api/chart-of-accounts?limit=500`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const result = await res.json();
-            if (res.ok && result.data) {
+            const result = await apiGet<ChartOfAccount[]>(`/api/chart-of-accounts?limit=500`);
+            if (result.data) {
                 setAccountOptions(result.data.filter((a: ChartOfAccount) => !a.is_header && a.is_active));
             }
         } catch (err) {
@@ -88,20 +86,11 @@ export function JournalForm({ token, onSuccess, onPermissionDenied }: JournalFor
 
         setIsLoading(true);
         try {
-            const response = await fetch(`/api/journals`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ entry_date: entryDate, description, lines: validLines }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) {
-                if (response.status === 403) onPermissionDenied?.();
-                throw new Error(errorData.message || "Gagal menyimpan jurnal.");
-            }
+            const errorData = await apiPost<{ entry_number?: string }>(
+                `/api/journals`,
+                { entry_date: entryDate, description, lines: validLines },
+                { redirectOn403: false },
+            );
 
             setIsExpanded(false);
             setDescription("");
@@ -111,6 +100,7 @@ export function JournalForm({ token, onSuccess, onPermissionDenied }: JournalFor
             ]);
             onSuccess(errorData.data?.entry_number || "");
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) onPermissionDenied?.();
             toast.error("Gagal Menyimpan Jurnal", { description: error.message });
         } finally {
             setIsLoading(false);

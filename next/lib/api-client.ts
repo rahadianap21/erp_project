@@ -44,9 +44,11 @@ async function parseBody(res: Response): Promise<unknown> {
 }
 
 function messageFromBody(body: unknown, fallback: string): string {
-  if (body && typeof body === "object" && "message" in body) {
-    const m = (body as { message?: unknown }).message
-    if (typeof m === "string" && m) return m
+  if (body && typeof body === "object") {
+    const o = body as { message?: unknown; error?: unknown }
+    if (typeof o.message === "string" && o.message) return o.message
+    // Lapisan RBAC lama membalas {"error": ...} tanpa field message.
+    if (typeof o.error === "string" && o.error) return o.error
   }
   return fallback
 }

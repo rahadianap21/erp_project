@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet } from "@/lib/api-client";
 import { Edit2, Trash2, BookOpenCheck, Shield, FolderOpen, FileText, CornerUpLeft, ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
 import React, { useEffect, useMemo, useState } from "react";
-import Cookies from "js-cookie";
 
 export interface ChartOfAccount {
     id: number;
@@ -44,17 +44,12 @@ export function ChartOfAccountTable({ canUpdate, canDelete, refreshTrigger, onDe
     const [search, setSearch] = useState<string>("");
     const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
-    const authToken = Cookies.get("session_active");
 
     useEffect(() => {
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const res = await fetch(`/api/chart-of-accounts?limit=1000`, {
-                    headers: { "Authorization": `Bearer ${authToken}` },
-                    cache: "no-store",
-                });
-                const result = await res.json();
+                const result = await apiGet<ChartOfAccount[]>(`/api/chart-of-accounts?limit=1000`);
                 const rows: ChartOfAccount[] = Array.isArray(result.data) ? result.data : [];
                 setAccounts(rows);
 
@@ -70,7 +65,7 @@ export function ChartOfAccountTable({ canUpdate, canDelete, refreshTrigger, onDe
             }
         };
         fetchAll();
-    }, [authToken, refreshTrigger]);
+    }, [refreshTrigger]);
 
     // Peta relasi: anak per induk + lookup cepat per id. Induk yang tidak ada
     // di daftar (mis. sudah nonaktif) diperlakukan sebagai root agar tidak hilang.

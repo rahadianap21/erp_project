@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Loader2, BookOpenCheck, Hash, FolderOpen, Scale, Power } from "lucide-react";
@@ -35,11 +36,8 @@ export function ChartOfAccountForm({ token, editingAccount, onSuccess, onCancelE
 
     const fetchParentOptions = async () => {
         try {
-            const res = await fetch(`/api/chart-of-accounts?limit=500`, {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const result = await res.json();
-            if (res.ok && result.data) {
+            const result = await apiGet<ChartOfAccount[]>(`/api/chart-of-accounts?limit=500`);
+            if (result.data) {
                 const options: ChartOfAccount[] = result.data.filter((a: ChartOfAccount) => a.is_header);
                 setParentOptions(editingAccount ? options.filter((a) => a.id !== editingAccount.id) : options);
             }
@@ -79,28 +77,18 @@ export function ChartOfAccountForm({ token, editingAccount, onSuccess, onCancelE
         const url = isEditMode
             ? `/api/chart-of-accounts?id=${editingAccount.id}`
             : `/api/chart-of-accounts`;
-        const method = isEditMode ? "PUT" : "POST";
 
         try {
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    code,
-                    name,
-                    account_type: accountType,
-                    normal_balance: normalBalance,
-                    parent_id: parentId ? Number(parentId) : null,
-                    is_header: isHeader,
-                    is_active: isActive,
-                }),
-            });
-
-            const errorData = await response.json().catch(() => ({}));
-            if (!response.ok) throw new Error(errorData.message || "Gagal memproses akun.");
+            const payload = {
+                code,
+                name,
+                account_type: accountType,
+                normal_balance: normalBalance,
+                parent_id: parentId ? Number(parentId) : null,
+                is_header: isHeader,
+                is_active: isActive,
+            };
+            await (isEditMode ? apiPut(url, payload) : apiPost(url, payload));
 
             resetForm();
             setIsExpanded(false);

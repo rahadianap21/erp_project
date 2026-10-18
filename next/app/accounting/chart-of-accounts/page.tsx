@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError, apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -47,19 +48,7 @@ export default function ChartOfAccountsPage() {
         const targetedCode = accountToDeactivate.code;
 
         try {
-            const response = await fetch(`/api/chart-of-accounts?id=${accountToDeactivate.id}`, {
-                method: "DELETE",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                if (response.status === 403) setHttpStatus(403);
-                throw new Error(errorData.message || "Gagal menonaktifkan akun.");
-            }
+            await apiDelete(`/api/chart-of-accounts?id=${accountToDeactivate.id}`, { redirectOn403: false });
 
             setAccountToDeactivate(null);
             toast.success("Akun Dinonaktifkan", {
@@ -68,6 +57,7 @@ export default function ChartOfAccountsPage() {
             });
             setRefreshTrigger((prev) => prev + 1);
         } catch (error: any) {
+            if (error instanceof ApiError && error.status === 403) setHttpStatus(403);
             toast.error("Operasi Gagal", {
                 description: error.message || "Masalah internal server.",
             });

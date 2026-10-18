@@ -1,5 +1,6 @@
 "use client";
 
+import { apiGet, apiPost, apiPut } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { CalendarRange, Lock, LockOpen, RefreshCw, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import Cookies from "js-cookie";
 
 export interface AccountingPeriod {
     id: number;
@@ -41,16 +41,12 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
     const [openMonth, setOpenMonth] = useState<number>(new Date().getMonth() + 1);
     const [target, setTarget] = useState<AccountingPeriod | null>(null);
 
-    const authToken = Cookies.get("session_active");
 
     const fetchPeriods = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/accounting-periods`, {
-                headers: { "Authorization": `Bearer ${authToken}` },
-            });
-            const result = await res.json();
-            if (res.ok && Array.isArray(result.data)) setPeriods(result.data);
+            const result = await apiGet<AccountingPeriod[]>(`/api/accounting-periods`);
+            if (Array.isArray(result.data)) setPeriods(result.data);
         } catch (err) {
             console.error("Gagal memuat periode fiskal:", err);
         } finally {
@@ -59,19 +55,13 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
     };
 
     useEffect(() => {
-        if (authToken) fetchPeriods();
-    }, [authToken, revision]);
+        fetchPeriods();
+    }, [revision]);
 
     const openPeriod = async () => {
         setProcessing("open");
         try {
-            const res = await fetch(`/api/accounting-periods`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` },
-                body: JSON.stringify({ year: openYear, month: openMonth }),
-            });
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.message || "Gagal membuka periode.");
+            await apiPost(`/api/accounting-periods`, { year: openYear, month: openMonth });
             toast.success("Periode Fiskal Dibuka", { description: `${monthNames[openMonth - 1]} ${openYear} kini aktif.` });
             fetchPeriods();
         } catch (error: any) {
@@ -85,15 +75,7 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
         const isClose = period.status === "OPEN";
         setProcessing(`toggle-${period.id}`);
         try {
-            const res = await fetch(
-                `/api/accounting-periods/${isClose ? "close" : "reopen"}?year=${period.period_year}&month=${period.period_month}`,
-                {
-                    method: "PUT",
-                    headers: { "Authorization": `Bearer ${authToken}` },
-                }
-            );
-            const result = await res.json();
-            if (!res.ok) throw new Error(result.message || "Gagal mengubah status periode.");
+            await apiPut(`/api/accounting-periods/${isClose ? "close" : "reopen"}?year=${period.period_year}&month=${period.period_month}`, undefined);
             toast.success(isClose ? "Periode Fiskal Ditutup" : "Periode Fiskal Dibuka Kembali", {
                 description: isClose
                     ? `Jurnal penutup diterbitkan: pendapatan & beban dinolkan ke Laba Ditahan. ${monthNames[period.period_month - 1]} ${period.period_year} terkunci dari posting baru.`
