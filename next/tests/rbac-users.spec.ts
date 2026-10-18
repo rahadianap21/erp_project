@@ -23,7 +23,7 @@ test('Frontend - User tanpa izin "users:read" direwrite ke ForbiddenView di URL 
     // Coba paksa buka /users
     await page.goto(`${targetUrl}/users`);
 
-    // middleware.ts memakai NextResponse.rewrite, bukan redirect: URL browser TIDAK
+    // proxy.ts memakai NextResponse.rewrite, bukan redirect: URL browser TIDAK
     // berubah (tetap /users), tetapi yang dirender adalah halaman 403.
     await expect(page).toHaveURL(`${targetUrl}/users`);
 
@@ -64,12 +64,12 @@ test('Frontend - Sidebar menyembunyikan grup Users Management jika tidak punya i
 
     // 1. MENCEGAT PENGALIHAN DARI MIDDLEWARE
     // Jika /dashboard mencoba memanggil endpoint status user atau backend, kita kembalikan status sukses
-    // agar middleware mengizinkan browser tetap berada di halaman dashboard.
+    // agar proxy mengizinkan browser tetap berada di halaman dashboard.
     await page.route(/\/api\/users/, async (route) => {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) });
     });
 
-    // 2. SUNTIK COOKIE: punya dashboard:read (agar /dashboard lolos gerbang middleware)
+    // 2. SUNTIK COOKIE: punya dashboard:read (agar /dashboard lolos gerbang proxy)
     // tetapi tidak punya users:read/roles:read/settings:read.
     await page.context().addCookies([
         { name: 'auth_token', value: 'VALID_MOCK_TOKEN', domain: domainHost, path: '/' },
