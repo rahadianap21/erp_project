@@ -1,7 +1,7 @@
 "use client"
 
+import { apiGet, apiPost } from "@/lib/api-client";
 import * as React from "react"
-import Cookies from "js-cookie"
 import {
   MinusIcon,
   PlusIcon,
@@ -178,7 +178,6 @@ function lineDiscount(type: string, value: number, base: number): number {
 }
 
 export function PosTerminal() {
-  const authToken = Cookies.get("session_active")
 
   const [bootstrap, setBootstrap] = React.useState<POSBootstrap | null>(null)
   const [products, setProducts] = React.useState<POSProduct[]>([])
@@ -203,24 +202,15 @@ export function PosTerminal() {
 
   const showProducts = search.trim().length > 0
 
-  const headers = React.useMemo(
-    () => ({
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${authToken}`,
-    }),
-    [authToken]
-  )
 
   const loadBootstrap = React.useCallback(async () => {
     try {
-      const res = await fetch(`/api/pos/bootstrap`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat data kasir")
+      const body = await apiGet<POSBootstrap>(`/api/pos/bootstrap`)
       setBootstrap(body.data)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat data kasir")
     }
-  }, [headers])
+  }, [])
 
   const loadProducts = React.useCallback(async () => {
     setLoadingProducts(true)
@@ -228,16 +218,14 @@ export function PosTerminal() {
       const params = new URLSearchParams()
       if (search) params.set("search", search)
       params.set("limit", "120")
-      const res = await fetch(`/api/pos/products?${params.toString()}`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat produk")
+      const body = await apiGet<POSProduct[]>(`/api/pos/products?${params.toString()}`)
       setProducts(body.data ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat produk")
     } finally {
       setLoadingProducts(false)
     }
-  }, [headers, search])
+  }, [search])
 
   React.useEffect(() => {
     loadBootstrap()
@@ -265,21 +253,15 @@ export function PosTerminal() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/pos/members?search=${encodeURIComponent(memberQuery)}&limit=10`,
-          { headers }
-        )
-        const body = await res.json()
-        if (res.ok) {
-          setMemberResults(body.data ?? [])
-          setShowMemberResults(true)
-        }
+        const res = await apiGet<Member[]>(`/api/pos/members?search=${encodeURIComponent(memberQuery)}&limit=10`, { redirectOn403: false })
+        setMemberResults(res.data ?? [])
+        setShowMemberResults(true)
       } catch {
         /* abaikan pencarian member */
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [memberQuery, headers])
+  }, [memberQuery])
 
   const taxRate = bootstrap?.tax_rate ?? 0.12
   const taxMode = bootstrap?.tax_mode ?? "INCLUSIVE"
@@ -394,13 +376,7 @@ export function PosTerminal() {
           reference_number: p.referenceNumber,
         })),
       }
-      const res = await fetch(`/api/sales`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal menyimpan penjualan")
+      const body = await apiPost<Sale>(`/api/sales`, payload)
       setPaymentOpen(false)
       setReceipt(body.data)
       clearCart()

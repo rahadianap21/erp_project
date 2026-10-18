@@ -1,7 +1,7 @@
 "use client"
 
+import { apiGet, apiPost } from "@/lib/api-client";
 import * as React from "react"
-import Cookies from "js-cookie"
 import { readPermissionList } from "@/lib/permissions"
 import { BanIcon, ChevronLeftIcon, ChevronRightIcon, ReceiptTextIcon, SearchIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -50,7 +50,6 @@ interface Sale {
 const LIMIT = 20
 
 export default function SalesHistoryPage() {
-  const authToken = Cookies.get("session_active")
   const permissions = React.useMemo<string[]>(() => readPermissionList() ?? [], [])
   const canVoid = permissions.includes("sales:void")
 
@@ -67,10 +66,6 @@ export default function SalesHistoryPage() {
   const [voidReason, setVoidReason] = React.useState("")
   const [voiding, setVoiding] = React.useState(false)
 
-  const headers = React.useMemo(
-    () => ({ "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }),
-    [authToken]
-  )
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -81,17 +76,15 @@ export default function SalesHistoryPage() {
       params.set("limit", String(LIMIT))
       params.set("direction", direction)
       if (cursor) params.set("cursor_id", String(cursor))
-      const res = await fetch(`/api/sales?${params.toString()}`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat penjualan")
+      const body = await apiGet<Sale[]>(`/api/sales?${params.toString()}`)
       setSales(body.data ?? [])
-      setTotal(body.total ?? 0)
+      setTotal(Number((body.body as { total?: number })?.total ?? 0))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat penjualan")
     } finally {
       setLoading(false)
     }
-  }, [headers, search, status, cursor, direction])
+  }, [search, status, cursor, direction])
 
   React.useEffect(() => {
     load()
@@ -99,9 +92,7 @@ export default function SalesHistoryPage() {
 
   const openDetail = async (id: number) => {
     try {
-      const res = await fetch(`/api/sales?id=${id}`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat detail")
+      const body = await apiGet<Sale>(`/api/sales?id=${id}`)
       setDetail(body.data)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat detail")
@@ -136,13 +127,7 @@ export default function SalesHistoryPage() {
     if (!detail) return
     setVoiding(true)
     try {
-      const res = await fetch(`/api/sales/void?id=${detail.id}`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ reason: voidReason }),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal membatalkan")
+      await apiPost(`/api/sales/void?id=${detail.id}`, { reason: voidReason })
       toast.success("Penjualan dibatalkan")
       setDetail(null)
       setVoidReason("")

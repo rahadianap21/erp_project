@@ -1,7 +1,7 @@
 "use client"
 
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import * as React from "react"
-import Cookies from "js-cookie"
 import { HistoryIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon, Users2Icon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -59,11 +59,6 @@ const POINT_TYPE_LABEL: Record<string, string> = {
 }
 
 export default function MembersPage() {
-  const authToken = Cookies.get("session_active")
-  const headers = React.useMemo(
-    () => ({ "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }),
-    [authToken]
-  )
 
   const [members, setMembers] = React.useState<Member[]>([])
   const [search, setSearch] = React.useState("")
@@ -83,16 +78,14 @@ export default function MembersPage() {
       const params = new URLSearchParams()
       if (search) params.set("search", search)
       params.set("limit", "100")
-      const res = await fetch(`/api/members?${params.toString()}`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat member")
+      const body = await apiGet<Member[]>(`/api/members?${params.toString()}`)
       setMembers(body.data ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat member")
     } finally {
       setLoading(false)
     }
-  }, [headers, search])
+  }, [search])
 
   React.useEffect(() => {
     const timer = setTimeout(load, 250)
@@ -127,13 +120,7 @@ export default function MembersPage() {
     setSaving(true)
     try {
       const url = editing ? `/api/members?id=${editing.id}` : `/api/members`
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers,
-        body: JSON.stringify(form),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal menyimpan member")
+      await (editing ? apiPut(url, form) : apiPost(url, form))
       toast.success(editing ? "Member diperbarui" : "Member ditambahkan")
       setDialogOpen(false)
       load()
@@ -147,12 +134,7 @@ export default function MembersPage() {
   const remove = async (m: Member) => {
     if (!window.confirm(`Hapus member ${m.name}?`)) return
     try {
-      const res = await fetch(`/api/members?id=${m.id}`, {
-        method: "DELETE",
-        headers,
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal menghapus member")
+      await apiDelete(`/api/members?id=${m.id}`)
       toast.success("Member dihapus")
       load()
     } catch (err) {
@@ -165,9 +147,7 @@ export default function MembersPage() {
     setEntries([])
     setLoadingHistory(true)
     try {
-      const res = await fetch(`/api/members/points?id=${m.id}&limit=50`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat riwayat poin")
+      const body = await apiGet<PointEntry[]>(`/api/members/points?id=${m.id}&limit=50`)
       setEntries(body.data ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat riwayat poin")

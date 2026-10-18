@@ -1,8 +1,8 @@
 "use client"
 
+import { apiGet, apiPut } from "@/lib/api-client";
 import { readPermissionList } from "@/lib/permissions";
 import * as React from "react"
-import Cookies from "js-cookie"
 import { Loader2Icon, PercentIcon, SaveIcon, ReceiptTextIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -30,11 +30,6 @@ const MODE_OPTIONS = [
 ]
 
 export default function SettingsPage() {
-  const authToken = Cookies.get("session_active")
-  const headers = React.useMemo(
-    () => ({ "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }),
-    [authToken]
-  )
 
   const canUpdate = React.useMemo(
     () => (readPermissionList() ?? []).includes("settings:update"),
@@ -49,10 +44,8 @@ export default function SettingsPage() {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/settings`, { headers })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.message || "Gagal memuat pengaturan.")
-      const view: SettingsView = body.data
+      const body = await apiGet<SettingsView>(`/api/settings`)
+      const view: SettingsView = body.data ?? ({} as SettingsView)
       setRatePercent(Math.round((view.ppn_rate ?? 0.12) * 10000) / 100)
       setMode(view.ppn_price_mode || "INCLUSIVE")
     } catch (err: any) {
@@ -60,7 +53,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
-  }, [headers])
+  }, [])
 
   React.useEffect(() => {
     load()
@@ -76,17 +69,11 @@ export default function SettingsPage() {
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/settings`, {
-        method: "PUT",
-        headers,
-        body: JSON.stringify({
-          ppn_rate: ratePercent / 100,
-          ppn_price_mode: mode,
-        }),
+      const body = await apiPut<SettingsView>(`/api/settings`, {
+        ppn_rate: ratePercent / 100,
+        ppn_price_mode: mode,
       })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(body.message || "Gagal menyimpan pengaturan.")
-      const view: SettingsView = body.data ?? {}
+      const view: SettingsView = body.data ?? ({} as SettingsView)
       setRatePercent(Math.round((view.ppn_rate ?? ratePercent / 100) * 10000) / 100)
       setMode(view.ppn_price_mode || mode)
       toast.success("Pengaturan Tersimpan", {

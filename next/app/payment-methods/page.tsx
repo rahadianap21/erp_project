@@ -1,7 +1,7 @@
 "use client"
 
+import { apiDelete, apiGet, apiPost, apiPut } from "@/lib/api-client";
 import * as React from "react"
-import Cookies from "js-cookie"
 import { CreditCardIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -42,11 +42,6 @@ const emptyForm = {
 }
 
 export default function PaymentMethodsPage() {
-  const authToken = Cookies.get("session_active")
-  const headers = React.useMemo(
-    () => ({ "Content-Type": "application/json", Authorization: `Bearer ${authToken}` }),
-    [authToken]
-  )
 
   const [methods, setMethods] = React.useState<PaymentMethod[]>([])
   const [loading, setLoading] = React.useState(false)
@@ -58,16 +53,14 @@ export default function PaymentMethodsPage() {
   const load = React.useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/payment-methods`, { headers })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal memuat metode pembayaran")
+      const body = await apiGet<PaymentMethod[]>(`/api/payment-methods`)
       setMethods(body.data ?? [])
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal memuat metode pembayaran")
     } finally {
       setLoading(false)
     }
-  }, [headers])
+  }, [])
 
   React.useEffect(() => {
     load()
@@ -112,13 +105,7 @@ export default function PaymentMethodsPage() {
       const url = editing
         ? `/api/payment-methods?id=${editing.id}`
         : `/api/payment-methods`
-      const res = await fetch(url, {
-        method: editing ? "PUT" : "POST",
-        headers,
-        body: JSON.stringify(payload),
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal menyimpan metode pembayaran")
+      await (editing ? apiPut(url, payload) : apiPost(url, payload))
       toast.success(editing ? "Metode diperbarui" : "Metode ditambahkan")
       setDialogOpen(false)
       load()
@@ -132,12 +119,7 @@ export default function PaymentMethodsPage() {
   const remove = async (m: PaymentMethod) => {
     if (!window.confirm(`Hapus metode ${m.name}?`)) return
     try {
-      const res = await fetch(`/api/payment-methods?id=${m.id}`, {
-        method: "DELETE",
-        headers,
-      })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body.message ?? "Gagal menghapus metode")
+      await apiDelete(`/api/payment-methods?id=${m.id}`)
       toast.success("Metode dihapus")
       load()
     } catch (err) {
