@@ -233,7 +233,7 @@ export function AppSidebar({
             const fallbackList = cleanArrayStr.split(",");
             setPermissions(fallbackList);
           }
-        } catch (fallbackError) {
+        } catch {
           // Jika fallback juga gagal, set array kosong agar aplikasi tidak crash
           setPermissions([]);
         }

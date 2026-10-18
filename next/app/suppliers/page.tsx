@@ -4,7 +4,6 @@ import { apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import SupplierForm from "./components/supplier-form";
 import { toast } from "sonner";
@@ -51,9 +50,6 @@ interface Supplier {
 }
 
 export default function SuppliersCRUDPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [httpStatus, setHttpStatus] = useState<number>(200);
   const [permissions, setPermissions] = useState({
     create: false,
@@ -153,12 +149,6 @@ export default function SuppliersCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-xs font-medium">
-          {error}
-        </div>
-      )}
-
       {/* Panel Form Pengisian Data Vendor */}
       {(permissions.create || editingSupplier) && (
         <SupplierForm

@@ -8,7 +8,6 @@ import dynamic from "next/dynamic";
 import { ProductCategoryForm } from "./components/product-category-form";
 import { toast } from "sonner";
 import { ForbiddenView } from "@/components/forbidden-view";
-import { FolderTree } from "lucide-react";
 
 // 🌟 INTEGRASI PORTAL: Ekstrak secara kaku Named Export dari komponen anak
 const ProductCategoryTable = dynamic(
@@ -49,7 +48,6 @@ interface ProductCategory {
 }
 
 export default function ProductCategoriesCRUDPage() {
-  const [loading, setLoading] = useState<boolean>(true);
   const [httpStatus, setHttpStatus] = useState<number>(200);
   const [permissions, setPermissions] = useState({
     create: false,
@@ -62,7 +60,6 @@ export default function ProductCategoriesCRUDPage() {
   const [categoryToDelete, setCategoryToDelete] =
     useState<ProductCategory | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
   const authToken = Cookies.get("session_active");
 
@@ -125,12 +122,6 @@ export default function ProductCategoriesCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-xs font-medium">
-          {error}
-        </div>
-      )}
-
       {(permissions.create || editingCategory) && (
         <ProductCategoryForm
           token={authToken}

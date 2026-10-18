@@ -137,7 +137,6 @@ export default function JournalsPage() {
       )}
 
       <JournalTable
-        token={authToken}
         canPost={permissions.post}
         canVoidReverse={permissions.void}
         refreshTrigger={refreshTrigger}

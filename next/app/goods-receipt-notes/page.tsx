@@ -2,9 +2,7 @@
 
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useEffect, useState } from "react";
-import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
-import { toast } from "sonner";
 import { PackageCheck } from "lucide-react";
 import { ForbiddenView } from "@/components/forbidden-view";
 

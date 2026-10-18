@@ -63,7 +63,6 @@ export interface JournalLine {
 }
 
 interface JournalTableProps {
-  token: string | undefined;
   canPost: boolean;
   canVoidReverse: boolean;
   refreshTrigger: number;
@@ -79,7 +78,6 @@ const STATUS_BADGE: Record<JournalEntry["status"], string> = {
 };
 
 export function JournalTable({
-  token,
   canPost,
   canVoidReverse,
   refreshTrigger,

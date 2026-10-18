@@ -20,7 +20,6 @@ interface Role {
 
 interface RoleFormProps {
   token: string | undefined; // Tangkap token dari parent
-  roleOptions: string[]; // Tangkap opsi role riil dari database (string[])
   editingRole: Role | null;
   onSuccess: (mode: "create" | "update", name: string) => void;
   onCancelEdit: () => void;
@@ -28,14 +27,12 @@ interface RoleFormProps {
 
 export default function RoleForm({
   token,
-  roleOptions,
   editingRole,
   onSuccess,
   onCancelEdit,
 }: RoleFormProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const [name, setName] = useState<string>("");
 
@@ -120,7 +117,6 @@ export default function RoleForm({
     const isEditMode = editingRole !== null;
     // Gunakan URL absolute backend sesuai arsitektur fetch pada page.tsx Anda
     const url = isEditMode ? `/api/roles?id=${editingRole.id}` : `/api/roles`;
-    const method = isEditMode ? "PUT" : "POST";
 
     try {
       const payload = { name, permissions: selectedPermissions };
@@ -131,9 +127,6 @@ export default function RoleForm({
       setIsExpanded(false);
       onSuccess(isEditMode ? "update" : "create", name);
     } catch (error: any) {
-      setErrorMessage(
-        error.message || "Terjadi kesalahan internal koneksi server."
-      );
       toast.error("Gagal Menyimpan Pengguna", {
         description:
           error.message ||

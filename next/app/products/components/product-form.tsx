@@ -15,7 +15,6 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import Cookies from "js-cookie";
 import { ComboboxSelect } from "@/components/combobox-select";
 
 interface Category {
@@ -73,8 +72,6 @@ export function ProductForm({
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
-
-  const authToken = Cookies.get("session_active") || "";
 
   // State Form Utama
   const [sku, setSku] = useState<string>("");
@@ -230,64 +227,6 @@ export function ProductForm({
     setIsTaxable(true);
   };
 
-  // 🌟 FUNGSI BARU: Tambah Master Satuan Kilat Lewat Dropdown (Aman & Tervalidasi)
-  const handleCreateQuickUnit = async (typedValue: string) => {
-    if (!token) return;
-
-    // Bersihkan teks input dari karakter ilegal standar kode satuan (hanya huruf dan angka)
-    const cleanKode = typedValue
-      .trim()
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-    if (cleanKode.length < 2) {
-      toast.error("Validasi Kode Gagal", {
-        description:
-          "Kode satuan minimal terdiri dari 2 karakter alfanumerik murni!",
-      });
-      return;
-    }
-
-    const toastId = toast.loading("Mendaftarkan master satuan baru...");
-    try {
-      // Tembak endpoint API master unit Go Anda
-      const result = await apiPost<unknown>(`/api/units`, {
-        kode: cleanKode,
-        name: `${cleanKode} (BUATAN KILAT)`, // Penanda nama default buatan on the fly
-      });
-      {
-        toast.success("Master Satuan Berhasil Dibuat", {
-          id: toastId,
-          description: `Satuan ${cleanKode} kini siap dipakai.`,
-        });
-
-        // 🔄 SEGARKAN DATA DROPDOWN SECARA REAL-TIME TANPA RELOAD HALAMAN!
-        // Panggil kembali fungsi fetchRelations() lama Anda untuk memperbarui RAM state array units
-        if (typeof fetchRelations === "function") {
-          await fetchRelations();
-        } else {
-          // Jika fetchRelations Anda diletakkan di dalam useEffect, jalankan hit mandiri atau windows reload fallback
-          window.location.reload();
-        }
-
-        // Otomatis pilih satuan yang baru saja dibuat ke dalam form state
-        if (
-          result.data &&
-          typeof result.data === "object" &&
-          "id" in result.data
-        ) {
-          const createdId = (result.data as { id: number }).id;
-          setSellingUnitId(String(createdId));
-          setPurchaseUnitId(String(createdId));
-        }
-      }
-    } catch (err: any) {
-      toast.error("Gagal Membuat Satuan", {
-        id: toastId,
-        description: err.message,
-      });
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -330,8 +269,6 @@ export function ProductForm({
     const url = isEditMode
       ? `/api/products?id=${editingProduct.id}`
       : `/api/products`;
-    const method = isEditMode ? "PUT" : "POST";
-
     try {
       const payload = {
         sku: sku || undefined,

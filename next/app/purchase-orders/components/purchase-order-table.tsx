@@ -3,7 +3,6 @@
 import { apiGet } from "@/lib/api-client";
 import {
   FileText,
-  Phone,
   User,
   Calendar,
   DollarSign,
@@ -12,7 +11,6 @@ import {
   XCircle,
   ChevronRight as ArrowRight,
   Loader2,
-  Package,
   ListOrdered,
   Percent,
   Landmark,
@@ -34,7 +32,7 @@ import { useDebounceFetch } from "@/hooks/use-api-list";
 import { POStatusTimeline } from "./po-status-timeline";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
 import { DataTablePagination } from "@/components/data-table-pagination";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Cookies from "js-cookie";
 
 export interface PurchaseOrder {

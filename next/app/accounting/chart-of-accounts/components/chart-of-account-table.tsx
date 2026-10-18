@@ -153,8 +153,6 @@ export function ChartOfAccountTable({
     });
   };
 
-  const hasChildren = (id: number) => (childrenMap.get(id)?.length ?? 0) > 0;
-
   const renderRows = (
     nodes: ChartOfAccount[],
     depth: number

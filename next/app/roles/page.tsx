@@ -25,9 +25,6 @@ interface Role {
 }
 
 export default function RolesCRUDPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [httpStatus, setHttpStatus] = useState<number>(200);
   const [permissions, setPermissions] = useState({
     create: false,
@@ -111,18 +108,11 @@ export default function RolesCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-xs font-medium">
-          {error}
-        </div>
-      )}
-
       {/* 🔄 LANGKAH PERBAIKAN 2: Form harus dirender jika user punya hak 'create' ATAU sedang meng-edit data */}
       {(permissions.create || editingRole) && (
         <RoleForm
           token={authToken}
           onSuccess={handleFormSuccess} // Gunakan callback hander terpusat agar toast muncul
-          roleOptions={[]}
           editingRole={editingRole}
           onCancelEdit={() => setEditingRole(null)}
         />

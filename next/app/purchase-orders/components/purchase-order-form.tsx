@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronUp,
   Percent,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComboboxSelect } from "@/components/combobox-select";
@@ -482,7 +481,6 @@ export function PurchaseOrderForm({
     const targetUrl = isEditMode
       ? `/api/purchase-orders?id=${editingPO.id}`
       : `/api/purchase-orders`;
-    const targetMethod = isEditMode ? "PUT" : "POST";
 
     try {
       // Payload differs by mode. Saat koreksi, supplier_id SENGAJA tidak

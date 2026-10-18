@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Cookies from "js-cookie";
 import { ensureSession, hasPermission } from "@/lib/permissions";
-import { toast } from "sonner";
 
 // useReportAccess memusatkan pemeriksaan sesi dan izin accounting:read untuk
 // seluruh halaman laporan keuangan. Pola ini meniru halaman akuntansi lain

@@ -44,7 +44,6 @@ interface SupplierTableProps {
   refreshTrigger: number;
   onDeleteClick: (supplier: Supplier) => void;
   onEditClick: (supplier: Supplier) => void;
-  onRoleOptionsChange?: (options: string[]) => void;
   onForbidden?: () => void;
 }
 
@@ -128,7 +127,6 @@ export function SupplierTable({
   refreshTrigger,
   onDeleteClick,
   onEditClick,
-  onRoleOptionsChange,
   onForbidden,
 }: SupplierTableProps) {
   // Panggil custom hook universal dengan tipe <User> dan endpoint API Go

@@ -101,7 +101,6 @@ export function ProductCategoryForm({
     const url = isEditMode
       ? `/api/categories?id=${editingCategory.id}`
       : `/api/categories`;
-    const method = isEditMode ? "PUT" : "POST";
 
     try {
       const payload = {

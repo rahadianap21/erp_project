@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
@@ -34,8 +33,6 @@ const itemVariants = {
 };
 
 export default function AuthForm() {
-  const router = useRouter();
-
   // Form handler untuk Login
   const loginForm = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),

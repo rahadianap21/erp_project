@@ -3,24 +3,7 @@
 import { apiPost, apiPut } from "@/lib/api-client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  ChevronDown,
-  ChevronUp,
-  AlertTriangle,
-  Eye,
-  EyeOff,
-} from "lucide-react";
-// 🌟 TAMBAH: Impor komponen AlertDialog khusus milik proyek Anda
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-  AlertDialogAction,
-} from "@/components/ui/alert-dialog";
+import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
 interface User {
@@ -51,7 +34,6 @@ export default function UserForm({
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Efek Reaktif untuk Mode Edit
   useEffect(() => {
@@ -62,7 +44,6 @@ export default function UserForm({
       setPassword("");
       setShowPassword(false);
       setIsExpanded(true);
-      setErrorMessage("");
     } else {
       resetForm();
     }
@@ -74,7 +55,6 @@ export default function UserForm({
     setSelectedRole("");
     setPassword("");
     setShowPassword(false);
-    setErrorMessage("");
   };
 
   const handleCancel = () => {
@@ -89,7 +69,6 @@ export default function UserForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setErrorMessage("");
 
     const isEditMode = editingUser !== null;
     const targetPath = isEditMode
@@ -114,9 +93,6 @@ export default function UserForm({
       setIsExpanded(false);
       onSuccess(isEditMode ? "update" : "create", name);
     } catch (error: any) {
-      setErrorMessage(
-        error.message || "Terjadi kesalahan internal koneksi server."
-      );
       toast.error("Gagal Menyimpan Pengguna", {
         description:
           error.message ||

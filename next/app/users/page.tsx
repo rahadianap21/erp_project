@@ -3,7 +3,6 @@
 import { apiDelete } from "@/lib/api-client";
 import { ensureSession, readPermissionFlags } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
-import Cookies from "js-cookie";
 import dynamic from "next/dynamic";
 import UserForm from "./components/user-form";
 import { UserTableSkeleton } from "./components/user-table";
@@ -36,9 +35,6 @@ interface User {
 }
 
 export default function UsersCRUDPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [httpStatus, setHttpStatus] = useState<number>(200);
   const [permissions, setPermissions] = useState({
     create: false,
@@ -121,12 +117,6 @@ export default function UsersCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-xs font-medium">
-          {error}
-        </div>
-      )}
-
       {/* 🔄 LANGKAH PERBAIKAN 2: Form harus dirender jika user punya hak 'create' ATAU sedang meng-edit data */}
       {(permissions.create || editingUser) && (
         <UserForm

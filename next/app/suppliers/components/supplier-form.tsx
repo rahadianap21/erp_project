@@ -90,7 +90,6 @@ export default function SupplierForm({
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [selectedVillage, setSelectedVillage] = useState<string>("");
   const [postalCode, setPostalCode] = useState<string>("");
-  const [errorMessage, setErrorMessage] = useState<string>("");
 
   // Load Data Provinsi Pertama Kali (On Mount)
   useEffect(() => {
@@ -225,7 +224,6 @@ export default function SupplierForm({
     const url = isEditMode
       ? `/api/suppliers?id=${editingSupplier.id}`
       : `/api/suppliers`;
-    const method = isEditMode ? "PUT" : "POST";
 
     try {
       const payload = {
