@@ -98,6 +98,7 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 
 	var totalGrossItems float64 = 0
 	for i, item := range po.Items {
+<<<<<<< HEAD
 		productObj, ok := productsByID[item.ProductID]
 		if !ok {
 			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: produk tidak ditemukan", i+1)
@@ -108,6 +109,11 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 		// lalu penerimaan dan hutang usaha tercatat pada vendor yang salah.
 		if productObj.SupplierID != po.SupplierID {
 			return domain.NewBusinessRuleError("barang pada baris ke-%d bukan milik rekanan supplier dokumen ini", i+1)
+=======
+		productObj, err := u.productRepo.GetByID(ctx, item.ProductID)
+		if err != nil {
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
+>>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 		}
 
 		po.Items[i].UnitPrice = productObj.PurchasePrice
@@ -320,6 +326,7 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 		productIDs = append(productIDs, it.ProductID)
 	}
 
+<<<<<<< HEAD
 	// Satu query untuk semua produk, bukan satu query per baris PO.
 	productList, err := u.productRepo.GetByIDs(ctx, productIDs)
 	if err != nil {
@@ -336,6 +343,11 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 		productObj, ok := productsByID[it.ProductID]
 		if !ok {
 			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: produk tidak ditemukan", i+1)
+=======
+		productObj, err := u.productRepo.GetByID(ctx, it.ProductID)
+		if err != nil {
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
+>>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 		}
 
 		// Pengaman integritas: barang harus milik rekanan PO. Tanpa ini klien
