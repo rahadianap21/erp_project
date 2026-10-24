@@ -17,11 +17,7 @@ import (
 // menjadi satu-satunya tempat pemetaan error → status HTTP.
 
 // respondJSON menulis payload JSON dengan status yang diberikan.
-<<<<<<< HEAD
 func respondJSON(w http.ResponseWriter, status int, payload any) {
-=======
-func respondJSON(w http.ResponseWriter, status int, payload interface{}) {
->>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
@@ -106,11 +102,8 @@ func StatusForError(err error) int {
 
 	case errors.Is(err, domain.ErrSaleAlreadyVoid),
 		errors.Is(err, domain.ErrSaleNotPosted),
-<<<<<<< HEAD
 		errors.Is(err, domain.ErrSaleSnapshotChanged),
 		errors.Is(err, domain.ErrGRNReceiptChanged),
-=======
->>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 		errors.Is(err, domain.ErrJournalAlreadyRev),
 		errors.Is(err, domain.ErrJournalAlreadyPost),
 		errors.Is(err, domain.ErrJournalAlreadyVoid),
@@ -186,22 +179,14 @@ func parsePOID(r *http.Request) (int64, error) {
 	idStr := r.URL.Query().Get("id")
 	poID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || poID <= 0 {
-<<<<<<< HEAD
 		return 0, errors.New("parameter ID dokumen PO tidak valid")
-=======
-		return 0, errors.New("Parameter ID dokumen PO tidak valid")
->>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 	}
 	return poID, nil
 }
 
 // decodeJSONBody membaca body JSON request. Bila gagal, sudah menulis 400 ke w
 // dan mengembalikan false supaya pemanggil cukup return.
-<<<<<<< HEAD
 func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) bool {
-=======
-func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst interface{}) bool {
->>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 	if err := json.NewDecoder(r.Body).Decode(dst); err != nil {
 		respondJSON(w, http.StatusBadRequest, map[string]string{"message": "body tidak valid: " + err.Error()})
 		return false

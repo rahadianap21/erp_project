@@ -12,7 +12,6 @@ import (
 // constraint.
 const pgUniqueViolation = "23505"
 
-<<<<<<< HEAD
 // journalSourceUniqueIndex adalah nama unique index parsial yang menjamin hanya
 // satu jurnal POSTED BELUM DIBALIK untuk tiap (source_type, source_id) — inilah
 // pengaman idempotensi auto-posting (GRN) dan jurnal penutup. Jurnal yang sudah
@@ -28,9 +27,6 @@ func uniqueViolationConstraint(err error) (string, bool) {
 	}
 	return "", false
 }
-
-=======
->>>>>>> e47ff22 (refactor(go): sentralisasi pemetaan error domain ke handler.WriteError)
 // asUniqueViolation mengenali pelanggaran unique constraint (SQLSTATE 23505)
 // dan mengembalikan error pg-nya. Dipakai mapDuplicate dan repository PO yang
 // punya kebutuhan pesan khusus (ErrNomorPOBentrok untuk retry penomoran).
