@@ -78,6 +78,7 @@ type ProductRepository interface {
 	Create(ctx context.Context, prod *Product) error
 	GetProductsCursor(ctx context.Context, search string, categoryFilter int32, cursorID int64, limit int, direction string) ([]Product, int64, error)
 	GetByID(ctx context.Context, id int64) (*Product, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]Product, error)
 	Update(ctx context.Context, prod *Product) error
 	Delete(ctx context.Context, id int64, deletedBy int64) error
 }

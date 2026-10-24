@@ -503,6 +503,32 @@ LEFT JOIN m_units u_sell ON p.selling_unit_id = u_sell.id    -- 🌟 LEFT JOIN 1
 LEFT JOIN m_units u_purch ON p.purchase_unit_id = u_purch.id  -- 🌟 LEFT JOIN 2: Satuan Beli
 WHERE p.id = $1 AND p.deleted_at IS NULL;
 
+-- name: GetProductsByIDs :many
+-- Mengambil beberapa produk sekaligus (satu query) untuk alur yang sebelumnya
+-- memanggil GetProductByID per baris, misalnya validasi harga PO.
+SELECT
+    p.id, p.sku, p.barcode, p.name, p.description, p.category_id, p.supplier_id,
+    p.selling_unit_id, p.purchase_unit_id,
+    p.conversion_rate,
+    c.name as category_name, s.name as supplier_name,
+    u_sell.kode as selling_unit_kode, u_sell.name as selling_unit_name,
+    u_purch.kode as purchase_unit_kode, u_purch.name as purchase_unit_name,
+    p.purchase_price as prod_purchase_price,
+    p.selling_price as prod_selling_price,
+    p.min_stock_level as prod_min_stock,
+    p.discount_type as prod_discount_type,
+    p.discount_value as prod_discount_value,
+    p.current_stock as prod_current_stock,
+    p.avg_cost as prod_avg_cost,
+    p.is_taxable,
+    p.is_active, p.created_at
+FROM m_products p
+LEFT JOIN m_product_categories c ON p.category_id = c.id
+LEFT JOIN m_suppliers s ON p.supplier_id = s.id
+LEFT JOIN m_units u_sell ON p.selling_unit_id = u_sell.id
+LEFT JOIN m_units u_purch ON p.purchase_unit_id = u_purch.id
+WHERE p.id = ANY(sqlc.arg(ids)::bigint[]) AND p.deleted_at IS NULL;
+
 -- name: CountProducts :one
 SELECT COUNT(*) as total_count
 FROM m_products p
@@ -814,10 +840,27 @@ INSERT INTO t_purchase_order_details (
     sqlc.arg(sub_total)::numeric
 );
 
+-- name: LockPurchaseOrderForUpdate :one
+-- Mengunci header PO sebelum koreksi/pencabutan. Lock ini diserialkan dengan
+-- approve (TransitionPurchaseOrderStatus), pembuatan GRN, dan penutupan
+-- penerimaan yang semuanya juga mengunci baris header yang sama.
+--
+-- Tanpa lock ini, usecase bisa membaca PENDING lalu request approve menang
+-- balapan, tetapi UPDATE detail tetap menimpa dokumen yang sudah APPROVED.
+SELECT id, status
+FROM t_purchase_orders
+WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL
+FOR UPDATE;
+
 -- name: UpdatePurchaseOrderHeader :one
 -- Koreksi header PO. supplier_id SENGAJA tidak disentuh: di form edit kolom
 -- supplier terkunci (rekanan tidak boleh dialihkan setelah PO terbit), jadi
 -- kueri ini tidak menerima parameter supplier sama sekali.
+--
+-- Syarat status=PENDING diulang di sini sebagai pagar terakhir. Pemeriksaan
+-- utama dilakukan setelah LockPurchaseOrderForUpdate, tetapi menulis syaratnya
+-- juga di statement UPDATE membuat jalur ini tetap aman kalau suatu saat ada
+-- pemanggil baru yang lupa mengunci header lebih dulu.
 UPDATE t_purchase_orders
 SET
     tax_type     = sqlc.arg(tax_type)::text,
@@ -827,14 +870,16 @@ SET
     notes        = sqlc.narg(notes)::text,
     updated_at   = NOW(),
     updated_by   = sqlc.narg(updated_by)::bigint
-WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL
+WHERE id = sqlc.arg(id)::bigint
+  AND deleted_at IS NULL
+  AND status = 'PENDING'
 RETURNING id, po_number, supplier_id, tax_type, dpp_amount, tax_amount, total_amount, status, updated_at;
 
 -- name: DeletePurchaseOrderDetails :exec
 -- Hapus seluruh baris detail milik satu PO. Dipakai pada alur koreksi: detail
--- diganti utuh (delete + insert) di dalam satu transaksi. Pilihan ini aman karena
--- tidak ada tabel lain yang meng referensi t_purchase_order_details, dan usecase
--- sudah menolak update bila ada baris yang qty_received > 0.
+-- diganti utuh (delete + insert) di dalam satu transaksi. Detail GRN
+-- mereferensikan baris ini dengan ON DELETE RESTRICT, jadi koreksi baru aman
+-- setelah repository memverifikasi qty_received = 0 (artinya belum ada GRN).
 DELETE FROM t_purchase_order_details
 WHERE purchase_order_id = sqlc.arg(purchase_order_id)::bigint;
 
@@ -847,17 +892,22 @@ JOIN t_purchase_orders po ON po.id = d.purchase_order_id
 WHERE d.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
   AND po.deleted_at IS NULL;
 
--- name: SoftDeletePurchaseOrder :exec
+-- name: SoftDeletePurchaseOrder :execrows
 -- Pencabutan dokumen PO memakai soft delete: baris TIDAK dihapus fisik, hanya
 -- diisi deleted_at. Seluruh query pembacaan PO sudah memfilter deleted_at IS NULL,
 -- jadi dokumen ini langsung hilang dari daftar tanpa merusak riwayat keuangan.
 -- Baris detail sengaja dibiarkan agar jejak audit barang tetap utuh.
+--
+-- Syarat status=PENDING adalah pagar terakhir setelah header dikunci. Dokumen
+-- yang sudah APPROVED/RECEIVED tidak boleh hilang dari daftar aktif.
 UPDATE t_purchase_orders
 SET
     deleted_at = NOW(),
     updated_at = NOW(),
     updated_by = sqlc.narg(updated_by)::bigint
-WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL;
+WHERE id = sqlc.arg(id)::bigint
+  AND deleted_at IS NULL
+  AND status = 'PENDING';
 
 -- =========================================================================
 -- LOOKUP KHUSUS FORM PURCHASE ORDER (Endpoint Ringan, Tanpa RBAC Modul Master)
@@ -1114,6 +1164,27 @@ JOIN m_units u ON u.id = p.purchase_unit_id
 WHERE gd.grn_id = sqlc.arg(grn_id)::bigint
 ORDER BY gd.id ASC;
 
+-- name: GetGRNDetailsByPOID :many
+-- Mengambil detail SELURUH GRN milik satu PO dalam satu query. Dipakai saat
+-- menutup penerimaan supaya tidak perlu memanggil GetGRNDetails per GRN.
+SELECT
+    gd.id,
+    gd.grn_id,
+    gd.purchase_order_detail_id,
+    gd.product_id,
+    gd.qty_received,
+    gd.conversion_rate,
+    gd.created_at,
+    p.sku,
+    p.name AS product_name,
+    u.kode AS purchase_unit_kode
+FROM t_goods_receipt_note_details gd
+JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+JOIN m_products p ON p.id = gd.product_id
+JOIN m_units u ON u.id = p.purchase_unit_id
+WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
+ORDER BY gd.grn_id ASC, gd.id ASC;
+
 -- name: GetPOReceivedDeltas :many
 -- Menjumlahkan qty diterima (satuan beli) dikali conversion_rate snapshot per
 -- produk untuk sebuah PO. Dipakai saat MENUTUP penerimaan supaya stok baru
@@ -1137,7 +1208,26 @@ FROM t_goods_receipt_note_details gd
 JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
 JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
 WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
-GROUP BY gd.product_id;
+GROUP BY gd.product_id
+-- Urutan produk ditentukan secara deterministik supaya penutupan dua PO yang
+-- memuat produk sama selalu mengunci baris m_products dalam urutan yang sama.
+-- Tanpa ORDER BY, urutan hasil GROUP BY bisa berbeda dan dua transaksi dapat
+-- saling menunggu (deadlock) saat menaikkan stok.
+ORDER BY gd.product_id ASC;
+
+-- name: CountGRNsByPOID :one
+-- Menghitung GRN yang menempel pada satu PO. Dipakai saat MENUTUP penerimaan
+-- untuk memastikan daftar GRN yang jurnalnya sudah diterbitkan usecase masih
+-- sama dengan daftar yang stoknya akan ditambahkan repository.
+--
+-- Tanpa pemeriksaan ini, GRN baru yang dibuat setelah usecase membaca daftar
+-- tetapi sebelum repository mengunci header akan ikut dijumlahkan stoknya
+-- padahal jurnalnya belum pernah diterbitkan. Lock header membuat GRN baru
+-- setelah pemeriksaan ini menunggu sampai transaksi selesai, lalu ditolak
+-- karena status PO sudah RECEIVED.
+SELECT COUNT(*)::bigint AS total
+FROM t_goods_receipt_notes g
+WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint;
 
 -- name: GetGRNsByPOID :many
 SELECT
@@ -1319,6 +1409,38 @@ WHERE id = ANY(sqlc.arg(ids)::bigint[]) AND deleted_at IS NULL;
 SELECT id, period_year, period_month, status, closed_at, closed_by, created_at, updated_at
 FROM m_accounting_periods
 WHERE period_year = sqlc.arg(period_year)::int AND period_month = sqlc.arg(period_month)::int;
+
+-- name: GetAccountPeriodForUpdate :one
+-- Mengunci periode untuk operasi tutup/buka buku. Semua penulisan jurnal pada
+-- periode ini memakai FOR SHARE, sehingga tidak bisa melewati status CLOSED.
+SELECT id, period_year, period_month, status, closed_at, closed_by, created_at, updated_at
+FROM m_accounting_periods
+WHERE period_year = sqlc.arg(period_year)::int
+  AND period_month = sqlc.arg(period_month)::int
+FOR UPDATE;
+
+-- name: GetAccountPeriodForShare :one
+-- Dipakai saat jurnal POSTED/pembalik akan ditulis. Kunci ini kompatibel
+-- dengan beberapa penulis paralel, tetapi menunggu transaksi tutup buku yang
+-- memegang FOR UPDATE.
+SELECT id, period_year, period_month, status, closed_at, closed_by, created_at, updated_at
+FROM m_accounting_periods
+WHERE period_year = sqlc.arg(period_year)::int
+  AND period_month = sqlc.arg(period_month)::int
+FOR SHARE;
+
+-- name: LockJournalEntryPeriodForShare :one
+-- Mengunci periode milik jurnal DRAFT yang akan diposting. Baris jurnal sendiri
+-- tidak dikunci di sini karena UPDATE ... status = 'DRAFT' menjadi CAS-nya.
+SELECT p.id, p.period_year, p.period_month, p.status, p.closed_at, p.closed_by,
+       p.created_at, p.updated_at
+FROM t_journal_entries j
+JOIN m_accounting_periods p
+  ON p.period_year = j.period_year
+ AND p.period_month = j.period_month
+WHERE j.id = sqlc.arg(id)::bigint
+  AND p.status = 'OPEN'
+FOR SHARE OF p;
 
 -- name: CreateAccountPeriod :one
 INSERT INTO m_accounting_periods (period_year, period_month, status, created_by, updated_by)
@@ -1569,11 +1691,17 @@ SET value = EXCLUDED.value,
 -- source_id) sudah punya jurnal POSTED — memakai unique index parsial itulah
 -- auto-posting dijamin idempoten. Pelanggaran pada nomor jurnal meminta
 -- pemanggil mengambil nomor berikutnya.
+--
+-- INSERT ... SELECT ini juga mengunci baris periode dengan FOR SHARE dan hanya
+-- menghasilkan baris bila periode masih OPEN. Dengan begitu penutupan buku yang
+-- memegang FOR UPDATE tidak bisa berlomba dengan auto-posting: salah satunya
+-- menunggu, dan bila periode sudah ditutup, INSERT tidak menulis apa pun.
 INSERT INTO t_journal_entries (
     entry_number, entry_date, description, source_type, source_id, source_reference,
     status, total_debit, total_credit, period_year, period_month, reversal_of_id,
     posted_at, posted_by, created_by, updated_by
-) VALUES (
+)
+SELECT
     sqlc.arg(entry_number)::varchar,
     sqlc.arg(entry_date)::date,
     sqlc.narg(description)::text,
@@ -1590,7 +1718,11 @@ INSERT INTO t_journal_entries (
     sqlc.narg(posted_by)::bigint,
     sqlc.narg(created_by)::bigint,
     sqlc.narg(updated_by)::bigint
-)
+FROM m_accounting_periods p
+WHERE p.period_year = sqlc.arg(period_year)::int
+  AND p.period_month = sqlc.arg(period_month)::int
+  AND p.status = 'OPEN'
+FOR SHARE
 RETURNING id, entry_number, entry_date, description, status, total_debit, total_credit,
           period_year, period_month, posted_at, posted_by, voided_at, voided_by,
           void_reason, reversal_of_id, reversed_by_id, created_at, updated_at, created_by;
@@ -1817,6 +1949,13 @@ SELECT m.id, m.code, m.name, m.channel, m.account_id, m.is_cash, m.sort_order, m
 FROM m_payment_methods m
 WHERE m.id = sqlc.arg(id)::bigint AND m.deleted_at IS NULL;
 
+-- name: GetPaymentMethodsByIDs :many
+-- Mengambil beberapa metode pembayaran sekaligus supaya pemetaan akun pada
+-- transaksi penjualan tidak menembak satu query per metode.
+SELECT m.id, m.code, m.name, m.channel, m.account_id, m.is_cash, m.sort_order, m.is_active
+FROM m_payment_methods m
+WHERE m.id = ANY(sqlc.arg(ids)::bigint[]) AND m.deleted_at IS NULL;
+
 -- name: UpdatePaymentMethod :exec
 UPDATE m_payment_methods SET
     code = sqlc.arg(code)::varchar,
@@ -1846,6 +1985,120 @@ SELECT m.id, m.code, m.name, m.channel, m.account_id, m.is_cash, m.sort_order, m
 FROM m_payment_methods m
 WHERE m.deleted_at IS NULL
 ORDER BY m.sort_order ASC, m.name ASC;
+
+-- ------------------------------ MASTER VOUCHER ---------------------------
+
+-- name: CreateVoucher :one
+INSERT INTO m_vouchers (
+    code, name, description, discount_type, discount_value,
+    min_purchase, max_discount, valid_from, valid_until, is_active,
+    created_by, updated_by
+) VALUES (
+    sqlc.arg(code)::varchar,
+    sqlc.arg(name)::varchar,
+    sqlc.arg(description)::text,
+    sqlc.arg(discount_type)::varchar,
+    sqlc.arg(discount_value)::numeric,
+    sqlc.arg(min_purchase)::numeric,
+    sqlc.arg(max_discount)::numeric,
+    sqlc.narg(valid_from)::date,
+    sqlc.narg(valid_until)::date,
+    sqlc.arg(is_active)::boolean,
+    sqlc.narg(created_by)::bigint,
+    sqlc.narg(updated_by)::bigint
+)
+RETURNING id, code, name, description, discount_type, discount_value,
+          min_purchase, max_discount, valid_from, valid_until, is_active,
+          used_at, created_at;
+
+-- name: GetVoucherByID :one
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL;
+
+-- name: GetVoucherByCode :one
+-- Pencarian kode untuk scan barcode; tidak sensitif huruf besar/kecil.
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE UPPER(code) = UPPER(sqlc.arg(code)::varchar) AND deleted_at IS NULL;
+
+-- name: GetVouchersCursorNext :many
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND (sqlc.arg(search_query)::text = ''
+       OR name ILIKE '%' || sqlc.arg(search_query)::text || '%'
+       OR code ILIKE '%' || sqlc.arg(search_query)::text || '%')
+  AND (sqlc.arg(cursor_id)::bigint = 0 OR id < sqlc.arg(cursor_id)::bigint)
+ORDER BY id DESC
+LIMIT sqlc.arg(req_limit)::int;
+
+-- name: GetVouchersCursorPrev :many
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND (sqlc.arg(search_query)::text = ''
+       OR name ILIKE '%' || sqlc.arg(search_query)::text || '%'
+       OR code ILIKE '%' || sqlc.arg(search_query)::text || '%')
+  AND id > sqlc.arg(cursor_id)::bigint
+ORDER BY id ASC
+LIMIT sqlc.arg(req_limit)::int;
+
+-- name: CountVouchers :one
+SELECT COUNT(*)::bigint AS total_count
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND (sqlc.arg(search_query)::text = ''
+       OR name ILIKE '%' || sqlc.arg(search_query)::text || '%'
+       OR code ILIKE '%' || sqlc.arg(search_query)::text || '%');
+
+-- name: UpdateVoucher :exec
+UPDATE m_vouchers SET
+    code = sqlc.arg(code)::varchar,
+    name = sqlc.arg(name)::varchar,
+    description = sqlc.arg(description)::text,
+    discount_type = sqlc.arg(discount_type)::varchar,
+    discount_value = sqlc.arg(discount_value)::numeric,
+    min_purchase = sqlc.arg(min_purchase)::numeric,
+    max_discount = sqlc.arg(max_discount)::numeric,
+    valid_from = sqlc.narg(valid_from)::date,
+    valid_until = sqlc.narg(valid_until)::date,
+    is_active = sqlc.arg(is_active)::boolean,
+    updated_at = NOW(),
+    updated_by = sqlc.narg(updated_by)::bigint
+WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL;
+
+-- name: DeleteVoucher :exec
+UPDATE m_vouchers
+SET deleted_at = NOW(), updated_at = NOW(), deleted_by = sqlc.narg(deleted_by)::bigint
+WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL;
+
+-- name: LockVoucherForSale :one
+-- Mengunci voucher di dalam transaksi nota agar single-use tidak bisa
+-- dilanggar oleh dua transaksi bersamaan.
+SELECT id, code, discount_type, discount_value, min_purchase, max_discount,
+       valid_from, valid_until, is_active, used_at
+FROM m_vouchers
+WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL
+FOR UPDATE;
+
+-- name: MarkVoucherUsed :execrows
+UPDATE m_vouchers
+SET used_at = NOW(), updated_at = NOW(), updated_by = sqlc.narg(updated_by)::bigint
+WHERE id = sqlc.arg(id)::bigint AND used_at IS NULL;
+
+-- name: ReleaseVoucher :exec
+UPDATE m_vouchers
+SET used_at = NULL, updated_at = NOW(), updated_by = sqlc.narg(updated_by)::bigint
+WHERE id = sqlc.arg(id)::bigint;
 
 -- ------------------------------ PRODUK POS ------------------------------
 
@@ -1889,6 +2142,7 @@ WHERE id = ANY(sqlc.arg(product_ids)::bigint[]) AND deleted_at IS NULL;
 SELECT id, sku, name, selling_price, current_stock, avg_cost, discount_type, discount_value, is_taxable
 FROM m_products
 WHERE id = ANY(sqlc.arg(product_ids)::bigint[]) AND deleted_at IS NULL
+ORDER BY id
 FOR UPDATE;
 
 -- name: DecrementProductStock :execrows
@@ -1900,10 +2154,27 @@ SET current_stock = current_stock - sqlc.arg(qty)::int,
     updated_by = sqlc.narg(updated_by)::bigint
 WHERE id = sqlc.arg(id)::bigint AND current_stock >= sqlc.arg(qty)::int;
 
--- name: RestoreProductStock :exec
--- Pengembalian stok saat penjualan dibatalkan (void).
+-- name: LockProductsForVoid :many
+-- Mengunci produk yang stoknya harus dikembalikan saat void, termasuk produk
+-- yang sudah dinonaktifkan/di-soft-delete. ORDER BY id menjaga urutan kunci
+-- tetap deterministik antar transaksi.
+SELECT id, current_stock, avg_cost
+FROM m_products
+WHERE id = ANY(sqlc.arg(product_ids)::bigint[])
+ORDER BY id
+FOR UPDATE;
+
+-- name: RestoreProductStockWithValuation :exec
+-- Mengembalikan stok sekaligus nilai persediaan pada harga pokok asli penjualan
+-- memakai rata-rata tertimbang. RHS memakai nilai baris SEBELUM update.
 UPDATE m_products
 SET current_stock = current_stock + sqlc.arg(qty)::int,
+    avg_cost = CASE
+        WHEN current_stock + sqlc.arg(qty)::int > 0
+        THEN (current_stock * avg_cost + sqlc.arg(cost_total)::numeric)
+             / (current_stock + sqlc.arg(qty)::int)
+        ELSE avg_cost
+    END,
     updated_at = NOW(),
     updated_by = sqlc.narg(updated_by)::bigint
 WHERE id = sqlc.arg(id)::bigint;
@@ -1922,6 +2193,7 @@ INSERT INTO t_sales (
     subtotal, item_discount, discount_type, discount_value, discount_amount,
     dpp_amount, tax_amount, total_amount, paid_amount, change_amount, cost_total,
     points_earned, redeem_points, redeem_amount,
+    voucher_id, voucher_code, voucher_discount,
     payment_status, status, due_date, notes, created_by, updated_by
 ) VALUES (
     sqlc.arg(sale_number)::varchar,
@@ -1942,6 +2214,9 @@ INSERT INTO t_sales (
     sqlc.arg(points_earned)::bigint,
     sqlc.arg(redeem_points)::bigint,
     sqlc.arg(redeem_amount)::numeric,
+    sqlc.narg(voucher_id)::bigint,
+    sqlc.arg(voucher_code)::varchar,
+    sqlc.arg(voucher_discount)::numeric,
     sqlc.arg(payment_status)::varchar,
     sqlc.arg(status)::varchar,
     sqlc.narg(due_date)::date,
@@ -1952,7 +2227,8 @@ INSERT INTO t_sales (
 RETURNING id, sale_number, sale_date, member_id, tax_type, subtotal, item_discount,
           discount_type, discount_value, discount_amount, dpp_amount, tax_amount,
           total_amount, paid_amount, change_amount, cost_total, points_earned, redeem_points,
-          redeem_amount, payment_status, status, due_date, notes, created_at;
+          redeem_amount, voucher_id, voucher_code, voucher_discount,
+          payment_status, status, due_date, notes, created_at;
 
 -- name: CreateSaleDetail :exec
 INSERT INTO t_sales_details (
@@ -1998,6 +2274,7 @@ SELECT
     s.tax_type, s.subtotal, s.item_discount, s.discount_type, s.discount_value,
     s.discount_amount, s.dpp_amount, s.tax_amount, s.total_amount, s.paid_amount,
     s.change_amount, s.cost_total, s.points_earned, s.redeem_points, s.redeem_amount,
+    s.voucher_id, s.voucher_code, s.voucher_discount,
     s.payment_status, s.status, s.due_date, s.notes, s.journal_entry_id,
     s.voided_at, s.void_reason, s.created_at, s.created_by
 FROM t_sales s
@@ -2025,7 +2302,7 @@ ORDER BY p.id ASC;
 -- name: GetSalesCursorNext :many
 SELECT
     s.id, s.sale_number, s.sale_date, s.member_id, COALESCE(c.name, '') AS member_name,
-    s.total_amount, s.paid_amount, s.payment_status, s.status, s.tax_type, s.created_at
+    s.total_amount, s.paid_amount, s.voucher_code, s.payment_status, s.status, s.tax_type, s.created_at
 FROM t_sales s
 LEFT JOIN m_members c ON c.id = s.member_id
 WHERE (sqlc.arg(search_query)::text = ''
@@ -2039,7 +2316,7 @@ LIMIT sqlc.arg(req_limit)::int;
 -- name: GetSalesCursorPrev :many
 SELECT
     s.id, s.sale_number, s.sale_date, s.member_id, COALESCE(c.name, '') AS member_name,
-    s.total_amount, s.paid_amount, s.payment_status, s.status, s.tax_type, s.created_at
+    s.total_amount, s.paid_amount, s.voucher_code, s.payment_status, s.status, s.tax_type, s.created_at
 FROM t_sales s
 LEFT JOIN m_members c ON c.id = s.member_id
 WHERE (sqlc.arg(search_query)::text = ''
@@ -2060,7 +2337,8 @@ WHERE (sqlc.arg(search_query)::text = ''
   AND (sqlc.arg(status_filter)::text = 'ALL' OR s.status = sqlc.arg(status_filter)::text);
 
 -- name: LockSaleForVoid :one
-SELECT s.id, s.sale_number, s.member_id, s.points_earned, s.redeem_points, s.status, s.journal_entry_id
+SELECT s.id, s.sale_number, s.member_id, s.points_earned, s.redeem_points,
+       s.voucher_id, s.status, s.journal_entry_id
 FROM t_sales s
 WHERE s.id = sqlc.arg(id)::bigint
 FOR UPDATE;

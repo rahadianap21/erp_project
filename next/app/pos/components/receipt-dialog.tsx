@@ -65,6 +65,13 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
         sale.item_discount + sale.discount_amount
       )}</span></div>
       ${
+        sale.voucher_discount > 0.001
+          ? `<div class="row"><span>Voucher ${escapeHtml(
+              sale.voucher_code || ""
+            )}</span><span>-${formatRupiah(sale.voucher_discount)}</span></div>`
+          : ""
+      }
+      ${
         sale.tax_amount > 0.001
           ? `<div class="row"><span>DPP</span><span>${formatRupiah(sale.dpp_amount)}</span></div>
       <div class="row"><span>PPN</span><span>${formatRupiah(sale.tax_amount)}</span></div>`
@@ -139,6 +146,12 @@ export function ReceiptDialog({ sale, onClose }: ReceiptDialogProps) {
               -{formatRupiah(sale.item_discount + sale.discount_amount)}
             </span>
           </div>
+          {sale.voucher_discount > 0.001 && (
+            <div className="flex justify-between text-blue-600">
+              <span>Voucher {sale.voucher_code}</span>
+              <span>-{formatRupiah(sale.voucher_discount)}</span>
+            </div>
+          )}
           {sale.tax_amount > 0.001 && (
             <>
               <div className="flex justify-between">

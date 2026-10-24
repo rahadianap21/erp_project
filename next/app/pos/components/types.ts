@@ -24,6 +24,21 @@ export interface Member {
   is_active: boolean;
 }
 
+export interface Voucher {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  discount_type: string;
+  discount_value: number;
+  min_purchase: number;
+  max_discount: number;
+  valid_from?: string | null;
+  valid_until?: string | null;
+  is_active: boolean;
+  used_at?: string | null;
+}
+
 export interface POSProduct {
   id: number;
   sku: string;
@@ -48,9 +63,6 @@ export interface POSBootstrap {
 export interface CartLine {
   product: POSProduct;
   qty: number;
-  unitPrice: number;
-  discountType: string;
-  discountValue: number;
 }
 
 export interface PaymentDraft {
@@ -98,6 +110,9 @@ export interface Sale {
   points_earned: number;
   redeem_points: number;
   redeem_amount: number;
+  voucher_id?: number;
+  voucher_code?: string;
+  voucher_discount: number;
   payment_status: string;
   status: string;
   due_date?: string | null;

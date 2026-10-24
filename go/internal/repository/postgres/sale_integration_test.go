@@ -19,7 +19,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -76,13 +78,13 @@ func TestSaleCreateDanVoidMenulisJurnalSeimbang(t *testing.T) {
 	saleRepo := NewSQLSaleRepository(pool)
 	memberRepo := NewSQLMemberRepository(pool)
 	paymentRepo := NewSQLPaymentMethodRepository(pool)
-	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, journalUC, nil)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, journalUC, nil)
 
 	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
 		MemberID: 0,
 		TaxType:  domain.SaleTaxNonPPN,
 		Items: []domain.SaleLineInput{
-			{ProductID: productID, Qty: 2, UnitPrice: 20000},
+			{ProductID: productID, Qty: 2},
 		},
 		Payments: []domain.SalePaymentInput{
 			{PaymentMethodID: tunaiID, Amount: 40000},
@@ -236,13 +238,13 @@ func TestSaleTolakPembayaranSebagian(t *testing.T) {
 	saleRepo := NewSQLSaleRepository(pool)
 	memberRepo := NewSQLMemberRepository(pool)
 	paymentRepo := NewSQLPaymentMethodRepository(pool)
-	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, journalUC, nil)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, journalUC, nil)
 
 	_, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
 		MemberID: 0,
 		TaxType:  domain.SaleTaxNonPPN,
 		Items: []domain.SaleLineInput{
-			{ProductID: productID, Qty: 3, UnitPrice: 10000},
+			{ProductID: productID, Qty: 3},
 		},
 		Payments: []domain.SalePaymentInput{
 			{PaymentMethodID: tunaiID, Amount: 10000},
@@ -312,13 +314,13 @@ func TestSaleLebihBayarMencatatKembalianTanpaPiutang(t *testing.T) {
 	saleRepo := NewSQLSaleRepository(pool)
 	memberRepo := NewSQLMemberRepository(pool)
 	paymentRepo := NewSQLPaymentMethodRepository(pool)
-	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, journalUC, nil)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, journalUC, nil)
 
 	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
 		MemberID: 0,
 		TaxType:  domain.SaleTaxNonPPN,
 		Items: []domain.SaleLineInput{
-			{ProductID: productID, Qty: 3, UnitPrice: 10000},
+			{ProductID: productID, Qty: 3},
 		},
 		Payments: []domain.SalePaymentInput{
 			{PaymentMethodID: tunaiID, Amount: 50000},
@@ -441,14 +443,14 @@ func TestSaleMemberPoinEarnRedeemDanVoid(t *testing.T) {
 	saleRepo := NewSQLSaleRepository(pool)
 	memberRepo := NewSQLMemberRepository(pool)
 	paymentRepo := NewSQLPaymentMethodRepository(pool)
-	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, journalUC, nil)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, journalUC, nil)
 
 	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
 		MemberID:     memberID,
 		TaxType:      domain.SaleTaxNonPPN,
 		RedeemPoints: 20,
 		Items: []domain.SaleLineInput{
-			{ProductID: productID, Qty: 1, UnitPrice: 100000},
+			{ProductID: productID, Qty: 1},
 		},
 		Payments: []domain.SalePaymentInput{
 			{PaymentMethodID: tunaiID, Amount: 98000},
@@ -590,15 +592,15 @@ func TestSalePajakPerBarisTersimpanDanJurnalSeimbang(t *testing.T) {
 	saleRepo := NewSQLSaleRepository(pool)
 	memberRepo := NewSQLMemberRepository(pool)
 	paymentRepo := NewSQLPaymentMethodRepository(pool)
-	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, journalUC, nil)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, journalUC, nil)
 
 	// Harga kena PPN 112000 (inclusive -> DPP 100000 + PPN 12000) dan tanpa PPN
 	// 100000 (DPP penuh). Total nota 212000.
 	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
 		MemberID: 0,
 		Items: []domain.SaleLineInput{
-			{ProductID: taxableID, Qty: 1, UnitPrice: 112000},
-			{ProductID: nonTaxableID, Qty: 1, UnitPrice: 100000},
+			{ProductID: taxableID, Qty: 1},
+			{ProductID: nonTaxableID, Qty: 1},
 		},
 		Payments: []domain.SalePaymentInput{
 			{PaymentMethodID: tunaiID, Amount: 212000},
@@ -676,5 +678,309 @@ func TestSalePajakPerBarisTersimpanDanJurnalSeimbang(t *testing.T) {
 	}
 	if kreditPPN != 12000 {
 		t.Fatalf("kredit PPN keluaran harus 12000, dapat %.2f", kreditPPN)
+	}
+}
+
+func TestSaleStaleSnapshotDitolakTanpaMengubahStok(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+
+	var categoryID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_product_categories ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skipf("tidak ada kategori produk, test dilewati: %v", err)
+	}
+	var supplierID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_suppliers ORDER BY id LIMIT 1`).Scan(&supplierID); err != nil {
+		t.Skipf("tidak ada supplier, test dilewati: %v", err)
+	}
+	var unitID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_units ORDER BY id LIMIT 1`).Scan(&unitID); err != nil {
+		t.Skipf("tidak ada satuan, test dilewati: %v", err)
+	}
+	var actorID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM s_users ORDER BY id LIMIT 1`).Scan(&actorID); err != nil {
+		t.Skipf("tidak ada pengguna, test dilewati: %v", err)
+	}
+
+	saleRepo := NewSQLSaleRepository(pool)
+	cases := []struct {
+		name   string
+		mutate string
+	}{
+		{"harga berubah", `UPDATE m_products SET selling_price = 25000 WHERE id = $1`},
+		{"hpp berubah", `UPDATE m_products SET avg_cost = 12000 WHERE id = $1`},
+		{"diskon produk berubah", `UPDATE m_products SET discount_type = 'PERCENT', discount_value = 10 WHERE id = $1`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sku := fmt.Sprintf("UJI-SNAPSHOT-%d", time.Now().UnixNano())
+			var productID int64
+			if err := pool.QueryRow(ctx, `
+				INSERT INTO m_products
+					(sku, name, category_id, supplier_id, selling_unit_id, purchase_unit_id,
+					 purchase_price, selling_price, current_stock, avg_cost, is_active)
+				VALUES ($1, 'Produk Uji Snapshot', $2, $3, $4, $4, 10000, 20000, 5, 10000, TRUE)
+				RETURNING id`, sku, categoryID, supplierID, unitID).Scan(&productID); err != nil {
+				t.Fatalf("gagal membuat produk uji: %v", err)
+			}
+			t.Cleanup(func() {
+				bg := context.Background()
+				_, _ = pool.Exec(bg, `DELETE FROM t_sales WHERE id IN (SELECT sale_id FROM t_sales_details WHERE product_id = $1)`, productID)
+				_, _ = pool.Exec(bg, `DELETE FROM m_products WHERE id = $1`, productID)
+			})
+
+			products, err := saleRepo.GetProductsForSale(ctx, []int64{productID})
+			if err != nil {
+				t.Fatalf("GetProductsForSale gagal: %v", err)
+			}
+			sale, err := domain.CalculateSale(domain.CreateSaleInput{
+				Items: []domain.SaleLineInput{{ProductID: productID, Qty: 1}},
+				Payments: []domain.SalePaymentInput{
+					{PaymentMethodID: 1, Amount: 20000},
+				},
+			}, products, domain.TaxConfig{Rate: 0, Mode: domain.TaxModeExclusive})
+			if err != nil {
+				t.Fatalf("CalculateSale gagal: %v", err)
+			}
+			createdBy := actorID
+			sale.CreatedBy = &createdBy
+
+			if _, err := pool.Exec(ctx, tc.mutate, productID); err != nil {
+				t.Fatalf("gagal mengubah produk: %v", err)
+			}
+			_, err = saleRepo.CreateSale(ctx, sale, nil)
+			if !errors.Is(err, domain.ErrSaleSnapshotChanged) {
+				t.Fatalf("harus ErrSaleSnapshotChanged, dapat %v", err)
+			}
+
+			var stock int
+			if err := pool.QueryRow(ctx, `SELECT current_stock FROM m_products WHERE id = $1`, productID).Scan(&stock); err != nil {
+				t.Fatalf("gagal membaca stok: %v", err)
+			}
+			if stock != 5 {
+				t.Fatalf("stok tidak boleh berubah, dapat %d", stock)
+			}
+			var detailCount int
+			if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM t_sales_details WHERE product_id = $1`, productID).Scan(&detailCount); err != nil {
+				t.Fatalf("gagal menghitung rincian: %v", err)
+			}
+			if detailCount != 0 {
+				t.Fatalf("tidak boleh ada rincian nota, dapat %d", detailCount)
+			}
+		})
+	}
+}
+
+func TestSaleVoidMengembalikanNilaiPersediaanRataRata(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+
+	var categoryID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_product_categories ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skipf("tidak ada kategori produk, test dilewati: %v", err)
+	}
+	var supplierID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_suppliers ORDER BY id LIMIT 1`).Scan(&supplierID); err != nil {
+		t.Skipf("tidak ada supplier, test dilewati: %v", err)
+	}
+	var unitID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_units ORDER BY id LIMIT 1`).Scan(&unitID); err != nil {
+		t.Skipf("tidak ada satuan, test dilewati: %v", err)
+	}
+	var actorID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM s_users ORDER BY id LIMIT 1`).Scan(&actorID); err != nil {
+		t.Skipf("tidak ada pengguna, test dilewati: %v", err)
+	}
+	var tunaiID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_payment_methods WHERE code = 'TUNAI' AND deleted_at IS NULL LIMIT 1`).Scan(&tunaiID); err != nil {
+		t.Skipf("metode TUNAI belum ada, test dilewati: %v", err)
+	}
+
+	sku := fmt.Sprintf("UJI-VOID-VALUASI-%d", time.Now().UnixNano())
+	var productID int64
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO m_products
+			(sku, name, category_id, supplier_id, selling_unit_id, purchase_unit_id,
+			 purchase_price, selling_price, current_stock, avg_cost, is_active)
+		VALUES ($1, 'Produk Uji Void Valuasi', $2, $3, $4, $4, 10000, 20000, 10, 10000, TRUE)
+		RETURNING id`, sku, categoryID, supplierID, unitID).Scan(&productID); err != nil {
+		t.Fatalf("gagal membuat produk uji: %v", err)
+	}
+
+	saleRepo := NewSQLSaleRepository(pool)
+	memberRepo := NewSQLMemberRepository(pool)
+	paymentRepo := NewSQLPaymentMethodRepository(pool)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, nil, nil)
+
+	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
+		Items: []domain.SaleLineInput{{ProductID: productID, Qty: 2}},
+		Payments: []domain.SalePaymentInput{
+			{PaymentMethodID: tunaiID, Amount: 40000},
+		},
+		CreatedBy: actorID,
+	})
+	if err != nil {
+		t.Fatalf("CreateSale gagal: %v", err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		_, _ = pool.Exec(bg, `DELETE FROM t_sales WHERE id = $1`, sale.ID)
+		_, _ = pool.Exec(bg, `DELETE FROM m_products WHERE id = $1`, productID)
+	})
+	if sale.CostTotal != 20000 {
+		t.Fatalf("HPP nota harus 20000, dapat %.2f", sale.CostTotal)
+	}
+
+	// Simulasikan perubahan nilai persediaan setelah penjualan (mis. penerimaan
+	// barang baru): 10 unit @ 12000. Void harus mengembalikan 2 unit pada HPP
+	// asli 10000, sehingga rata-rata menjadi (120000+20000)/12.
+	if _, err := pool.Exec(ctx, `UPDATE m_products SET current_stock = 10, avg_cost = 12000 WHERE id = $1`, productID); err != nil {
+		t.Fatalf("gagal menyiapkan nilai persediaan: %v", err)
+	}
+	if err := saleUC.VoidSale(ctx, sale.ID, actorID, "uji valuasi void"); err != nil {
+		t.Fatalf("VoidSale gagal: %v", err)
+	}
+
+	var stock int
+	var avgCost float64
+	if err := pool.QueryRow(ctx, `SELECT current_stock, avg_cost FROM m_products WHERE id = $1`, productID).Scan(&stock, &avgCost); err != nil {
+		t.Fatalf("gagal membaca stok/avg_cost: %v", err)
+	}
+	if stock != 12 {
+		t.Fatalf("stok setelah void harus 12, dapat %d", stock)
+	}
+	wantAvg := 140000.0 / 12.0
+	if math.Abs(avgCost-wantAvg) > 0.0001 {
+		t.Fatalf("avg_cost setelah void harus %.4f, dapat %.4f", wantAvg, avgCost)
+	}
+}
+
+func TestSaleVoucherSekaliPakaiDanDilepasSaatVoid(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+
+	var categoryID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_product_categories ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skipf("tidak ada kategori produk, test dilewati: %v", err)
+	}
+	var supplierID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_suppliers ORDER BY id LIMIT 1`).Scan(&supplierID); err != nil {
+		t.Skipf("tidak ada supplier, test dilewati: %v", err)
+	}
+	var unitID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_units ORDER BY id LIMIT 1`).Scan(&unitID); err != nil {
+		t.Skipf("tidak ada satuan, test dilewati: %v", err)
+	}
+	var actorID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM s_users ORDER BY id LIMIT 1`).Scan(&actorID); err != nil {
+		t.Skipf("tidak ada pengguna, test dilewati: %v", err)
+	}
+	var tunaiID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_payment_methods WHERE code = 'TUNAI' AND deleted_at IS NULL LIMIT 1`).Scan(&tunaiID); err != nil {
+		t.Skipf("metode TUNAI belum ada, test dilewati: %v", err)
+	}
+
+	nano := time.Now().UnixNano()
+	sku := fmt.Sprintf("UJI-SALE-VCR-%d", nano)
+	var productID int64
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO m_products
+			(sku, name, category_id, supplier_id, selling_unit_id, purchase_unit_id,
+			 purchase_price, selling_price, current_stock, avg_cost, is_active)
+		VALUES ($1, 'Produk Uji Voucher', $2, $3, $4, $4, 10000, 20000, 10, 10000, TRUE)
+		RETURNING id`, sku, categoryID, supplierID, unitID).Scan(&productID); err != nil {
+		t.Fatalf("gagal membuat produk uji: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM m_products WHERE id = $1`, productID)
+	})
+
+	voucherRepo := NewSQLVoucherRepository(pool)
+	voucher, err := voucherRepo.Create(ctx, domain.VoucherInput{
+		Code:          fmt.Sprintf("UJI-VCR-%d", nano),
+		Name:          "Voucher Uji",
+		DiscountType:  domain.VoucherDiscountAmount,
+		DiscountValue: 5000,
+		IsActive:      true,
+	}, actorID)
+	if err != nil {
+		t.Fatalf("gagal membuat voucher uji: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM m_vouchers WHERE id = $1`, voucher.ID)
+	})
+
+	coaRepo := NewSQLChartOfAccountRepository(pool)
+	periodRepo := NewSQLAccountingPeriodRepository(pool)
+	journalRepo := NewSQLJournalRepository(pool)
+	settingsRepo := NewSQLAccountingSettingsRepository(pool)
+	reportRepo := NewSQLAccountingReportRepository(pool)
+	journalUC := usecase.NewJournalUsecase(journalRepo, coaRepo, periodRepo, settingsRepo, reportRepo)
+
+	saleRepo := NewSQLSaleRepository(pool)
+	saleUC := usecase.NewSaleUsecase(saleRepo, NewSQLMemberRepository(pool), NewSQLPaymentMethodRepository(pool), voucherRepo, journalUC, nil)
+
+	sale, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
+		TaxType:     domain.SaleTaxNonPPN,
+		VoucherCode: "  " + voucher.Code + " ",
+		Items: []domain.SaleLineInput{
+			{ProductID: productID, Qty: 1},
+		},
+		Payments: []domain.SalePaymentInput{
+			{PaymentMethodID: tunaiID, Amount: 15000},
+		},
+		CreatedBy: actorID,
+	})
+	if err != nil {
+		t.Fatalf("CreateSale dengan voucher gagal: %v", err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		if sale.JournalEntryID != nil {
+			_, _ = pool.Exec(bg, `DELETE FROM t_journal_entry_lines WHERE journal_entry_id IN
+				(SELECT id FROM t_journal_entries WHERE source_id = $1 OR reversal_of_id = $1 OR id = $2)`, sale.ID, *sale.JournalEntryID)
+			_, _ = pool.Exec(bg, `DELETE FROM t_journal_entries WHERE source_id = $1 OR reversal_of_id = $1 OR id = $2`, sale.ID, *sale.JournalEntryID)
+		}
+		_, _ = pool.Exec(bg, `DELETE FROM t_sales WHERE id = $1`, sale.ID)
+	})
+
+	if sale.VoucherID != voucher.ID || sale.VoucherCode != voucher.Code {
+		t.Fatalf("voucher nota harus %d/%s, dapat %d/%s", voucher.ID, voucher.Code, sale.VoucherID, sale.VoucherCode)
+	}
+	if sale.VoucherDiscount != 5000 || sale.TotalAmount != 15000 {
+		t.Fatalf("diskon/total harus 5000/15000, dapat %.2f/%.2f", sale.VoucherDiscount, sale.TotalAmount)
+	}
+
+	var usedAt *time.Time
+	if err := pool.QueryRow(ctx, `SELECT used_at FROM m_vouchers WHERE id = $1`, voucher.ID).Scan(&usedAt); err != nil {
+		t.Fatalf("gagal membaca used_at: %v", err)
+	}
+	if usedAt == nil {
+		t.Fatal("voucher harus ditandai terpakai setelah nota dibuat")
+	}
+
+	_, err = saleUC.CreateSale(ctx, domain.CreateSaleInput{
+		TaxType:     domain.SaleTaxNonPPN,
+		VoucherCode: voucher.Code,
+		Items: []domain.SaleLineInput{
+			{ProductID: productID, Qty: 1},
+		},
+		Payments: []domain.SalePaymentInput{
+			{PaymentMethodID: tunaiID, Amount: 15000},
+		},
+		CreatedBy: actorID,
+	})
+	if !errors.Is(err, domain.ErrVoucherUsed) {
+		t.Fatalf("pemakaian ulang harus ErrVoucherUsed, dapat %v", err)
+	}
+
+	if err := saleUC.VoidSale(ctx, sale.ID, actorID, "uji voucher"); err != nil {
+		t.Fatalf("VoidSale gagal: %v", err)
+	}
+	if err := pool.QueryRow(ctx, `SELECT used_at FROM m_vouchers WHERE id = $1`, voucher.ID).Scan(&usedAt); err != nil {
+		t.Fatalf("gagal membaca used_at setelah void: %v", err)
+	}
+	if usedAt != nil {
+		t.Fatal("voucher harus dilepas setelah nota dibatalkan")
 	}
 }

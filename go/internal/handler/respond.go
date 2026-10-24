@@ -102,6 +102,8 @@ func StatusForError(err error) int {
 
 	case errors.Is(err, domain.ErrSaleAlreadyVoid),
 		errors.Is(err, domain.ErrSaleNotPosted),
+		errors.Is(err, domain.ErrSaleSnapshotChanged),
+		errors.Is(err, domain.ErrGRNReceiptChanged),
 		errors.Is(err, domain.ErrJournalAlreadyRev),
 		errors.Is(err, domain.ErrJournalAlreadyPost),
 		errors.Is(err, domain.ErrJournalAlreadyVoid),

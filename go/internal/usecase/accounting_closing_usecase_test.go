@@ -21,12 +21,12 @@ type fakeClosingManager struct {
 	reverseErr       error
 }
 
-func (f *fakeClosingManager) PostClosingEntry(_ context.Context, period *domain.AccountingPeriod, _ int64) error {
+func (f *fakeClosingManager) PostClosingEntryTx(_ context.Context, _ domain.AccountingTx, period *domain.AccountingPeriod, _ int64) error {
 	f.postedPeriodID = period.ID
 	return f.postErr
 }
 
-func (f *fakeClosingManager) ReverseClosingEntry(_ context.Context, period *domain.AccountingPeriod, _ int64) error {
+func (f *fakeClosingManager) ReverseClosingEntryTx(_ context.Context, _ domain.AccountingTx, period *domain.AccountingPeriod, _ int64) error {
 	f.reversedPeriodID = period.ID
 	return f.reverseErr
 }
@@ -152,13 +152,17 @@ func TestPostClosingEntryTanpaSaldoTemporer(t *testing.T) {
 	}
 }
 
-// TestPostClosingEntryIdempoten: bentrok unique index sumber dianggap sukses.
+// TestPostClosingEntryIdempoten: jurnal penutup POSTED yang sudah ada harus
+// dideteksi sebelum menulis, bukan lewat pelanggaran unique index.
 func TestPostClosingEntryIdempoten(t *testing.T) {
-	repo := &fakeJournalRepo{createErr: domain.ErrJournalAlreadyPost}
+	repo := &fakeJournalRepo{sourceID: 77}
 	uc := newClosingUsecase(repo, skenarioNeraca(), closingMapping())
 
 	if err := uc.PostClosingEntry(context.Background(), period2026(3, domain.PeriodStatusOpen), 99); err != nil {
 		t.Fatalf("jurnal penutup yang sudah ada harus diabaikan, dapat %v", err)
+	}
+	if repo.createCalls != 0 {
+		t.Fatal("tidak boleh mencoba menulis jurnal penutup kedua kali")
 	}
 }
 
@@ -277,5 +281,35 @@ func TestReopenPeriodMembalikJurnalPenutup(t *testing.T) {
 	}
 	if closer.reversedPeriodID != 7 {
 		t.Fatalf("jurnal penutup harus dibalik untuk periode 7, dapat %d", closer.reversedPeriodID)
+	}
+}
+
+// existingClosingTx mensimulasikan transaksi yang sudah memiliki jurnal penutup
+// POSTED. Pre-check harus mencegah percobaan insert kedua yang akan memicu
+// unique violation dan membatalkan transaksi.
+type existingClosingTx struct {
+	domain.AccountingTx
+	createCalls int
+}
+
+func (f *existingClosingTx) GetPostedJournalIDBySource(context.Context, string, int64) (int64, error) {
+	return 55, nil
+}
+
+func (f *existingClosingTx) CreatePostedJournal(context.Context, *domain.JournalEntry) error {
+	f.createCalls++
+	return nil
+}
+
+func TestPostClosingEntryTxMelewatiJurnalYangSudahAda(t *testing.T) {
+	repo := &fakeJournalRepo{}
+	uc := newClosingUsecase(repo, skenarioNeraca(), closingMapping())
+	tx := &existingClosingTx{}
+
+	if err := uc.PostClosingEntryTx(context.Background(), tx, period2026(3, domain.PeriodStatusOpen), 99); err != nil {
+		t.Fatalf("jurnal penutup yang sudah ada harus dilewati, dapat %v", err)
+	}
+	if tx.createCalls != 0 {
+		t.Fatal("tidak boleh mencoba insert jurnal penutup kedua kali di dalam transaksi")
 	}
 }

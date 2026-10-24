@@ -161,6 +161,49 @@ func (r *sqlProductRepository) GetByID(ctx context.Context, id int64) (*domain.P
 	}, nil
 }
 
+func (r *sqlProductRepository) GetByIDs(ctx context.Context, ids []int64) ([]domain.Product, error) {
+	if len(ids) == 0 {
+		return []domain.Product{}, nil
+	}
+	rows, err := r.q.GetProductsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	products := make([]domain.Product, 0, len(rows))
+	for _, row := range rows {
+		products = append(products, domain.Product{
+			ID:               row.ID,
+			Sku:              row.Sku,
+			Barcode:          r.interfaceToString(row.Barcode),
+			Name:             row.Name,
+			Description:      r.interfaceToString(row.Description),
+			CategoryID:       row.CategoryID,
+			SupplierID:       row.SupplierID,
+			SellingUnitID:    row.SellingUnitID,
+			PurchaseUnitID:   row.PurchaseUnitID,
+			ConversionRate:   row.ConversionRate,
+			CategoryName:     r.interfaceToString(row.CategoryName),
+			SupplierName:     r.interfaceToString(row.SupplierName),
+			SellingUnitKode:  r.interfaceToString(row.SellingUnitKode),
+			SellingUnitName:  r.interfaceToString(row.SellingUnitName),
+			PurchaseUnitKode: r.interfaceToString(row.PurchaseUnitKode),
+			PurchaseUnitName: r.interfaceToString(row.PurchaseUnitName),
+			PurchasePrice:    r.numericToFloat64(row.ProdPurchasePrice),
+			SellingPrice:     r.numericToFloat64(row.ProdSellingPrice),
+			MinStockLevel:    row.ProdMinStock,
+			DiscountType:     row.ProdDiscountType,
+			DiscountValue:    r.numericToFloat64(row.ProdDiscountValue),
+			CurrentStock:     row.ProdCurrentStock,
+			AvgCost:          r.numericToFloat64(row.ProdAvgCost),
+			IsTaxable:        row.IsTaxable,
+			IsActive:         row.IsActive,
+			CreatedAt:        r.interfaceToTime(row.CreatedAt),
+		})
+	}
+	return products, nil
+}
+
 func (r *sqlProductRepository) Update(ctx context.Context, prod *domain.Product) error {
 	var barcodePg pgtype.Text
 	if prod.Barcode != "" {

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"go_backend/internal/domain"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // --- Fakes khusus auto-posting ---
@@ -69,6 +71,45 @@ func (f *fakePeriodRepo) Reopen(context.Context, int, int) (int64, error) { retu
 func (f *fakePeriodRepo) List(context.Context, int) ([]domain.AccountingPeriod, error) {
 	return nil, nil
 }
+func (f *fakePeriodRepo) WithTx(ctx context.Context, fn func(domain.AccountingTx) error) error {
+	return fn(&fakeAccountingTx{repo: f})
+}
+
+type fakeAccountingTx struct {
+	repo *fakePeriodRepo
+}
+
+func (f *fakeAccountingTx) LockPeriod(context.Context, int, int) (*domain.AccountingPeriod, error) {
+	return f.repo.period, nil
+}
+func (f *fakeAccountingTx) CreatePeriod(_ context.Context, year, month int, _ int64) (*domain.AccountingPeriod, error) {
+	return &domain.AccountingPeriod{PeriodYear: year, PeriodMonth: month, Status: domain.PeriodStatusOpen}, nil
+}
+func (f *fakeAccountingTx) AccountBalances(context.Context, time.Time, time.Time) ([]domain.AccountBalance, error) {
+	return nil, nil
+}
+func (f *fakeAccountingTx) GetAccountsByIDs(context.Context, []int64) ([]domain.ChartOfAccount, error) {
+	return nil, nil
+}
+func (f *fakeAccountingTx) ListAccountingSettings(context.Context) (map[string]int64, error) {
+	return nil, nil
+}
+func (f *fakeAccountingTx) NextJournalSeq(context.Context, string) (int64, error) { return 1, nil }
+func (f *fakeAccountingTx) GetPostedJournalIDBySource(context.Context, string, int64) (int64, error) {
+	return 0, pgx.ErrNoRows
+}
+func (f *fakeAccountingTx) CreatePostedJournal(context.Context, *domain.JournalEntry) error {
+	return nil
+}
+func (f *fakeAccountingTx) ReverseJournal(context.Context, int64, time.Time, string, int64) (*domain.JournalEntry, error) {
+	return nil, nil
+}
+func (f *fakeAccountingTx) ClosePeriod(context.Context, int64, int64, int64) (int64, error) {
+	return f.repo.Close(context.Background(), 0, 0, 0)
+}
+func (f *fakeAccountingTx) ReopenPeriod(context.Context, int, int) (int64, error) {
+	return f.repo.Reopen(context.Background(), 0, 0)
+}
 
 type fakeJournalRepo struct {
 	seq         int64
@@ -116,6 +157,9 @@ func (f *fakeJournalRepo) NextSeq(context.Context, string) (int64, error) {
 func (f *fakeJournalRepo) GetPostedIDBySource(context.Context, string, int64) (int64, error) {
 	if f.sourceErr != nil {
 		return 0, f.sourceErr
+	}
+	if f.sourceID == 0 {
+		return 0, pgx.ErrNoRows
 	}
 	return f.sourceID, nil
 }

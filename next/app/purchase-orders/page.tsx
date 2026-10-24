@@ -7,6 +7,7 @@ import {
   apiPut,
   messageFromError,
 } from "@/lib/api-client";
+import { createIdempotencyKey } from "@/lib/idempotency";
 import { ensureSession, readPermissionList } from "@/lib/permissions";
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
@@ -60,6 +61,10 @@ export default function PurchaseOrdersPage() {
     }[]
   >([]);
   const [finishLoading, setFinishLoading] = useState(false);
+  const finishRequestRef = React.useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
 
   const authToken = Cookies.get("session_active");
 
@@ -110,14 +115,28 @@ export default function PurchaseOrdersPage() {
 
     setIsProcessing(true);
     const targetedNumber = poToFinish.po_number;
+    const fingerprint = String(poToFinish.id);
+    if (
+      !finishRequestRef.current ||
+      finishRequestRef.current.fingerprint !== fingerprint
+    ) {
+      finishRequestRef.current = {
+        fingerprint,
+        key: createIdempotencyKey(),
+      };
+    }
 
     try {
       await apiPut(
         `/api/purchase-orders/finish-receiving?id=${poToFinish.id}&allow_partial=true`,
         undefined,
-        { redirectOn403: false }
+        {
+          redirectOn403: false,
+          headers: { "Idempotency-Key": finishRequestRef.current.key },
+        }
       );
 
+      finishRequestRef.current = null;
       setPoToFinish(null);
       toast.success("Penerimaan PO Ditutup", {
         description: `Dokumen ${targetedNumber} kini berstatus RECEIVED.`,

@@ -9,12 +9,14 @@ import (
 
 	"go_backend/internal/config"
 	"go_backend/internal/handler"
+	"go_backend/internal/middleware/limiter"
 	"go_backend/internal/repository/postgres"
 	"go_backend/internal/router"
 	"go_backend/internal/usecase"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -49,7 +51,10 @@ func main() {
 
 	userRepo := postgres.NewSQLUserRepository(dbPool)
 	userUseCase := usecase.NewUserUsecase(userRepo, roleRepo, cfg)
-	userHandler := &handler.UserHandler{UserUsecase: userUseCase}
+	userHandler := &handler.UserHandler{
+		UserUsecase:       userUseCase,
+		LoginEmailLimiter: limiter.NewKeyedLimiter(rate.Every(6*time.Second), 10, 10*time.Minute),
+	}
 
 	regionRepo := postgres.NewSQLRegionRepository(dbPool)
 	regionUseCase := usecase.NewRegionUsecase(regionRepo)
@@ -110,22 +115,27 @@ func main() {
 	saleRepo := postgres.NewSQLSaleRepository(dbPool)
 	memberRepo := postgres.NewSQLMemberRepository(dbPool)
 	paymentMethodRepo := postgres.NewSQLPaymentMethodRepository(dbPool)
+	voucherRepo := postgres.NewSQLVoucherRepository(dbPool)
 	appSettingsRepo := postgres.NewSQLSettingsRepository(dbPool)
 	settingsUsecase := usecase.NewSettingsUsecase(appSettingsRepo)
-	saleUsecase := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentMethodRepo, journalUsecase, settingsUsecase)
+	saleUsecase := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentMethodRepo, voucherRepo, journalUsecase, settingsUsecase)
 	posUsecase := usecase.NewPOSUsecase(saleRepo, memberRepo, paymentMethodRepo, settingsUsecase)
 	saleHandler := handler.NewSaleHandler(saleUsecase, posUsecase)
 	memberUsecase := usecase.NewMemberUsecase(memberRepo)
 	memberHandler := handler.NewMemberHandler(memberUsecase)
 	paymentMethodUsecase := usecase.NewPaymentMethodUsecase(paymentMethodRepo)
 	paymentMethodHandler := handler.NewPaymentMethodHandler(paymentMethodUsecase)
+	voucherUsecase := usecase.NewVoucherUsecase(voucherRepo)
+	voucherHandler := handler.NewVoucherHandler(voucherUsecase)
 	settingsHandler := handler.NewSettingsHandler(settingsUsecase)
 
-	router.RegisterRoutes(cfg, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, settingsHandler)
+	mux := http.NewServeMux()
+	handler := router.RegisterRoutes(mux, cfg, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, voucherHandler, settingsHandler)
 
 	fmt.Printf("Server produksi siap melayani di http://localhost:%s\n", cfg.Port)
 	server := &http.Server{
 		Addr:              ":" + cfg.Port,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

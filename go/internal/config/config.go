@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 )
 
 // MinJWTSecretLen adalah panjang minimum secret JWT.
@@ -27,6 +28,9 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	CORSOrigin  string
+	// TrustedProxies adalah daftar IP/CIDR reverse proxy yang boleh mengisi
+	// X-Forwarded-For. Bila kosong, header tersebut diabaikan sepenuhnya.
+	TrustedProxies []string
 }
 
 // LoadConfig membaca konfigurasi dari environment dan mengembalikan error
@@ -69,9 +73,24 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Port:        port,
-		DatabaseURL: databaseURL,
-		JWTSecret:   jwtSecret,
-		CORSOrigin:  corsOrigin,
+		Port:           port,
+		DatabaseURL:    databaseURL,
+		JWTSecret:      jwtSecret,
+		CORSOrigin:     corsOrigin,
+		TrustedProxies: splitCSV(os.Getenv("TRUSTED_PROXIES")),
 	}, nil
+}
+
+// splitCSV memecah daftar dipisah koma dan membuang nilai kosong.
+func splitCSV(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var result []string
+	for _, item := range strings.Split(raw, ",") {
+		if trimmed := strings.TrimSpace(item); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
 }

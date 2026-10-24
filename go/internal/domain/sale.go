@@ -60,6 +60,7 @@ var (
 	ErrSaleRedeemMelebihiSaldo = errors.New("poin tidak cukup untuk ditukar")
 	ErrSaleTaxInvalid          = errors.New("tipe pajak tidak dikenal")
 	ErrSaleDiscountInvalid     = errors.New("diskon tidak valid")
+	ErrSaleSnapshotChanged     = errors.New("harga atau biaya produk berubah, ulangi transaksi")
 	ErrSaleNotFound            = errors.New("transaksi penjualan tidak ditemukan")
 	ErrSaleNotPosted           = errors.New("transaksi penjualan tidak dalam status POSTED")
 	ErrSaleAlreadyVoid         = errors.New("transaksi penjualan sudah dibatalkan")
@@ -95,6 +96,7 @@ type PaymentMethodRepository interface {
 	Update(ctx context.Context, id int64, in PaymentMethodInput, actorID int64) error
 	Delete(ctx context.Context, id, actorID int64) error
 	GetByID(ctx context.Context, id int64) (*PaymentMethod, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]PaymentMethod, error)
 	ListActive(ctx context.Context) ([]PaymentMethod, error)
 	ListAll(ctx context.Context) ([]PaymentMethod, error)
 }
@@ -164,6 +166,7 @@ type SaleDetail struct {
 	TaxAmount      float64 `json:"tax_amount"`
 	CostUnit       float64 `json:"cost_unit"`
 	CostTotal      float64 `json:"cost_total"`
+	IsTaxable      bool    `json:"-"`
 }
 
 type SalePayment struct {
@@ -178,45 +181,47 @@ type SalePayment struct {
 }
 
 type Sale struct {
-	ID             int64         `json:"id"`
-	SaleNumber     string        `json:"sale_number"`
-	SaleDate       time.Time     `json:"sale_date"`
-	MemberID       int64         `json:"member_id"`
-	MemberName     string        `json:"member_name"`
-	TaxType        string        `json:"tax_type"`
-	Subtotal       float64       `json:"subtotal"`
-	ItemDiscount   float64       `json:"item_discount"`
-	DiscountType   string        `json:"discount_type"`
-	DiscountValue  float64       `json:"discount_value"`
-	DiscountAmount float64       `json:"discount_amount"`
-	DppAmount      float64       `json:"dpp_amount"`
-	TaxAmount      float64       `json:"tax_amount"`
-	TotalAmount    float64       `json:"total_amount"`
-	PaidAmount     float64       `json:"paid_amount"`
-	ChangeAmount   float64       `json:"change_amount"`
-	CostTotal      float64       `json:"cost_total"`
-	PointsEarned   int64         `json:"points_earned"`
-	RedeemPoints   int64         `json:"redeem_points"`
-	RedeemAmount   float64       `json:"redeem_amount"`
-	PaymentStatus  string        `json:"payment_status"`
-	Status         string        `json:"status"`
-	DueDate        *time.Time    `json:"due_date,omitempty"`
-	Notes          string        `json:"notes"`
-	JournalEntryID *int64        `json:"journal_entry_id,omitempty"`
-	VoidedAt       *time.Time    `json:"voided_at,omitempty"`
-	VoidReason     string        `json:"void_reason,omitempty"`
-	CreatedAt      time.Time     `json:"created_at"`
-	CreatedBy      *int64        `json:"created_by,omitempty"`
-	Details        []SaleDetail  `json:"details,omitempty"`
-	Payments       []SalePayment `json:"payments,omitempty"`
+	ID              int64         `json:"id"`
+	SaleNumber      string        `json:"sale_number"`
+	SaleDate        time.Time     `json:"sale_date"`
+	MemberID        int64         `json:"member_id"`
+	MemberName      string        `json:"member_name"`
+	TaxType         string        `json:"tax_type"`
+	Subtotal        float64       `json:"subtotal"`
+	ItemDiscount    float64       `json:"item_discount"`
+	DiscountType    string        `json:"discount_type"`
+	DiscountValue   float64       `json:"discount_value"`
+	DiscountAmount  float64       `json:"discount_amount"`
+	DppAmount       float64       `json:"dpp_amount"`
+	TaxAmount       float64       `json:"tax_amount"`
+	TotalAmount     float64       `json:"total_amount"`
+	PaidAmount      float64       `json:"paid_amount"`
+	ChangeAmount    float64       `json:"change_amount"`
+	CostTotal       float64       `json:"cost_total"`
+	PointsEarned    int64         `json:"points_earned"`
+	RedeemPoints    int64         `json:"redeem_points"`
+	RedeemAmount    float64       `json:"redeem_amount"`
+	VoucherID       int64         `json:"voucher_id,omitempty"`
+	VoucherCode     string        `json:"voucher_code,omitempty"`
+	VoucherDiscount float64       `json:"voucher_discount"`
+	PaymentStatus   string        `json:"payment_status"`
+	Status          string        `json:"status"`
+	DueDate         *time.Time    `json:"due_date,omitempty"`
+	Notes           string        `json:"notes"`
+	JournalEntryID  *int64        `json:"journal_entry_id,omitempty"`
+	VoidedAt        *time.Time    `json:"voided_at,omitempty"`
+	VoidReason      string        `json:"void_reason,omitempty"`
+	CreatedAt       time.Time     `json:"created_at"`
+	CreatedBy       *int64        `json:"created_by,omitempty"`
+	Details         []SaleDetail  `json:"details,omitempty"`
+	Payments        []SalePayment `json:"payments,omitempty"`
 }
 
+// SaleLineInput hanya memuat produk dan jumlah. Harga jual dan diskon selalu
+// diambil dari master produk di server; nilai harga/diskon dari klien diabaikan.
 type SaleLineInput struct {
-	ProductID     int64   `json:"product_id"`
-	Qty           int     `json:"qty"`
-	UnitPrice     float64 `json:"unit_price"`
-	DiscountType  string  `json:"discount_type"`
-	DiscountValue float64 `json:"discount_value"`
+	ProductID int64 `json:"product_id"`
+	Qty       int   `json:"qty"`
 }
 
 type SalePaymentInput struct {
@@ -226,11 +231,14 @@ type SalePaymentInput struct {
 }
 
 type CreateSaleInput struct {
-	MemberID      int64              `json:"member_id"`
-	TaxType       string             `json:"tax_type"`
+	MemberID int64  `json:"member_id"`
+	TaxType  string `json:"tax_type"`
+	// DiscountType/DiscountValue dipertahankan hanya agar diskon nota manual
+	// yang masih dikirim klien lama bisa ditolak secara eksplisit.
 	DiscountType  string             `json:"discount_type"`
 	DiscountValue float64            `json:"discount_value"`
 	RedeemPoints  int64              `json:"redeem_points"`
+	VoucherCode   string             `json:"voucher_code"`
 	DueDate       *time.Time         `json:"due_date"`
 	Notes         string             `json:"notes"`
 	Items         []SaleLineInput    `json:"items"`
@@ -344,33 +352,43 @@ func discountAmount(dtype string, value, base float64) (float64, error) {
 	}
 }
 
-// CalculateSale menghitung seluruh nilai nota (baris, diskon, DPP, PPN, total,
-// HPP, status pembayaran) dari input mentah, snapshot produk, dan konfigurasi
-// pajak global. Pajak dihitung PER BARIS: hanya baris yang produknya kena PPN
-// (IsTaxable) yang memperoleh DPP/PPN. Diskon nota dan tukar poin dialokasikan
-// proporsional ke tiap baris dengan koreksi pembulatan (largest remainder).
-// Fungsi ini murni sehingga bisa diuji tanpa database. Kecukupan stok TIDAK
-// diperiksa di sini karena pengecekan final dilakukan repository di bawah kunci
-// baris.
+// CalculateSale menghitung seluruh nilai nota (baris, diskon produk, DPP, PPN,
+// total, HPP, status pembayaran) dari input, snapshot produk, dan konfigurasi
+// pajak global. Harga jual serta diskon selalu berasal dari master produk.
+// Diskon nota manual tidak didukung; tukar poin dialokasikan proporsional ke
+// tiap baris dengan koreksi pembulatan (largest remainder). Fungsi ini murni
+// sehingga bisa diuji tanpa database. Kecukupan stok TIDAK diperiksa di sini
+// karena pengecekan final dilakukan repository di bawah kunci baris.
 func CalculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg TaxConfig) (*Sale, error) {
+	return calculateSale(in, products, cfg, nil)
+}
+
+// CalculateSaleWithVoucher menghitung nota dengan potongan voucher pada urutan:
+// diskon produk, voucher, tukar poin, lalu PPN. Voucher yang diberikan sudah
+// divalidasi statusnya oleh usecase; fungsi ini tetap memeriksa nilai diskon
+// dan minimal belanja sebagai lapisan pertahanan.
+func CalculateSaleWithVoucher(in CreateSaleInput, products map[int64]SaleProductInfo, cfg TaxConfig, voucher *Voucher) (*Sale, error) {
+	return calculateSale(in, products, cfg, voucher)
+}
+
+func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg TaxConfig, voucher *Voucher) (*Sale, error) {
 	if len(in.Items) == 0 {
 		return nil, ErrSaleItemsRequired
 	}
-	if in.DiscountType == "" {
-		in.DiscountType = SaleDiscountNone
+	if (in.DiscountType != "" && in.DiscountType != SaleDiscountNone) || in.DiscountValue != 0 {
+		return nil, fmt.Errorf("%w: diskon nota manual tidak diizinkan", ErrSaleDiscountInvalid)
 	}
 	if in.MemberID <= 0 && in.RedeemPoints > 0 {
 		return nil, ErrSaleRedeemTanpaMember
 	}
 
 	sale := &Sale{
-		MemberID:      in.MemberID,
-		DiscountType:  in.DiscountType,
-		DiscountValue: in.DiscountValue,
-		Notes:         in.Notes,
-		Status:        SaleStatusPosted,
-		Details:       make([]SaleDetail, 0, len(in.Items)),
-		Payments:      make([]SalePayment, 0, len(in.Payments)),
+		MemberID:     in.MemberID,
+		DiscountType: SaleDiscountNone,
+		Notes:        in.Notes,
+		Status:       SaleStatusPosted,
+		Details:      make([]SaleDetail, 0, len(in.Items)),
+		Payments:     make([]SalePayment, 0, len(in.Payments)),
 	}
 
 	// 1. Hitung tiap baris dan kumpulkan basis untuk alokasi diskon/pajak.
@@ -385,15 +403,13 @@ func CalculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 		if !ok {
 			return nil, fmt.Errorf("%w: id %d", ErrSaleProductNotFound, it.ProductID)
 		}
-		unitPrice := it.UnitPrice
-		if unitPrice <= 0 {
-			unitPrice = p.SellingPrice
-		}
+		unitPrice := p.SellingPrice
 		if unitPrice < 0 {
 			return nil, ErrSaleLineInvalid
 		}
 		gross := roundMoney(float64(it.Qty) * unitPrice)
-		disc, err := discountAmount(it.DiscountType, it.DiscountValue, gross)
+		discountType := normalizeDiscountType(p.DiscountType)
+		disc, err := discountAmount(discountType, p.DiscountValue, gross)
 		if err != nil {
 			return nil, err
 		}
@@ -407,13 +423,14 @@ func CalculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 			ProductName:    p.Name,
 			Qty:            it.Qty,
 			UnitPrice:      roundMoney(unitPrice),
-			DiscountType:   normalizeDiscountType(it.DiscountType),
-			DiscountValue:  it.DiscountValue,
+			DiscountType:   discountType,
+			DiscountValue:  p.DiscountValue,
 			DiscountAmount: disc,
 			GrossAmount:    gross,
 			LineTotal:      net,
 			CostUnit:       costUnit,
 			CostTotal:      cost,
+			IsTaxable:      p.IsTaxable,
 		})
 		lineNet = append(lineNet, net)
 		lineTaxable = append(lineTaxable, p.IsTaxable)
@@ -425,18 +442,29 @@ func CalculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	itemDiscount = roundMoney(itemDiscount)
 	costTotal = roundMoney(costTotal)
 
-	// 2. Diskon nota dialokasikan proporsional ke tiap baris (berdasarkan neto
-	// baris) sehingga pajak tiap baris tetap akurat.
-	netBeforeInvoice := roundMoney(subtotal - itemDiscount)
-	invDiscount, err := discountAmount(in.DiscountType, in.DiscountValue, netBeforeInvoice)
-	if err != nil {
-		return nil, err
+	// 2. Diskon voucher dihitung dari nilai setelah diskon item, lalu
+	// dialokasikan proporsional ke tiap baris agar DPP/PPN tiap baris tetap
+	// mencerminkan potongan sebenarnya. Minimal belanja diukur dari subtotal
+	// sebelum diskon item.
+	if voucher != nil {
+		if err := voucher.ValidateSubtotal(subtotal); err != nil {
+			return nil, err
+		}
+		voucherAmount, err := voucher.DiscountAmount(roundMoney(subtotal - itemDiscount))
+		if err != nil {
+			return nil, err
+		}
+		voucherAlloc := allocateProportional(voucherAmount, lineNet)
+		for i := range lineNet {
+			lineNet[i] = roundMoney(lineNet[i] - voucherAlloc[i])
+		}
+		sale.VoucherID = voucher.ID
+		sale.VoucherCode = voucher.Code
+		sale.VoucherDiscount = voucherAmount
 	}
-	invAlloc := allocateProportional(invDiscount, lineNet)
-	postInvNet := make([]float64, len(lineNet))
-	for i := range lineNet {
-		postInvNet[i] = roundMoney(lineNet[i] - invAlloc[i])
-	}
+
+	// Nilai neto tiap baris sudah final setelah diskon produk + voucher.
+	postInvNet := lineNet
 
 	// lineTax menghitung DPP dan PPN dari sebuah nilai neto satu baris.
 	lineTax := func(net float64, taxable bool) (dpp, tax float64) {
@@ -552,7 +580,7 @@ func CalculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 
 	sale.Subtotal = subtotal
 	sale.ItemDiscount = itemDiscount
-	sale.DiscountAmount = invDiscount
+	sale.DiscountAmount = 0
 	sale.DppAmount = dppTotal
 	sale.TaxAmount = taxTotal
 	sale.TotalAmount = total

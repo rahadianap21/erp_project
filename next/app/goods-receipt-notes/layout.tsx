@@ -5,5 +5,9 @@ export default async function GoodsReceiptNotesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Goods Receipt Notes">{children}</RouteShell>;
+  return (
+    <RouteShell title="Goods Receipt Notes" permission="grn:read">
+      {children}
+    </RouteShell>
+  );
 }

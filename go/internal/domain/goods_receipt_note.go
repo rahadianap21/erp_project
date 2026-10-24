@@ -45,6 +45,10 @@ var (
 	ErrGRNSatuanBermasalah = errors.New("penerimaan ditolak: satuan barang pada baris PO tidak sesuai dengan satuan produk")
 	// ErrGRNBarisPONotFound dikembalikan saat detail PO acuan tidak ada.
 	ErrGRNBarisPONotFound = errors.New("penerimaan ditolak: baris detail PO tidak ditemukan")
+	// ErrGRNReceiptChanged dikembalikan saat daftar GRN berubah di antara
+	// penerbitan jurnal dan penutupan stok. Penutupan dibatalkan supaya tidak ada
+	// GRN yang stoknya masuk tanpa jurnal; pengguna cukup mengulang.
+	ErrGRNReceiptChanged = errors.New("penerimaan ditolak: daftar GRN berubah saat penutupan, silakan ulangi")
 )
 
 // GoodsReceiptNote merepresentasikan dokumen penerimaan barang (GRN).
@@ -104,7 +108,13 @@ type GoodsReceiptNoteRepository interface {
 	// termasuk PPN yang bukan biaya perolehan. Nilai ini dipakai saat menghitung
 	// ulang harga pokok rata-rata produk; stok dan harga pokok selalu berubah
 	// bersama di dalam transaksi ini.
-	FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64) error
+	//
+	// expectedGRNCount adalah jumlah GRN yang jurnalnya sudah diterbitkan
+	// usecase. Repository wajib membandingkannya dengan jumlah GRN terkini
+	// SETELAH mengunci header. Kalau berbeda, penutupan gagal dengan
+	// ErrGRNReceiptChanged: GRN baru belum berjurnal, jadi stoknya tidak boleh
+	// ikut ditambahkan.
+	FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error
 	GetListCursor(ctx context.Context, search string, cursorID int64, limit int, direction string) ([]GoodsReceiptNote, int64, error)
 	GetByID(ctx context.Context, id int64) (*GoodsReceiptNote, error)
 	GetByPOID(ctx context.Context, poID int64) ([]GoodsReceiptNote, error)

@@ -1,8 +1,21 @@
 "use client";
 
-import { API_BASE_URL } from "@/lib/config";
+import { apiGet, ApiError } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from "react";
-import Cookies from "js-cookie";
+
+interface ListResponseBody {
+  total?: number;
+  pagination?: {
+    next_cursor?: number | string | null;
+    prev_cursor?: number | string | null;
+    has_more?: boolean;
+  };
+  next_cursor?: number | string | null;
+  prev_cursor?: number | string | null;
+  has_next?: boolean;
+  has_prev?: boolean;
+  role_options?: string[];
+}
 
 interface UseDebounceFetchProps {
   endpoint: string;
@@ -121,28 +134,16 @@ export function useDebounceFetch<T>({
         }
       });
 
-      const authToken = Cookies.get("auth_token") || "";
-      const apiBaseUrl = API_BASE_URL;
-
-      const response = await fetch(
-        `${apiBaseUrl}${endpoint}?${queryParams.toString()}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          cache: "no-store",
-        }
+      // Lewat /api/proxy agar JWT httpOnly tetap di server. Jangan membaca
+      // cookie auth_token dari JavaScript: nilainya selalu kosong.
+      const response = await apiGet<T[]>(
+        `${endpoint}?${queryParams.toString()}`,
+        { redirectOn403: false }
       );
-
-      if (!response.ok) {
-        setHttpStatus(response.status);
-        throw new Error(`Server error: ${response.status}`);
-      }
-
-      const result = await response.json().catch(() => ({}));
-      const rows = Array.isArray(result.data) ? result.data : [];
+      const result = (
+        response.body && typeof response.body === "object" ? response.body : {}
+      ) as ListResponseBody;
+      const rows = Array.isArray(response.data) ? response.data : [];
 
       setData(rows);
       setTotal(Number(result.total) || rows.length || 0);
@@ -158,10 +159,10 @@ export function useDebounceFetch<T>({
 
       // Fallback (3): cursor backend adalah id baris terakhir, urutan id DESC.
       const lastRowId = rows.length
-        ? (rows[rows.length - 1] as { id?: number | string }).id
+        ? ((rows[rows.length - 1] as { id?: number | string }).id ?? null)
         : null;
       const firstRowId = rows.length
-        ? (rows[0] as { id?: number | string }).id
+        ? ((rows[0] as { id?: number | string }).id ?? null)
         : null;
 
       setNextCursor(
@@ -205,6 +206,9 @@ export function useDebounceFetch<T>({
         setRoleOptions(result.role_options);
       }
     } catch (error) {
+      if (error instanceof ApiError) {
+        setHttpStatus(error.status);
+      }
       setError(error instanceof Error ? error.message : String(error));
       console.error("Universal Fetch Error:", error);
     } finally {

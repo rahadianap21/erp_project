@@ -5,5 +5,9 @@ export default async function RolesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Roles Management">{children}</RouteShell>;
+  return (
+    <RouteShell title="Roles Management" permission="roles:read">
+      {children}
+    </RouteShell>
+  );
 }

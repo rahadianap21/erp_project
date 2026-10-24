@@ -53,14 +53,18 @@ func supplierUjiPO(t *testing.T, pool *pgxpool.Pool) int64 {
 	return id
 }
 
-func produkSiapBeliPO(t *testing.T, pool *pgxpool.Pool) int64 {
+// produkSiapBeliPO memilih produk milik supplier dokumen. CreatePO sekarang
+// menolak barang vendor lain (sama seperti UpdatePO), jadi produk dan supplier
+// uji tidak boleh diambil dari dua query yang saling lepas.
+func produkSiapBeliPO(t *testing.T, pool *pgxpool.Pool, supplierID int64) int64 {
 	t.Helper()
 	var id int64
 	if err := pool.QueryRow(context.Background(), `
 		SELECT id FROM m_products
 		WHERE deleted_at IS NULL AND purchase_price > 0 AND purchase_unit_id IS NOT NULL
-		ORDER BY id LIMIT 1`).Scan(&id); err != nil {
-		t.Skipf("tidak ada produk siap compra, test dilewati: %v", err)
+		  AND supplier_id = $1
+		ORDER BY id LIMIT 1`, supplierID).Scan(&id); err != nil {
+		t.Skipf("tidak ada produk siap compra untuk supplier %d, test dilewati: %v", supplierID, err)
 	}
 	return id
 }
@@ -114,7 +118,7 @@ func TestCreatePO_NomorTidakDipakaiUlangSetelahSoftDelete(t *testing.T) {
 	pool := poolUjiPO(t)
 	ctx := context.Background()
 	supplierID := supplierUjiPO(t, pool)
-	productID := produkSiapBeliPO(t, pool)
+	productID := produkSiapBeliPO(t, pool, supplierID)
 	u := usecase.NewPurchaseOrderUsecase(
 		NewSQLPurchaseOrderRepository(pool),
 		NewSQLProductRepository(pool),
@@ -170,7 +174,7 @@ func TestCreatePO_ParalelSemuaBerhasilAdalahIntiRace(t *testing.T) {
 	pool := poolUjiPO(t)
 	ctx := context.Background()
 	supplierID := supplierUjiPO(t, pool)
-	productID := produkSiapBeliPO(t, pool)
+	productID := produkSiapBeliPO(t, pool, supplierID)
 	u := usecase.NewPurchaseOrderUsecase(
 		NewSQLPurchaseOrderRepository(pool),
 		NewSQLProductRepository(pool),

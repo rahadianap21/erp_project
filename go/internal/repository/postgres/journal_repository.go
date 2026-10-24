@@ -183,7 +183,30 @@ func (r *sqlJournalRepository) GetByID(ctx context.Context, id int64) (*domain.J
 // terpengaruh berarti status bukan DRAFT lagi, periode tertutup, atau ada baris
 // ke akun non-posting — usecase memastikan pesannya lebih dulu sebelum CAS ini.
 func (r *sqlJournalRepository) Post(ctx context.Context, id, actorID int64) (int64, error) {
-	return r.q.PostJournalEntry(ctx, db.PostJournalEntryParams{ActorUserID: actorID, ID: id})
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := r.q.WithTx(tx)
+	// Kunci periode lebih dulu. Ini menutup celah antara pengecekan status oleh
+	// UPDATE dan transaksi tutup buku yang berjalan bersamaan.
+	if _, err := qtx.LockJournalEntryPeriodForShare(ctx, id); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, domain.ErrJournalPeriodClosed
+		}
+		return 0, err
+	}
+
+	rows, err := qtx.PostJournalEntry(ctx, db.PostJournalEntryParams{ActorUserID: actorID, ID: id})
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return rows, nil
 }
 
 func (r *sqlJournalRepository) Void(ctx context.Context, id, actorID int64, reason string) (int64, error) {
@@ -210,9 +233,21 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	qtx := r.q.WithTx(tx)
+	entry, err := reverseJournal(ctx, r.q.WithTx(tx), originalID, entryDate, reason, actorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
 
-	origRow, err := qtx.GetJournalEntryByID(ctx, originalID)
+// reverseJournal menjalankan pembalikan jurnal dengan kueri milik transaksi
+// pemanggil. Periode dikunci FOR SHARE agar penutupan buku tidak bisa berjalan
+// bersamaan dengan pembalik yang masih membaca status OPEN.
+func reverseJournal(ctx context.Context, q *db.Queries, originalID int64, entryDate time.Time, reason string, actorID int64) (*domain.JournalEntry, error) {
+	origRow, err := q.GetJournalEntryByID(ctx, originalID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrJournalNotFound
@@ -226,7 +261,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		return nil, domain.ErrJournalAlreadyRev
 	}
 
-	periodRow, err := qtx.GetAccountPeriod(ctx, db.GetAccountPeriodParams{
+	periodRow, err := q.GetAccountPeriodForShare(ctx, db.GetAccountPeriodForShareParams{
 		PeriodYear:  origRow.PeriodYear,
 		PeriodMonth: origRow.PeriodMonth,
 	})
@@ -237,7 +272,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		return nil, domain.ErrJournalPeriodClosed
 	}
 
-	origLines, err := qtx.GetJournalEntryLines(ctx, originalID)
+	origLines, err := q.GetJournalEntryLines(ctx, originalID)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +281,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 	for _, l := range origLines {
 		accountIDs = append(accountIDs, l.AccountID)
 	}
-	accounts, err := qtx.GetChartOfAccountsForPosting(ctx, accountIDs)
+	accounts, err := q.GetChartOfAccountsForPosting(ctx, accountIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +296,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 	}
 
 	datePrefix := origRow.EntryDate.Time.Format("20060102")
-	seq, err := qtx.NextJournalSeq(ctx, datePrefix)
+	seq, err := q.NextJournalSeq(ctx, datePrefix)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +319,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		PeriodMonth: int(origRow.PeriodMonth),
 	}
 
-	header, err := qtx.CreateJournalEntryHeader(ctx, db.CreateJournalEntryHeaderParams{
+	header, err := q.CreateJournalEntryHeader(ctx, db.CreateJournalEntryHeaderParams{
 		EntryNumber:  rev.EntryNumber,
 		EntryDate:    pgtype.Date{Time: origRow.EntryDate.Time, Valid: true},
 		Description:  pgtype.Text{String: description, Valid: description != ""},
@@ -308,7 +343,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		if desc != "" {
 			desc = "Pembalikan: " + desc
 		}
-		if err := qtx.CreateJournalEntryLine(ctx, db.CreateJournalEntryLineParams{
+		if err := q.CreateJournalEntryLine(ctx, db.CreateJournalEntryLineParams{
 			JournalEntryID: header.ID,
 			LineNo:         l.LineNo,
 			AccountID:      l.AccountID,
@@ -320,7 +355,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		}
 	}
 
-	rows, err := qtx.PostJournalEntry(ctx, db.PostJournalEntryParams{ActorUserID: actorID, ID: header.ID})
+	rows, err := q.PostJournalEntry(ctx, db.PostJournalEntryParams{ActorUserID: actorID, ID: header.ID})
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +363,7 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 		return nil, domain.ErrJournalPostBox
 	}
 
-	marked, err := qtx.SetOriginalJournalReversed(ctx, db.SetOriginalJournalReversedParams{
+	marked, err := q.SetOriginalJournalReversed(ctx, db.SetOriginalJournalReversedParams{
 		ReversalID: header.ID,
 		ID:         originalID,
 	})
@@ -337,10 +372,6 @@ func (r *sqlJournalRepository) Reverse(ctx context.Context, originalID int64, en
 	}
 	if marked == 0 {
 		return nil, domain.ErrJournalAlreadyRev
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, err
 	}
 
 	rev.Status = domain.JournalStatusPosted
@@ -389,8 +420,16 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	qtx := r.q.WithTx(tx)
+	if err := createPosted(ctx, r.q.WithTx(tx), entry); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
 
+// createPosted menulis jurnal POSTED memakai kueri milik transaksi pemanggil.
+// Kueri header hanya menghasilkan baris bila periode masih OPEN; pgx.ErrNoRows
+// berarti periode sudah ditutup atau belum dibuat.
+func createPosted(ctx context.Context, q *db.Queries, entry *domain.JournalEntry) error {
 	// id pelaku 0 berarti "tidak ada pengguna" (mis. auto-posting latar belakang);
 	// disimpan sebagai NULL agar tidak melanggar foreign key ke s_users.
 	actor := pgtype.Int8{}
@@ -398,7 +437,7 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 		actor = pgtype.Int8{Int64: *entry.CreatedBy, Valid: true}
 	}
 
-	header, err := qtx.CreatePostedJournalEntryHeader(ctx, db.CreatePostedJournalEntryHeaderParams{
+	header, err := q.CreatePostedJournalEntryHeader(ctx, db.CreatePostedJournalEntryHeaderParams{
 		EntryNumber:     entry.EntryNumber,
 		EntryDate:       pgtype.Date{Time: entry.EntryDate, Valid: true},
 		Description:     pgtype.Text{String: entry.Description, Valid: entry.Description != ""},
@@ -415,6 +454,9 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 		UpdatedBy:       actor,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrJournalPeriodClosed
+		}
 		if name, ok := uniqueViolationConstraint(err); ok {
 			if name == journalSourceUniqueIndex {
 				return domain.ErrJournalAlreadyPost
@@ -430,7 +472,7 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 	entry.UpdatedAt = header.UpdatedAt.Time
 
 	for _, line := range entry.Lines {
-		if err := qtx.CreateJournalEntryLine(ctx, db.CreateJournalEntryLineParams{
+		if err := q.CreateJournalEntryLine(ctx, db.CreateJournalEntryLineParams{
 			JournalEntryID: header.ID,
 			LineNo:         int32(line.LineNo),
 			AccountID:      line.AccountID,
@@ -441,8 +483,7 @@ func (r *sqlJournalRepository) CreatePosted(ctx context.Context, entry *domain.J
 			return err
 		}
 	}
-
-	return tx.Commit(ctx)
+	return nil
 }
 
 // --- Accounting Settings ---

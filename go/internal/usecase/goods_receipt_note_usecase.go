@@ -93,15 +93,15 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 	// stok dan status PO dulu yang berubah, PO sudah tampak selesai padahal buku
 	// besar belum terisi, dan kegagalan seperti itu justru jarang diulang.
 	if u.poster != nil {
-		for _, g := range grns {
-			full, err := u.grnRepo.GetByID(ctx, g.ID)
-			if err != nil {
-				return err
+		for i := range grns {
+			g := &grns[i]
+			// GetByPOID sudah membawa detail seluruh GRN dalam satu query. Baris
+			// tanpa detail berarti datanya menghilang di antara pembacaan header
+			// dan detail; jangan lanjut karena stok akan bertambah tanpa jurnal.
+			if len(g.Items) == 0 {
+				return domain.NewBusinessRuleError("penerimaan ditolak: detail grn %d tidak ditemukan saat penerbitan jurnal", g.ID)
 			}
-			if full == nil {
-				continue
-			}
-			if err := u.poster.PostGRNJournal(ctx, full, po, updatedBy); err != nil {
+			if err := u.poster.PostGRNJournal(ctx, g, po, updatedBy); err != nil {
 				return err
 			}
 		}
@@ -110,7 +110,13 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 	// Finalisasi transaksional: stok baru ditambahkan di sini lalu status PO
 	// berpindah ke RECEIVED. Stok tidak lagi bertambah saat GRN dibuat. Harga
 	// pokok rata-rata ikut dihitung ulang di transaksi yang sama.
-	if err := u.grnRepo.FinishReceiving(ctx, poID, updatedBy, netCostFactorFor(po.TaxType)); err != nil {
+	//
+	// expectedGRNCount dikirim supaya repository dapat menolak finalisasi bila
+	// ada GRN baru yang dibuat setelah daftar di atas dibaca. GRN itu belum
+	// menerbitkan jurnal; menambahkan stoknya sekarang akan membuat persediaan
+	// dan buku besar tidak sinkron. Pengguna cukup mengulang, dan pengulangan
+	// aman karena penerbitan jurnal per GRN idempoten.
+	if err := u.grnRepo.FinishReceiving(ctx, poID, updatedBy, netCostFactorFor(po.TaxType), len(grns)); err != nil {
 		return err
 	}
 	return nil

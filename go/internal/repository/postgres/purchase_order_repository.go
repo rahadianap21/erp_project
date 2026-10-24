@@ -2,10 +2,12 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	// 🌟 SAMAKAN DENGAN MASTER: Menggunakan pgxpool murni
@@ -327,9 +329,18 @@ func (r *sqlPurchaseOrderRepository) CountReceivedQty(ctx context.Context, id in
 // Update mengoreksi header lalu mengganti SELURUH baris detail dalam satu transaksi.
 //
 // Strategi "delete all + insert all" dipilih karena form edit mengirim daftar item
-// lengkap, bukan diff. Aman karena tidak ada tabel lain yang meng referensi
-// t_purchase_order_details, dan pemanggil sudah menolak update bila ada baris
-// dengan qty_received > 0 sehingga riwayat penerimaan tidak pernah hilang.
+// lengkap, bukan diff. Tabel detail GRN memang mereferensikan baris PO dengan
+// ON DELETE RESTRICT, tetapi transaksi ini menolak update bila ada baris dengan
+// qty_received > 0, sehingga baris yang sudah punya riwayat penerimaan tidak
+// pernah dihapus.
+//
+// Pemeriksaan status dan qty_received di usecase saja TIDAK cukup: approve atau
+// GRN bisa menang balapan setelah usecase membaca PENDING. Karena itu transaksi
+// ini mengunci header lebih dulu, lalu MEMBACA ULANG status dan qty_received
+// setelah lock didapat. Approve, CreateGRN, dan FinishReceiving juga mengunci
+// header yang sama, sehingga urutan yang mungkin hanya:
+//   - koreksi selesai lebih dulu, lalu approve; atau
+//   - approve/GRN selesai lebih dulu, lalu koreksi ditolak.
 func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.PurchaseOrder) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -339,7 +350,26 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 
 	qtx := r.q.WithTx(tx)
 
-	// 1. Koreksi header PO. Kueri memakai RETURNING sehingga baris yang terpengaruh
+	// 1. Kunci header dan validasi ulang kondisi yang menjadi syarat koreksi.
+	lock, err := qtx.LockPurchaseOrderForUpdate(ctx, po.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NewNotFoundError("dokumen po tidak ditemukan")
+		}
+		return err
+	}
+	if lock.Status != "PENDING" {
+		return domain.NewBusinessRuleError("dokumen berstatus %s sudah terkunci dan tidak dapat dikoreksi lagi", lock.Status)
+	}
+	received, err := qtx.CountPurchaseOrderReceivedQty(ctx, po.ID)
+	if err != nil {
+		return err
+	}
+	if received > 0 {
+		return domain.NewBusinessRuleError("koreksi ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
+	}
+
+	// 2. Koreksi header PO. Kueri memakai RETURNING sehingga baris yang terpengaruh
 	// bisa dideteksi: kalau nol baris berarti PO sudah terhapus / tidak ada.
 	header, err := qtx.UpdatePurchaseOrderHeader(ctx, db.UpdatePurchaseOrderHeaderParams{
 		TaxType:     po.TaxType,
@@ -351,15 +381,18 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 		ID:          po.ID,
 	})
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NewBusinessRuleError("dokumen tidak dapat dikoreksi karena statusnya sudah berubah")
+		}
 		return err
 	}
 
-	// 2. Hapus baris detail lama (qty_received dijamin nol oleh usecase).
+	// 3. Hapus baris detail lama (qty_received sudah diverifikasi nol di atas).
 	if err := qtx.DeletePurchaseOrderDetails(ctx, po.ID); err != nil {
 		return err
 	}
 
-	// 3. Tulis ulang detail dengan harga & satuan dari master produk.
+	// 4. Tulis ulang detail dengan harga & satuan dari master produk.
 	for _, item := range po.Items {
 		err = qtx.CreatePurchaseOrderDetail(ctx, db.CreatePurchaseOrderDetailParams{
 			PurchaseOrderID: header.ID,
@@ -386,14 +419,53 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 // SoftDelete mencabut dokumen PO dengan mengisi deleted_at. Tidak menghapus
 // fisik: dokumen hilang dari daftar karena semua query pembacaan memfilter
 // deleted_at IS NULL, sementara riwayat keuangan & detail tetap utuh untuk audit.
+//
+// Seperti Update, header dikunci dan kondisi PENDING/qty_received dibaca ulang
+// di dalam transaksi. Tanpa ini, approve yang menang balapan setelah pengecekan
+// usecase bisa diikuti soft delete, sehingga dokumen APPROVED lenyap dari daftar
+// aktif padahal sudah menjadi rujukan penerimaan barang.
 func (r *sqlPurchaseOrderRepository) SoftDelete(ctx context.Context, id int64, deletedBy int64) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qtx := r.q.WithTx(tx)
+
+	lock, err := qtx.LockPurchaseOrderForUpdate(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.NewNotFoundError("dokumen po tidak ditemukan")
+		}
+		return err
+	}
+	if lock.Status != "PENDING" {
+		return domain.NewBusinessRuleError("dokumen berstatus %s sudah terkunci dan tidak dapat dicabut", lock.Status)
+	}
+	received, err := qtx.CountPurchaseOrderReceivedQty(ctx, id)
+	if err != nil {
+		return err
+	}
+	if received > 0 {
+		return domain.NewBusinessRuleError("pencabutan ditolak: %d unit barang pada dokumen ini sudah diterima di gudang", received)
+	}
+
 	var updatedByPg pgtype.Int8
 	if deletedBy > 0 {
 		updatedByPg = pgtype.Int8{Int64: deletedBy, Valid: true}
 	}
 
-	return r.q.SoftDeletePurchaseOrder(ctx, db.SoftDeletePurchaseOrderParams{
+	rows, err := qtx.SoftDeletePurchaseOrder(ctx, db.SoftDeletePurchaseOrderParams{
 		UpdatedBy: updatedByPg,
 		ID:        id,
 	})
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.NewBusinessRuleError("dokumen tidak dapat dicabut karena statusnya sudah berubah")
+	}
+
+	return tx.Commit(ctx)
 }

@@ -780,6 +780,40 @@ CREATE TABLE IF NOT EXISTS m_payment_methods (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_methods_code_active_unique
     ON m_payment_methods (code) WHERE deleted_at IS NULL;
 
+CREATE TABLE IF NOT EXISTS m_vouchers (
+    id BIGSERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    discount_type VARCHAR(10) NOT NULL DEFAULT 'AMOUNT'
+        CHECK (discount_type IN ('PERCENT', 'AMOUNT')),
+    discount_value NUMERIC(15,2) NOT NULL DEFAULT 0
+        CHECK (discount_value >= 0),
+    min_purchase NUMERIC(15,2) NOT NULL DEFAULT 0
+        CHECK (min_purchase >= 0),
+    max_discount NUMERIC(15,2) NOT NULL DEFAULT 0
+        CHECK (max_discount >= 0),
+    valid_from DATE,
+    valid_until DATE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_by BIGINT REFERENCES s_users(id) ON DELETE SET NULL,
+    updated_by BIGINT REFERENCES s_users(id) ON DELETE SET NULL,
+    deleted_by BIGINT REFERENCES s_users(id) ON DELETE SET NULL,
+    CONSTRAINT m_vouchers_percent_check
+        CHECK (discount_type != 'PERCENT' OR (discount_value >= 0 AND discount_value <= 100)),
+    CONSTRAINT m_vouchers_valid_period_check
+        CHECK (valid_from IS NULL OR valid_until IS NULL OR valid_until >= valid_from)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vouchers_code_active_unique
+    ON m_vouchers (code) WHERE deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_m_vouchers_name ON m_vouchers (name);
+CREATE INDEX IF NOT EXISTS idx_m_vouchers_used_at ON m_vouchers (used_at);
+
 CREATE TABLE IF NOT EXISTS t_sales (
     id BIGSERIAL PRIMARY KEY,
     sale_number VARCHAR(50) NOT NULL,
@@ -805,6 +839,10 @@ CREATE TABLE IF NOT EXISTS t_sales (
         CONSTRAINT t_sales_redeem_points_non_neg CHECK (redeem_points >= 0),
     redeem_amount NUMERIC(15,2) NOT NULL DEFAULT 0
         CONSTRAINT t_sales_redeem_amount_non_neg CHECK (redeem_amount >= 0),
+    voucher_id BIGINT REFERENCES m_vouchers(id) ON DELETE RESTRICT,
+    voucher_code VARCHAR(50) NOT NULL DEFAULT '',
+    voucher_discount NUMERIC(15,2) NOT NULL DEFAULT 0
+        CONSTRAINT t_sales_voucher_discount_non_neg CHECK (voucher_discount >= 0),
     cost_total NUMERIC(15,2) NOT NULL DEFAULT 0,
     payment_status VARCHAR(10) NOT NULL DEFAULT 'UNPAID'
         CHECK (payment_status IN ('UNPAID', 'PARTIAL', 'PAID')),
@@ -826,6 +864,9 @@ CREATE TABLE IF NOT EXISTS t_sales (
 CREATE INDEX IF NOT EXISTS idx_t_sales_date ON t_sales (sale_date);
 CREATE INDEX IF NOT EXISTS idx_t_sales_member ON t_sales (member_id);
 CREATE INDEX IF NOT EXISTS idx_t_sales_status ON t_sales (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_t_sales_voucher_posted_unique
+    ON t_sales (voucher_id)
+    WHERE voucher_id IS NOT NULL AND status = 'POSTED';
 
 CREATE TABLE IF NOT EXISTS t_sales_details (
     id BIGSERIAL PRIMARY KEY,
@@ -890,3 +931,34 @@ CREATE TABLE IF NOT EXISTS t_sales_number_counters (
 
 
 
+
+-- =========================================================================
+-- IDEMPOTENSI HTTP
+-- =========================================================================
+--
+-- Satu baris = satu (pengguna, endpoint, Idempotency-Key). Selama status
+-- IN_PROGRESS permintaan lain dengan key sama ditolak; setelah COMPLETED
+-- respons disimpan dan diputar ulang. request_hash membedakan retry payload
+-- yang sama dari penyalahgunaan key untuk request berbeda.
+
+CREATE TABLE IF NOT EXISTS t_idempotency_keys (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES s_users(id) ON DELETE CASCADE,
+    scope VARCHAR(255) NOT NULL,
+    idempotency_key VARCHAR(255) NOT NULL,
+    request_hash CHAR(64) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS'
+        CHECK (status IN ('IN_PROGRESS', 'COMPLETED')),
+    response_status INT,
+    response_body BYTEA,
+    response_content_type VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP + INTERVAL '24 hours',
+    CONSTRAINT t_idempotency_keys_unique UNIQUE (user_id, scope, idempotency_key),
+    CONSTRAINT t_idempotency_keys_completed_has_status
+        CHECK (status = 'IN_PROGRESS' OR response_status IS NOT NULL)
+);
+
+CREATE INDEX IF NOT EXISTS idx_t_idempotency_keys_expires
+    ON t_idempotency_keys (expires_at);

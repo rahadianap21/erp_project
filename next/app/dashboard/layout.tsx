@@ -10,6 +10,7 @@ export default async function DashboardLayout({
   return (
     <RouteShell
       title="Enterprise Overview"
+      permission="dashboard:read"
       headerActions={
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="relative hidden md:block w-56 lg:w-72">

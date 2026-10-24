@@ -26,6 +26,10 @@ func (r *productRepoPalsu) GetByID(context.Context, int64) (*domain.Product, err
 	return nil, nil
 }
 
+func (r *productRepoPalsu) GetByIDs(context.Context, []int64) ([]domain.Product, error) {
+	return nil, nil
+}
+
 func (r *productRepoPalsu) Update(_ context.Context, p *domain.Product) error {
 	r.disimpan = *p
 	return nil

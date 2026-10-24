@@ -5,5 +5,9 @@ export default async function PaymentMethodsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Metode Pembayaran">{children}</RouteShell>;
+  return (
+    <RouteShell title="Metode Pembayaran" permission="payment-methods:read">
+      {children}
+    </RouteShell>
+  );
 }

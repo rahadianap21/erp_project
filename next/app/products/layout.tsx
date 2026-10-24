@@ -5,5 +5,9 @@ export default async function ProductsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Products Management">{children}</RouteShell>;
+  return (
+    <RouteShell title="Products Management" permission="products:read">
+      {children}
+    </RouteShell>
+  );
 }

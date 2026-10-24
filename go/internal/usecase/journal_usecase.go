@@ -25,25 +25,27 @@ func NewJournalUsecase(repo domain.JournalRepository, accountRepo domain.ChartOf
 	return &journalUsecase{repo: repo, accountRepo: accountRepo, periodRepo: periodRepo, settings: settings, reportRepo: reportRepo}
 }
 
-// validatePostableAccounts memastikan seluruh akun baris jurnal ada dan layak
-// diposting (bukan header, aktif, tidak terhapus). Mengembalikan peta id→akun.
-func (u *journalUsecase) validatePostableAccounts(ctx context.Context, lines []domain.JournalLineInput) (map[int64]domain.ChartOfAccount, error) {
+// accountIDsFromLines mengumpulkan id akun dari baris jurnal.
+func accountIDsFromLines(lines []domain.JournalLineInput) []int64 {
 	ids := make([]int64, 0, len(lines))
 	for _, l := range lines {
-		if l.AccountID <= 0 {
-			return nil, domain.NewBusinessRuleError("akun pada baris jurnal tidak valid")
-		}
 		ids = append(ids, l.AccountID)
 	}
-	accounts, err := u.accountRepo.GetByIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
+	return ids
+}
+
+// validatePostableAccountsFrom memastikan seluruh akun baris jurnal ada dan
+// layak diposting (bukan header, aktif, tidak terhapus).
+func validatePostableAccountsFrom(accounts []domain.ChartOfAccount, lines []domain.JournalLineInput) (map[int64]domain.ChartOfAccount, error) {
 	byID := make(map[int64]domain.ChartOfAccount, len(accounts))
 	for _, a := range accounts {
 		byID[a.ID] = a
 	}
+	postable := make(map[int64]domain.ChartOfAccount, len(lines))
 	for _, l := range lines {
+		if l.AccountID <= 0 {
+			return nil, domain.NewBusinessRuleError("akun pada baris jurnal tidak valid")
+		}
 		acc, ok := byID[l.AccountID]
 		if !ok {
 			return nil, &domain.JournalNotPostableError{AccountID: l.AccountID}
@@ -51,8 +53,24 @@ func (u *journalUsecase) validatePostableAccounts(ctx context.Context, lines []d
 		if !acc.IsActive || acc.IsHeader {
 			return nil, &domain.JournalNotPostableError{AccountID: acc.ID, Code: acc.Code}
 		}
+		postable[l.AccountID] = acc
 	}
-	return byID, nil
+	return postable, nil
+}
+
+// validatePostableAccounts memastikan seluruh akun baris jurnal ada dan layak
+// diposting (bukan header, aktif, tidak terhapus). Mengembalikan peta id→akun.
+func (u *journalUsecase) validatePostableAccounts(ctx context.Context, lines []domain.JournalLineInput) (map[int64]domain.ChartOfAccount, error) {
+	for _, l := range lines {
+		if l.AccountID <= 0 {
+			return nil, domain.NewBusinessRuleError("akun pada baris jurnal tidak valid")
+		}
+	}
+	accounts, err := u.accountRepo.GetByIDs(ctx, accountIDsFromLines(lines))
+	if err != nil {
+		return nil, err
+	}
+	return validatePostableAccountsFrom(accounts, lines)
 }
 
 func (u *journalUsecase) CreateJournal(ctx context.Context, in domain.JournalCreateInput, userID int64) (*domain.JournalEntry, error) {
@@ -440,15 +458,56 @@ func periodEndDate(year, month int) time.Time {
 // Jurnal diberi sumber CLOSING dengan source_id = id periode; unique index
 // parsial (source_type, source_id) menjadikannya idempoten sehingga penutupan
 // periode bisa diulang tanpa mencatat dua kali.
-func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.AccountingPeriod, actorID int64) error {
+type closingEntryStore interface {
+	AccountBalances(ctx context.Context, from, to time.Time) ([]domain.AccountBalance, error)
+	AccountsByIDs(ctx context.Context, ids []int64) ([]domain.ChartOfAccount, error)
+	AccountingMapping(ctx context.Context) (map[string]int64, error)
+}
+
+type repositoryClosingEntryStore struct {
+	u *journalUsecase
+}
+
+func (s repositoryClosingEntryStore) AccountBalances(ctx context.Context, from, to time.Time) ([]domain.AccountBalance, error) {
+	return s.u.reportRepo.AccountBalances(ctx, from, to)
+}
+
+func (s repositoryClosingEntryStore) AccountsByIDs(ctx context.Context, ids []int64) ([]domain.ChartOfAccount, error) {
+	return s.u.accountRepo.GetByIDs(ctx, ids)
+}
+
+func (s repositoryClosingEntryStore) AccountingMapping(ctx context.Context) (map[string]int64, error) {
+	return s.u.closingMapping(ctx)
+}
+
+type txClosingEntryStore struct {
+	tx domain.AccountingTx
+}
+
+func (s txClosingEntryStore) AccountBalances(ctx context.Context, from, to time.Time) ([]domain.AccountBalance, error) {
+	return s.tx.AccountBalances(ctx, from, to)
+}
+
+func (s txClosingEntryStore) AccountsByIDs(ctx context.Context, ids []int64) ([]domain.ChartOfAccount, error) {
+	return s.tx.GetAccountsByIDs(ctx, ids)
+}
+
+func (s txClosingEntryStore) AccountingMapping(ctx context.Context) (map[string]int64, error) {
+	return s.tx.ListAccountingSettings(ctx)
+}
+
+// buildClosingEntry menyusun jurnal penutup dari saldo kumulatif sampai akhir
+// periode. Mengembalikan nil bila tidak ada saldo pendapatan/beban yang perlu
+// ditutup. Fungsi ini tidak menulis apa pun; pemanggil yang menentukan transaksi.
+func buildClosingEntry(ctx context.Context, store closingEntryStore, period *domain.AccountingPeriod, actorID int64) (*domain.JournalEntry, error) {
 	if period == nil || period.ID <= 0 {
-		return domain.NewBusinessRuleError("jurnal penutup ditolak: periode tidak valid")
+		return nil, domain.NewBusinessRuleError("jurnal penutup ditolak: periode tidak valid")
 	}
 	periodEnd := periodEndDate(period.PeriodYear, period.PeriodMonth)
 
-	balances, err := u.reportRepo.AccountBalances(ctx, reportEpoch, periodEnd)
+	balances, err := store.AccountBalances(ctx, reportEpoch, periodEnd)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	description := fmt.Sprintf("Jurnal penutup periode %04d-%02d", period.PeriodYear, period.PeriodMonth)
@@ -489,19 +548,19 @@ func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.Ac
 	}
 	if len(lines) == 0 {
 		// Tidak ada saldo pendapatan/beban yang perlu ditutup.
-		return nil
+		return nil, nil
 	}
 
 	// Sisa selisih debit-kredit adalah laba/rugi yang dipindahkan ke Laba Ditahan.
 	diff := round2(totalDebit - totalCredit)
 	if diff != 0 {
-		mapping, err := u.closingMapping(ctx)
+		mapping, err := store.AccountingMapping(ctx)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		retainedID, err := requireMapping(mapping, "RETAINED_EARNINGS")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if diff > 0 {
 			addLine(retainedID, 0, diff)
@@ -510,14 +569,16 @@ func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.Ac
 		}
 	}
 
-	if _, err := u.validatePostableAccounts(ctx, toLineInputs(&lines)); err != nil {
-		return err
+	inputs := toLineInputs(&lines)
+	accounts, err := store.AccountsByIDs(ctx, accountIDsFromLines(inputs))
+	if err != nil {
+		return nil, err
 	}
-	if _, err := u.periodRepo.EnsureOpen(ctx, period.PeriodYear, period.PeriodMonth, actorID); err != nil {
-		return err
+	if _, err := validatePostableAccountsFrom(accounts, inputs); err != nil {
+		return nil, err
 	}
 
-	entry := &domain.JournalEntry{
+	return &domain.JournalEntry{
 		EntryDate:       periodEnd,
 		Description:     description,
 		SourceType:      domain.JournalSourceClosing,
@@ -530,24 +591,44 @@ func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.Ac
 		PeriodMonth:     period.PeriodMonth,
 		CreatedBy:       &actorID,
 		Lines:           lines,
-	}
+	}, nil
+}
 
-	datePrefix := periodEnd.Format("20060102")
+// postedClosingEntryExists memeriksa jurnal penutup POSTED yang belum dibalik.
+// Pemeriksaan dilakukan SEBELUM menulis agar idempotensi tidak bergantung pada
+// pelanggaran unique index, yang akan membatalkan transaksi PostgreSQL.
+func postedClosingEntryExists(
+	ctx context.Context,
+	get func(context.Context, string, int64) (int64, error),
+	periodID int64,
+) (bool, error) {
+	if _, err := get(ctx, domain.JournalSourceClosing, periodID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+// writeClosingEntry menerbitkan jurnal penutup dengan percobaan ulang nomor.
+func writeClosingEntry(
+	ctx context.Context,
+	entry *domain.JournalEntry,
+	nextSeq func(context.Context, string) (int64, error),
+	create func(context.Context, *domain.JournalEntry) error,
+) error {
+	datePrefix := entry.EntryDate.Format("20060102")
 	const maksPercobaanNomor = 5
 	for attempt := 1; attempt <= maksPercobaanNomor; attempt++ {
-		seq, err := u.repo.NextSeq(ctx, datePrefix)
+		seq, err := nextSeq(ctx, datePrefix)
 		if err != nil {
 			return err
 		}
 		entry.EntryNumber = fmt.Sprintf("JV/%s/%04d", datePrefix, seq)
 
-		err = u.repo.CreatePosted(ctx, entry)
+		err = create(ctx, entry)
 		if err == nil {
-			return nil
-		}
-		// Periode ini sudah punya jurnal penutup POSTED; penutupan ulang harus
-		// mengabaikannya, bukan mencatat laba/rugi untuk kedua kalinya.
-		if errors.Is(err, domain.ErrJournalAlreadyPost) {
 			return nil
 		}
 		if !errors.Is(err, domain.ErrNomorJurnalBentrok) {
@@ -558,6 +639,57 @@ func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.Ac
 		}
 	}
 	return domain.NewBusinessRuleError("jurnal penutup gagal diterbitkan: gagal menerbitkan nomor dokumen")
+}
+
+func (u *journalUsecase) PostClosingEntry(ctx context.Context, period *domain.AccountingPeriod, actorID int64) error {
+	if period == nil || period.ID <= 0 {
+		return domain.NewBusinessRuleError("jurnal penutup ditolak: periode tidak valid")
+	}
+	exists, err := postedClosingEntryExists(ctx, u.repo.GetPostedIDBySource, period.ID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	entry, err := buildClosingEntry(ctx, repositoryClosingEntryStore{u: u}, period, actorID)
+	if err != nil {
+		return err
+	}
+	if entry == nil {
+		return nil
+	}
+	if _, err := u.periodRepo.EnsureOpen(ctx, period.PeriodYear, period.PeriodMonth, actorID); err != nil {
+		return err
+	}
+	return writeClosingEntry(ctx, entry, u.repo.NextSeq, u.repo.CreatePosted)
+}
+
+// PostClosingEntryTx menerbitkan jurnal penutup di dalam transaksi pemanggil.
+// Periode sudah dikunci FOR UPDATE oleh alur tutup buku, jadi fungsi ini tidak
+// membuka transaksi baru dan tidak melakukan EnsureOpen terpisah.
+func (u *journalUsecase) PostClosingEntryTx(ctx context.Context, tx domain.AccountingTx, period *domain.AccountingPeriod, actorID int64) error {
+	if period == nil || period.ID <= 0 {
+		return domain.NewBusinessRuleError("jurnal penutup ditolak: periode tidak valid")
+	}
+	if period.Status != domain.PeriodStatusOpen {
+		return domain.ErrJournalPeriodClosed
+	}
+	exists, err := postedClosingEntryExists(ctx, tx.GetPostedJournalIDBySource, period.ID)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	entry, err := buildClosingEntry(ctx, txClosingEntryStore{tx: tx}, period, actorID)
+	if err != nil {
+		return err
+	}
+	if entry == nil {
+		return nil
+	}
+	return writeClosingEntry(ctx, entry, tx.NextJournalSeq, tx.CreatePostedJournal)
 }
 
 // ReverseClosingEntry membalik jurnal penutup sebuah periode bila ada, sehingga
@@ -578,6 +710,30 @@ func (u *journalUsecase) ReverseClosingEntry(ctx context.Context, period *domain
 	reason := fmt.Sprintf("Pembatalan jurnal penutup periode %04d-%02d", period.PeriodYear, period.PeriodMonth)
 	if _, err := u.repo.Reverse(ctx, id, time.Now(), reason, actorID); err != nil {
 		// Jurnal penutup sudah dibalik sebelumnya; tidak perlu diulang.
+		if errors.Is(err, domain.ErrJournalAlreadyRev) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// ReverseClosingEntryTx membalik jurnal penutup di dalam transaksi pemanggil.
+// Status periode sudah dibuka kembali di transaksi yang sama, sehingga jurnal
+// pembalik selalu tercatat pada periode yang sedang dibuka.
+func (u *journalUsecase) ReverseClosingEntryTx(ctx context.Context, tx domain.AccountingTx, period *domain.AccountingPeriod, actorID int64) error {
+	if period == nil || period.ID <= 0 {
+		return nil
+	}
+	id, err := tx.GetPostedJournalIDBySource(ctx, domain.JournalSourceClosing, period.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	reason := fmt.Sprintf("Pembatalan jurnal penutup periode %04d-%02d", period.PeriodYear, period.PeriodMonth)
+	if _, err := tx.ReverseJournal(ctx, id, time.Now(), reason, actorID); err != nil {
 		if errors.Is(err, domain.ErrJournalAlreadyRev) {
 			return nil
 		}

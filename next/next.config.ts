@@ -1,7 +1,5 @@
 import type { NextConfig } from "next";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8090";
-
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -16,14 +14,6 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
         ],
-      },
-    ];
-  },
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${API_BASE_URL}/api/:path*`,
       },
     ];
   },

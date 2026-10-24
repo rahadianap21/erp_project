@@ -20,8 +20,8 @@ type accountingPeriodUsecase struct {
 // periode fiskal. Didefinisikan sempit supaya periode tidak bergantung pada
 // seluruh permukaan jurnal umum.
 type periodClosingManager interface {
-	PostClosingEntry(ctx context.Context, period *domain.AccountingPeriod, actorID int64) error
-	ReverseClosingEntry(ctx context.Context, period *domain.AccountingPeriod, actorID int64) error
+	PostClosingEntryTx(ctx context.Context, tx domain.AccountingTx, period *domain.AccountingPeriod, actorID int64) error
+	ReverseClosingEntryTx(ctx context.Context, tx domain.AccountingTx, period *domain.AccountingPeriod, actorID int64) error
 }
 
 func NewAccountingPeriodUsecase(repo domain.AccountingPeriodRepository, closing periodClosingManager) domain.AccountingPeriodUsecase {
@@ -49,28 +49,41 @@ func (u *accountingPeriodUsecase) OpenPeriod(ctx context.Context, year, month, u
 		return nil, err
 	}
 
-	period, err := u.repo.Get(ctx, y, m)
-	if errors.Is(err, pgx.ErrNoRows) {
-		created, err := u.repo.EnsureOpen(ctx, y, m, userID)
-		if err != nil {
-			return nil, err
+	var result *domain.AccountingPeriod
+	err := u.repo.WithTx(ctx, func(tx domain.AccountingTx) error {
+		period, err := tx.LockPeriod(ctx, y, m)
+		if errors.Is(err, pgx.ErrNoRows) {
+			created, err := tx.CreatePeriod(ctx, y, m, userID)
+			if err != nil {
+				return err
+			}
+			if created.Status != domain.PeriodStatusOpen {
+				if err := u.reopenPeriodTx(ctx, tx, created, userID); err != nil {
+					return err
+				}
+				created.Status = domain.PeriodStatusOpen
+				created.ClosedAt = nil
+				created.ClosedBy = nil
+			}
+			result = created
+			return nil
 		}
-		return created, nil
-	}
+		if err != nil {
+			return err
+		}
+		if err := u.reopenPeriodTx(ctx, tx, period, userID); err != nil {
+			return err
+		}
+		period.Status = domain.PeriodStatusOpen
+		period.ClosedAt = nil
+		period.ClosedBy = nil
+		result = period
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	if period.Status == domain.PeriodStatusOpen {
-		return period, nil
-	}
-	rows, err := u.repo.Reopen(ctx, y, m)
-	if err != nil {
-		return nil, err
-	}
-	if rows == 0 {
-		return nil, domain.ErrPeriodeBerubah
-	}
-	return u.repo.Get(ctx, y, m)
+	return result, nil
 }
 
 func (u *accountingPeriodUsecase) ClosePeriod(ctx context.Context, year, month, userID int64) error {
@@ -78,54 +91,64 @@ func (u *accountingPeriodUsecase) ClosePeriod(ctx context.Context, year, month, 
 	if err := validatePeriode(y, m); err != nil {
 		return err
 	}
-	period, err := u.repo.Get(ctx, y, m)
-	if err != nil {
-		return notFoundAs(err, domain.ErrPeriodNotFound)
-	}
-	if period.Status == domain.PeriodStatusClosed {
-		return nil
-	}
-	// Terbitkan jurnal penutup SEBELUM periode dikunci. Bila ini gagal, periode
-	// tetap terbuka sehingga tidak pernah ada periode tertutup tanpa penutupan
-	// buku. Jurnal penutup idempoten, jadi pengulangan penutupan aman.
-	if u.closing != nil {
-		if err := u.closing.PostClosingEntry(ctx, period, userID); err != nil {
+	return u.repo.WithTx(ctx, func(tx domain.AccountingTx) error {
+		period, err := tx.LockPeriod(ctx, y, m)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrPeriodNotFound
+		}
+		if err != nil {
 			return err
 		}
-	}
-	rows, err := u.repo.Close(ctx, int64(y), int64(m), userID)
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return domain.ErrPeriodeBerubah
-	}
-	return nil
-}
-
-func (u *accountingPeriodUsecase) ReopenPeriod(ctx context.Context, year, month int, userID int64) error {
-	if err := validatePeriode(year, month); err != nil {
-		return err
-	}
-	period, err := u.repo.Get(ctx, year, month)
-	if err != nil {
-		return notFoundAs(err, domain.ErrPeriodNotFound)
-	}
-	if period.Status != domain.PeriodStatusOpen {
-		rows, err := u.repo.Reopen(ctx, year, month)
+		if period.Status == domain.PeriodStatusClosed {
+			return nil
+		}
+		if u.closing != nil {
+			if err := u.closing.PostClosingEntryTx(ctx, tx, period, userID); err != nil {
+				return err
+			}
+		}
+		rows, err := tx.ClosePeriod(ctx, int64(y), int64(m), userID)
 		if err != nil {
 			return err
 		}
 		if rows == 0 {
 			return domain.ErrPeriodeBerubah
 		}
-		period.Status = domain.PeriodStatusOpen
+		return nil
+	})
+}
+
+func (u *accountingPeriodUsecase) ReopenPeriod(ctx context.Context, year, month int, userID int64) error {
+	if err := validatePeriode(year, month); err != nil {
+		return err
 	}
-	// Batalkan jurnal penutup periode ini (bila ada) supaya pembukuan kembali
-	// seperti sebelum tutup buku. Selalu dicoba, termasuk saat periode memang
-	// sudah OPEN, agar percobaan ulang setelah kegagalan parsial tetap beres.
+	return u.repo.WithTx(ctx, func(tx domain.AccountingTx) error {
+		period, err := tx.LockPeriod(ctx, year, month)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrPeriodNotFound
+		}
+		if err != nil {
+			return err
+		}
+		return u.reopenPeriodTx(ctx, tx, period, userID)
+	})
+}
+
+// reopenPeriodTx membuka status periode lalu membalik jurnal penutupnya dalam
+// transaksi yang sama. Urutan ini penting: jurnal pembalik hanya boleh tercatat
+// setelah periode kembali OPEN.
+func (u *accountingPeriodUsecase) reopenPeriodTx(ctx context.Context, tx domain.AccountingTx, period *domain.AccountingPeriod, userID int64) error {
+	if period.Status != domain.PeriodStatusOpen {
+		rows, err := tx.ReopenPeriod(ctx, period.PeriodYear, period.PeriodMonth)
+		if err != nil {
+			return err
+		}
+		if rows == 0 {
+			return domain.ErrPeriodeBerubah
+		}
+	}
 	if u.closing != nil {
-		if err := u.closing.ReverseClosingEntry(ctx, period, userID); err != nil {
+		if err := u.closing.ReverseClosingEntryTx(ctx, tx, period, userID); err != nil {
 			return err
 		}
 	}

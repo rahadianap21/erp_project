@@ -104,6 +104,30 @@ func (r *sqlPaymentMethodRepository) GetByID(ctx context.Context, id int64) (*do
 	}, nil
 }
 
+func (r *sqlPaymentMethodRepository) GetByIDs(ctx context.Context, ids []int64) ([]domain.PaymentMethod, error) {
+	if len(ids) == 0 {
+		return []domain.PaymentMethod{}, nil
+	}
+	rows, err := r.q.GetPaymentMethodsByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.PaymentMethod, 0, len(rows))
+	for _, v := range rows {
+		result = append(result, domain.PaymentMethod{
+			ID:        v.ID,
+			Code:      v.Code,
+			Name:      v.Name,
+			Channel:   v.Channel,
+			AccountID: accountIDFromPg(v.AccountID),
+			IsCash:    v.IsCash,
+			SortOrder: int(v.SortOrder),
+			IsActive:  v.IsActive,
+		})
+	}
+	return result, nil
+}
+
 func (r *sqlPaymentMethodRepository) ListActive(ctx context.Context) ([]domain.PaymentMethod, error) {
 	rows, err := r.q.GetActivePaymentMethods(ctx)
 	if err != nil {

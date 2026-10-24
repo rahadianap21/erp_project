@@ -70,11 +70,22 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  webServer: {
-    command: "npm run dev:turbo",
-    url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  /* Jalankan stub API dan dev server sebelum test. Stub ini menggantikan
+     backend Go supaya halaman server-side (/api/me) dan proxy bisa diuji
+     tanpa database. */
+  webServer: [
+    {
+      command: "node tests/mock-api.mjs",
+      url: "http://localhost:8091/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 15_000,
+    },
+    {
+      command: "npm run dev:turbo",
+      url: "http://localhost:3000",
+      env: { API_URL: "http://localhost:8091" },
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 });

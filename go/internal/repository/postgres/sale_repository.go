@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"go_backend/internal/domain"
@@ -259,19 +260,70 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 	qtx := r.q.WithTx(tx)
 
 	// Kunci seluruh produk yang dijual supaya validasi stok final tidak bisa
-	// dilewati oleh penjualan bersamaan produk yang sama.
+	// dilewati oleh penjualan bersamaan produk yang sama. Bandingkan snapshot
+	// yang dipakai menghitung nota dengan baris terkunci; bila harga, diskon,
+	// pajak, atau HPP berubah, minta usecase menghitung ulang.
 	ids := uniqueProductIDs(sale.Details)
 	locks, err := qtx.LockProductsForSale(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
-	locked := make(map[int64]struct{}, len(locks))
+	locked := make(map[int64]domain.SaleProductInfo, len(locks))
 	for _, l := range locks {
-		locked[l.ID] = struct{}{}
+		locked[l.ID] = domain.SaleProductInfo{
+			ID:            l.ID,
+			SKU:           l.Sku,
+			Name:          l.Name,
+			SellingPrice:  numericToFloat(l.SellingPrice),
+			AvgCost:       numericToFloat(l.AvgCost),
+			CurrentStock:  int(l.CurrentStock),
+			DiscountType:  l.DiscountType,
+			DiscountValue: numericToFloat(l.DiscountValue),
+			IsTaxable:     l.IsTaxable,
+		}
 	}
 	for _, d := range sale.Details {
-		if _, ok := locked[d.ProductID]; !ok {
+		p, ok := locked[d.ProductID]
+		if !ok {
 			return nil, fmt.Errorf("%w: id %d", domain.ErrSaleProductNotFound, d.ProductID)
+		}
+		if saleProductSnapshotChanged(d, p) {
+			return nil, fmt.Errorf("%w: %s", domain.ErrSaleSnapshotChanged, d.ProductName)
+		}
+	}
+
+	var actorID int64
+	if sale.CreatedBy != nil {
+		actorID = *sale.CreatedBy
+	}
+
+	// Validasi voucher di bawah kunci baris. Pemeriksaan usecase bisa saja
+	// sudah basi, sehingga status single-use, masa berlaku, dan minimal
+	// belanja diperiksa ulang tepat sebelum nota ditulis.
+	if sale.VoucherID > 0 {
+		lock, err := qtx.LockVoucherForSale(ctx, sale.VoucherID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, domain.ErrVoucherNotFound
+			}
+			return nil, err
+		}
+		voucher := voucherFromLockRow(lock)
+		if err := voucher.ValidateUsable(time.Now()); err != nil {
+			return nil, err
+		}
+		if err := voucher.ValidateSubtotal(sale.Subtotal); err != nil {
+			return nil, err
+		}
+		usedRows, err := qtx.MarkVoucherUsed(ctx, db.MarkVoucherUsedParams{
+			UpdatedBy: int8FromID(actorID),
+			ID:        sale.VoucherID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if usedRows == 0 {
+			return nil, domain.ErrVoucherUsed
 		}
 	}
 
@@ -286,10 +338,6 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 	}
 	saleNumber := fmt.Sprintf("POS-%s-%04d", datePrefix, seq)
 
-	var actorID int64
-	if sale.CreatedBy != nil {
-		actorID = *sale.CreatedBy
-	}
 	actor := int8FromID(actorID)
 
 	var dueDate pgtype.Date
@@ -302,31 +350,39 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 		memberID = pgtype.Int8{Int64: sale.MemberID, Valid: true}
 	}
 
+	var voucherID pgtype.Int8
+	if sale.VoucherID > 0 {
+		voucherID = pgtype.Int8{Int64: sale.VoucherID, Valid: true}
+	}
+
 	header, err := qtx.CreateSale(ctx, db.CreateSaleParams{
-		SaleNumber:     saleNumber,
-		SaleDate:       pgtype.Date{Time: sale.SaleDate, Valid: true},
-		MemberID:       memberID,
-		TaxType:        sale.TaxType,
-		Subtotal:       numericFromFloat(sale.Subtotal),
-		ItemDiscount:   numericFromFloat(sale.ItemDiscount),
-		DiscountType:   sale.DiscountType,
-		DiscountValue:  numericFromFloat(sale.DiscountValue),
-		DiscountAmount: numericFromFloat(sale.DiscountAmount),
-		DppAmount:      numericFromFloat(sale.DppAmount),
-		TaxAmount:      numericFromFloat(sale.TaxAmount),
-		TotalAmount:    numericFromFloat(sale.TotalAmount),
-		PaidAmount:     numericFromFloat(sale.PaidAmount),
-		ChangeAmount:   numericFromFloat(sale.ChangeAmount),
-		CostTotal:      numericFromFloat(sale.CostTotal),
-		PointsEarned:   sale.PointsEarned,
-		RedeemPoints:   sale.RedeemPoints,
-		RedeemAmount:   numericFromFloat(sale.RedeemAmount),
-		PaymentStatus:  sale.PaymentStatus,
-		Status:         domain.SaleStatusPosted,
-		DueDate:        dueDate,
-		Notes:          sale.Notes,
-		CreatedBy:      actor,
-		UpdatedBy:      actor,
+		SaleNumber:      saleNumber,
+		SaleDate:        pgtype.Date{Time: sale.SaleDate, Valid: true},
+		MemberID:        memberID,
+		TaxType:         sale.TaxType,
+		Subtotal:        numericFromFloat(sale.Subtotal),
+		ItemDiscount:    numericFromFloat(sale.ItemDiscount),
+		DiscountType:    sale.DiscountType,
+		DiscountValue:   numericFromFloat(sale.DiscountValue),
+		DiscountAmount:  numericFromFloat(sale.DiscountAmount),
+		DppAmount:       numericFromFloat(sale.DppAmount),
+		TaxAmount:       numericFromFloat(sale.TaxAmount),
+		TotalAmount:     numericFromFloat(sale.TotalAmount),
+		PaidAmount:      numericFromFloat(sale.PaidAmount),
+		ChangeAmount:    numericFromFloat(sale.ChangeAmount),
+		CostTotal:       numericFromFloat(sale.CostTotal),
+		PointsEarned:    sale.PointsEarned,
+		RedeemPoints:    sale.RedeemPoints,
+		RedeemAmount:    numericFromFloat(sale.RedeemAmount),
+		VoucherID:       voucherID,
+		VoucherCode:     sale.VoucherCode,
+		VoucherDiscount: numericFromFloat(sale.VoucherDiscount),
+		PaymentStatus:   sale.PaymentStatus,
+		Status:          domain.SaleStatusPosted,
+		DueDate:         dueDate,
+		Notes:           sale.Notes,
+		CreatedBy:       actor,
+		UpdatedBy:       actor,
 	})
 	if err != nil {
 		return nil, err
@@ -434,12 +490,39 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 	if err != nil {
 		return nil, err
 	}
-	actor := int8FromID(actorID)
+
+	// Kembalikan stok pada HPP asli penjualan. Rata-rata tertimbang dipakai
+	// karena avg_cost produk bisa sudah berubah sejak nota dibuat.
+	type restock struct {
+		qty       int32
+		costTotal float64
+	}
+	restocks := make(map[int64]restock, len(details))
+	productIDs := make([]int64, 0, len(details))
 	for _, d := range details {
-		if err := qtx.RestoreProductStock(ctx, db.RestoreProductStockParams{
-			Qty:       d.Qty,
+		r := restocks[d.ProductID]
+		if r.qty == 0 {
+			productIDs = append(productIDs, d.ProductID)
+		}
+		r.qty += d.Qty
+		r.costTotal += numericToFloat(d.CostTotal)
+		restocks[d.ProductID] = r
+	}
+	productLocks, err := qtx.LockProductsForVoid(ctx, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	if len(productLocks) != len(productIDs) {
+		return nil, domain.ErrSaleProductNotFound
+	}
+	actor := int8FromID(actorID)
+	for _, p := range productLocks {
+		r := restocks[p.ID]
+		if err := qtx.RestoreProductStockWithValuation(ctx, db.RestoreProductStockWithValuationParams{
+			Qty:       r.qty,
+			CostTotal: numericFromFloat(r.costTotal),
 			UpdatedBy: actor,
-			ID:        d.ProductID,
+			ID:        p.ID,
 		}); err != nil {
 			return nil, err
 		}
@@ -448,6 +531,17 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 	// Batalkan poin yang terlibat pada nota ini (earn ditarik, redeem dikembalikan).
 	if lock.MemberID.Valid && (lock.PointsEarned > 0 || lock.RedeemPoints > 0) {
 		if err := reverseMemberPointsForSale(ctx, qtx, lock.MemberID.Int64, id, lock.PointsEarned, lock.RedeemPoints, actorID); err != nil {
+			return nil, err
+		}
+	}
+
+	// Voucher sekali pakai dikembalikan agar dapat digunakan lagi setelah nota
+	// dibatalkan.
+	if lock.VoucherID.Valid {
+		if err := qtx.ReleaseVoucher(ctx, db.ReleaseVoucherParams{
+			UpdatedBy: actor,
+			ID:        lock.VoucherID.Int64,
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -487,6 +581,37 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 		return nil, err
 	}
 	return r.GetByID(ctx, id)
+}
+
+// voucherFromLockRow memetakan baris voucher terkunci menjadi domain.Voucher.
+func voucherFromLockRow(v db.LockVoucherForSaleRow) *domain.Voucher {
+	return &domain.Voucher{
+		ID:            v.ID,
+		Code:          v.Code,
+		DiscountType:  v.DiscountType,
+		DiscountValue: numericToFloat(v.DiscountValue),
+		MinPurchase:   numericToFloat(v.MinPurchase),
+		MaxDiscount:   numericToFloat(v.MaxDiscount),
+		ValidFrom:     dateOnlyFromPg(v.ValidFrom),
+		ValidUntil:    dateOnlyFromPg(v.ValidUntil),
+		IsActive:      v.IsActive,
+		UsedAt:        convertPgTimeZ(v.UsedAt),
+	}
+}
+
+// saleProductSnapshotChanged mendeteksi perubahan nilai yang memengaruhi total
+// nota atau HPP antara snapshot pra-transaksi dan baris produk yang terkunci.
+func saleProductSnapshotChanged(d domain.SaleDetail, p domain.SaleProductInfo) bool {
+	if math.Abs(d.UnitPrice-p.SellingPrice) > 0.005 {
+		return true
+	}
+	if d.DiscountType != p.DiscountType || math.Abs(d.DiscountValue-p.DiscountValue) > 0.005 {
+		return true
+	}
+	if math.Abs(d.CostUnit-p.AvgCost) > 0.00005 {
+		return true
+	}
+	return d.IsTaxable != p.IsTaxable
 }
 
 func mapSaleDetail(row db.GetSaleDetailsRow) domain.SaleDetail {
@@ -533,32 +658,37 @@ func (r *sqlSaleRepository) GetByID(ctx context.Context, id int64) (*domain.Sale
 	}
 
 	sale := &domain.Sale{
-		ID:             row.ID,
-		SaleNumber:     row.SaleNumber,
-		SaleDate:       row.SaleDate.Time,
-		MemberName:     row.MemberName,
-		TaxType:        row.TaxType,
-		Subtotal:       numericToFloat(row.Subtotal),
-		ItemDiscount:   numericToFloat(row.ItemDiscount),
-		DiscountType:   row.DiscountType,
-		DiscountValue:  numericToFloat(row.DiscountValue),
-		DiscountAmount: numericToFloat(row.DiscountAmount),
-		DppAmount:      numericToFloat(row.DppAmount),
-		TaxAmount:      numericToFloat(row.TaxAmount),
-		TotalAmount:    numericToFloat(row.TotalAmount),
-		PaidAmount:     numericToFloat(row.PaidAmount),
-		ChangeAmount:   numericToFloat(row.ChangeAmount),
-		CostTotal:      numericToFloat(row.CostTotal),
-		PointsEarned:   row.PointsEarned,
-		RedeemPoints:   row.RedeemPoints,
-		RedeemAmount:   numericToFloat(row.RedeemAmount),
-		PaymentStatus:  row.PaymentStatus,
-		Status:         row.Status,
-		Notes:          row.Notes,
-		CreatedAt:      row.CreatedAt.Time,
+		ID:              row.ID,
+		SaleNumber:      row.SaleNumber,
+		SaleDate:        row.SaleDate.Time,
+		MemberName:      row.MemberName,
+		TaxType:         row.TaxType,
+		Subtotal:        numericToFloat(row.Subtotal),
+		ItemDiscount:    numericToFloat(row.ItemDiscount),
+		DiscountType:    row.DiscountType,
+		DiscountValue:   numericToFloat(row.DiscountValue),
+		DiscountAmount:  numericToFloat(row.DiscountAmount),
+		DppAmount:       numericToFloat(row.DppAmount),
+		TaxAmount:       numericToFloat(row.TaxAmount),
+		TotalAmount:     numericToFloat(row.TotalAmount),
+		PaidAmount:      numericToFloat(row.PaidAmount),
+		ChangeAmount:    numericToFloat(row.ChangeAmount),
+		CostTotal:       numericToFloat(row.CostTotal),
+		PointsEarned:    row.PointsEarned,
+		RedeemPoints:    row.RedeemPoints,
+		RedeemAmount:    numericToFloat(row.RedeemAmount),
+		VoucherCode:     row.VoucherCode,
+		VoucherDiscount: numericToFloat(row.VoucherDiscount),
+		PaymentStatus:   row.PaymentStatus,
+		Status:          row.Status,
+		Notes:           row.Notes,
+		CreatedAt:       row.CreatedAt.Time,
 	}
 	if row.MemberID.Valid {
 		sale.MemberID = row.MemberID.Int64
+	}
+	if row.VoucherID.Valid {
+		sale.VoucherID = row.VoucherID.Int64
 	}
 	if row.DueDate.Valid {
 		t := row.DueDate.Time
@@ -599,7 +729,7 @@ func (r *sqlSaleRepository) GetByID(ctx context.Context, id int64) (*domain.Sale
 	return sale, nil
 }
 
-func mapSaleListRow(id int64, saleNumber string, saleDate pgtype.Date, memberID pgtype.Int8, memberName string, total, paid pgtype.Numeric, paymentStatus, status, taxType string, createdAt pgtype.Timestamptz) domain.Sale {
+func mapSaleListRow(id int64, saleNumber string, saleDate pgtype.Date, memberID pgtype.Int8, memberName string, total, paid pgtype.Numeric, voucherCode, paymentStatus, status, taxType string, createdAt pgtype.Timestamptz) domain.Sale {
 	sale := domain.Sale{
 		ID:            id,
 		SaleNumber:    saleNumber,
@@ -607,6 +737,7 @@ func mapSaleListRow(id int64, saleNumber string, saleDate pgtype.Date, memberID 
 		MemberName:    memberName,
 		TotalAmount:   numericToFloat(total),
 		PaidAmount:    numericToFloat(paid),
+		VoucherCode:   voucherCode,
 		PaymentStatus: paymentStatus,
 		Status:        status,
 		TaxType:       taxType,
@@ -647,7 +778,7 @@ func (r *sqlSaleRepository) GetListCursor(ctx context.Context, param domain.Sale
 		}
 		results := make([]domain.Sale, 0, len(rows))
 		for _, v := range rows {
-			results = append(results, mapSaleListRow(v.ID, v.SaleNumber, v.SaleDate, v.MemberID, v.MemberName, v.TotalAmount, v.PaidAmount, v.PaymentStatus, v.Status, v.TaxType, v.CreatedAt))
+			results = append(results, mapSaleListRow(v.ID, v.SaleNumber, v.SaleDate, v.MemberID, v.MemberName, v.TotalAmount, v.PaidAmount, v.VoucherCode, v.PaymentStatus, v.Status, v.TaxType, v.CreatedAt))
 		}
 		for i, j := 0, len(results)-1; i < j; i, j = i+1, j-1 {
 			results[i], results[j] = results[j], results[i]
@@ -666,7 +797,7 @@ func (r *sqlSaleRepository) GetListCursor(ctx context.Context, param domain.Sale
 	}
 	results := make([]domain.Sale, 0, len(rows))
 	for _, v := range rows {
-		results = append(results, mapSaleListRow(v.ID, v.SaleNumber, v.SaleDate, v.MemberID, v.MemberName, v.TotalAmount, v.PaidAmount, v.PaymentStatus, v.Status, v.TaxType, v.CreatedAt))
+		results = append(results, mapSaleListRow(v.ID, v.SaleNumber, v.SaleDate, v.MemberID, v.MemberName, v.TotalAmount, v.PaidAmount, v.VoucherCode, v.PaymentStatus, v.Status, v.TaxType, v.CreatedAt))
 	}
 	return results, total, nil
 }

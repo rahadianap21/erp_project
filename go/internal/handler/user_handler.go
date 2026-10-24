@@ -5,8 +5,10 @@ import (
 	"errors"
 	"go_backend/internal/domain"
 	"go_backend/internal/middleware"
+	"go_backend/internal/middleware/limiter"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
@@ -14,6 +16,9 @@ import (
 
 type UserHandler struct {
 	UserUsecase domain.UserUsecase
+	// LoginEmailLimiter membatasi percobaan login per alamat email, terpisah
+	// dari limit per IP di router. Bisa nil pada test yang tidak membutuhkannya.
+	LoginEmailLimiter *limiter.KeyedLimiter
 }
 
 // 2. STRUCT RESPONSE YANG DIBUTUHKAN FRONTEND
@@ -106,6 +111,20 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.LoginEmailLimiter != nil {
+		emailKey := strings.ToLower(strings.TrimSpace(req.Email))
+		if emailKey == "" {
+			emailKey = "unknown"
+		}
+		if !h.LoginEmailLimiter.Allow(emailKey) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Retry-After", "6")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "Terlalu banyak percobaan login untuk akun ini. Coba beberapa saat lagi."})
+			return
+		}
+	}
+
 	// 1. Panggil Usecase yang kini sudah melakukan query JOIN antara Role dan Permissions
 	token, user, permissions, err := h.UserUsecase.Login(r.Context(), req.Email, req.Password)
 	if err != nil {
@@ -158,11 +177,13 @@ func (h *UserHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"message": "Akses disetujui! Anda berada di area sensitif.",
-		"user_id": auth.UserID,
-		"name":    claims["name"],
-		"email":   claims["email"],
-		"role_id": auth.RoleID,
+		"message":     "Akses disetujui! Anda berada di area sensitif.",
+		"user_id":     auth.UserID,
+		"name":        claims["name"],
+		"email":       claims["email"],
+		"role_id":     auth.RoleID,
+		"app":         auth.App,
+		"permissions": auth.Permissions,
 	})
 }
 

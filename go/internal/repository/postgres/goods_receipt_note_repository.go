@@ -207,10 +207,16 @@ func (r *sqlGRNRepository) CreateGRN(ctx context.Context, in domain.CreateGRNInp
 // Karena transisi status APPROVED->RECEIVED hanya bisa menang sekali, penambahan
 // stok pun otomatis tidak pernah dobel.
 //
+// expectedGRNCount adalah daftar GRN yang jurnalnya sudah diterbitkan usecase.
+// Setelah header dikunci, jumlah GRN di database harus sama. Kalau tidak,
+// berarti ada CreateGRN yang menang balapan di antara pembacaan usecase dan lock
+// ini; GRN tersebut belum berjurnal, jadi penutupan dibatalkan. CreateGRN yang
+// datang setelah lock akan menunggu, lalu ditolak karena status sudah RECEIVED.
+//
 // netCostFactor mengubah nilai terima bruto menjadi harga pokok perolehan per
 // produk. Faktor ini diteruskan sebagai NUMERIC 6 desimal supaya pembagian
 // TAX_INCLUSIVE (1/1.12) tidak kehilangan presisi sebelum sampai ke query.
-func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64) error {
+func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -228,6 +234,14 @@ func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, upda
 	}
 	if lock.Status != "APPROVED" {
 		return domain.ErrGRNPOSalahStatus
+	}
+
+	currentGRNCount, err := qtx.CountGRNsByPOID(ctx, poID)
+	if err != nil {
+		return err
+	}
+	if currentGRNCount != int64(expectedGRNCount) {
+		return domain.ErrGRNReceiptChanged
 	}
 
 	var updatedByPg pgtype.Int8
@@ -386,9 +400,36 @@ func (r *sqlGRNRepository) GetByPOID(ctx context.Context, poID int64) ([]domain.
 	if err != nil {
 		return nil, err
 	}
+	if len(rows) == 0 {
+		return []domain.GoodsReceiptNote{}, nil
+	}
+
+	// Detail seluruh GRN dibaca sekali untuk PO ini. Versi sebelumnya memanggil
+	// GetByID per GRN, sehingga biaya query tumbuh linear terhadap jumlah GRN.
+	detailRows, err := r.q.GetGRNDetailsByPOID(ctx, poID)
+	if err != nil {
+		return nil, err
+	}
+	detailsByGRN := make(map[int64][]domain.GoodsReceiptNoteDetail, len(rows))
+	for _, d := range detailRows {
+		detailsByGRN[d.GrnID] = append(detailsByGRN[d.GrnID], domain.GoodsReceiptNoteDetail{
+			ID:                    d.ID,
+			GRNID:                 d.GrnID,
+			PurchaseOrderDetailID: d.PurchaseOrderDetailID,
+			ProductID:             d.ProductID,
+			SKU:                   d.Sku,
+			ProductName:           d.ProductName,
+			PurchaseUnitKode:      d.PurchaseUnitKode,
+			QtyReceived:           d.QtyReceived,
+			ConversionRate:        d.ConversionRate,
+		})
+	}
+
 	results := make([]domain.GoodsReceiptNote, 0, len(rows))
 	for _, v := range rows {
-		results = append(results, mapGRNRow(v.ID, v.GrnNumber, v.PurchaseOrderID, v.ReceivedDate, v.TotalQty, v.Notes, v.CreatedAt, v.CreatedBy, ""))
+		grn := mapGRNRow(v.ID, v.GrnNumber, v.PurchaseOrderID, v.ReceivedDate, v.TotalQty, v.Notes, v.CreatedAt, v.CreatedBy, "")
+		grn.Items = detailsByGRN[grn.ID]
+		results = append(results, grn)
 	}
 	return results, nil
 }

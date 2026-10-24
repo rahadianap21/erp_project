@@ -51,8 +51,13 @@ func TestLaporanKeuanganMembacaJurnalPosted(t *testing.T) {
 
 	journalRepo := NewSQLJournalRepository(pool)
 	coaRepo := NewSQLChartOfAccountRepository(pool)
+	periodRepo := NewSQLAccountingPeriodRepository(pool)
 	reportRepo := NewSQLAccountingReportRepository(pool)
 	reportUC := usecase.NewAccountingReportUsecase(reportRepo, coaRepo)
+
+	if _, err := periodRepo.EnsureOpen(ctx, 2099, 6, 0); err != nil {
+		t.Fatalf("EnsureOpen periode uji gagal: %v", err)
+	}
 
 	entryNumber := fmt.Sprintf("JV-UJI-LAPORAN-%d", time.Now().UnixNano())
 	entryDate := time.Date(2099, time.June, 15, 0, 0, 0, 0, time.UTC)
@@ -77,6 +82,7 @@ func TestLaporanKeuanganMembacaJurnalPosted(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, `DELETE FROM t_journal_entry_lines WHERE journal_entry_id = $1`, entry.ID)
 		_, _ = pool.Exec(ctx, `DELETE FROM t_journal_entries WHERE id = $1`, entry.ID)
+		_, _ = pool.Exec(ctx, `DELETE FROM m_accounting_periods WHERE period_year = 2099 AND period_month = 6`)
 	})
 
 	from := time.Date(2099, time.January, 1, 0, 0, 0, 0, time.UTC)

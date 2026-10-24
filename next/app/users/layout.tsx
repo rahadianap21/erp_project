@@ -5,5 +5,9 @@ export default async function UsersLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Users Management">{children}</RouteShell>;
+  return (
+    <RouteShell title="Users Management" permission="users:read">
+      {children}
+    </RouteShell>
+  );
 }

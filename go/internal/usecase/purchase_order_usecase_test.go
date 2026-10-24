@@ -167,6 +167,19 @@ func (f *fakeProductRepo) GetByID(ctx context.Context, id int64) (*domain.Produc
 	return p, nil
 }
 
+func (f *fakeProductRepo) GetByIDs(ctx context.Context, ids []int64) ([]domain.Product, error) {
+	if f.getErr != nil {
+		return nil, f.getErr
+	}
+	products := make([]domain.Product, 0, len(ids))
+	for _, id := range ids {
+		if p, ok := f.products[id]; ok {
+			products = append(products, *p)
+		}
+	}
+	return products, nil
+}
+
 func (f *fakeProductRepo) Update(ctx context.Context, prod *domain.Product) error { return nil }
 
 func (f *fakeProductRepo) Delete(ctx context.Context, id int64, deletedBy int64) error { return nil }
@@ -825,6 +838,59 @@ func TestKonflikStatus_PembacaanUlangGagalTetapAman(t *testing.T) {
 	}
 	if conflict.From != poStatusPending {
 		t.Errorf("nilai cadangan harus status lama %s, dapat %s", poStatusPending, conflict.From)
+	}
+}
+
+// TestCreatePO_MenolakBarisTidakSah menjaga validasi yang sama dengan UpdatePO
+// juga berjalan saat dokumen pertama kali diterbitkan. Tanpa ini, klien dapat
+// membuat PO untuk vendor A yang memuat barang vendor B, atau mengirim baris
+// ganda/berkuantitas nol yang baru ditolak oleh database dengan pesan mentah.
+func TestCreatePO_MenolakBarisTidakSah(t *testing.T) {
+	tests := []struct {
+		name        string
+		items       []domain.PurchaseOrderDetail
+		wantErrPart string
+	}{
+		{
+			name:        "barang milik vendor lain",
+			items:       []domain.PurchaseOrderDetail{{ProductID: 9, QtyOrdered: 1}},
+			wantErrPart: "bukan milik rekanan supplier",
+		},
+		{
+			name:        "barang sama dobel",
+			items:       []domain.PurchaseOrderDetail{{ProductID: 4, QtyOrdered: 1}, {ProductID: 4, QtyOrdered: 2}},
+			wantErrPart: "sudah terisi di baris lain",
+		},
+		{
+			name:        "kuantitas nol",
+			items:       []domain.PurchaseOrderDetail{{ProductID: 4, QtyOrdered: 0}},
+			wantErrPart: "lebih besar dari nol",
+		},
+		{
+			name:        "barang belum dipilih",
+			items:       []domain.PurchaseOrderDetail{{ProductID: 0, QtyOrdered: 1}},
+			wantErrPart: "belum dipilih",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			u, poRepo, _ := newUsecase(poStatusPending, 0)
+			po := &domain.PurchaseOrder{
+				SupplierID: supplierID,
+				TaxType:    "NON_PPN",
+				Items:      tc.items,
+			}
+			err := u.CreatePO(context.Background(), po)
+			if err == nil {
+				t.Fatal("baris tidak sah harus ditolak")
+			}
+			if !strings.Contains(err.Error(), tc.wantErrPart) {
+				t.Fatalf("pesan harus memuat %q, dapat %q", tc.wantErrPart, err.Error())
+			}
+			if poRepo.seqCalls != 0 || poRepo.createCalls != 0 {
+				t.Fatalf("nomor/simpan tidak boleh disentuh, seq=%d create=%d", poRepo.seqCalls, poRepo.createCalls)
+			}
+		})
 	}
 }
 

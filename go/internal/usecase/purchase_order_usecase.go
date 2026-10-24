@@ -70,11 +70,44 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 	po.PoDate = now
 	po.Status = "PENDING"
 
+	seenProducts := make(map[int64]bool, len(po.Items))
+	productIDs := make([]int64, 0, len(po.Items))
+	for i, item := range po.Items {
+		if item.ProductID <= 0 {
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang belum dipilih", i+1)
+		}
+		if item.QtyOrdered <= 0 {
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: kuantitas harus lebih besar dari nol", i+1)
+		}
+		if seenProducts[item.ProductID] {
+			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang yang sama sudah terisi di baris lain", i+1)
+		}
+		seenProducts[item.ProductID] = true
+		productIDs = append(productIDs, item.ProductID)
+	}
+
+	// Ambil seluruh produk sekaligus, bukan satu query per baris PO.
+	productList, err := u.productRepo.GetByIDs(ctx, productIDs)
+	if err != nil {
+		return err
+	}
+	productsByID := make(map[int64]domain.Product, len(productList))
+	for _, product := range productList {
+		productsByID[product.ID] = product
+	}
+
 	var totalGrossItems float64 = 0
 	for i, item := range po.Items {
-		productObj, err := u.productRepo.GetByID(ctx, item.ProductID)
-		if err != nil {
-			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
+		productObj, ok := productsByID[item.ProductID]
+		if !ok {
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: produk tidak ditemukan", i+1)
+		}
+
+		// Sama seperti alur koreksi: barang harus milik rekanan PO. Tanpa ini
+		// klien dapat membuat dokumen untuk vendor A yang memuat barang vendor B,
+		// lalu penerimaan dan hutang usaha tercatat pada vendor yang salah.
+		if productObj.SupplierID != po.SupplierID {
+			return domain.NewBusinessRuleError("barang pada baris ke-%d bukan milik rekanan supplier dokumen ini", i+1)
 		}
 
 		po.Items[i].UnitPrice = productObj.PurchasePrice
@@ -271,10 +304,8 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 
 	// Susun detail dari master produk. Rekanan supplier diambil dari dokumen
 	// yang ada, bukan dari payload, karena tidak boleh dialihkan.
-	details := make([]domain.PurchaseOrderDetail, 0, len(req.Items))
-	var totalGrossItems float64
 	seenProducts := make(map[int64]bool, len(req.Items))
-
+	productIDs := make([]int64, 0, len(req.Items))
 	for i, it := range req.Items {
 		if it.ProductID <= 0 {
 			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang belum dipilih", i+1)
@@ -286,10 +317,25 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 			return domain.NewBusinessRuleError("baris ke-%d tidak valid: barang yang sama sudah terisi di baris lain", i+1)
 		}
 		seenProducts[it.ProductID] = true
+		productIDs = append(productIDs, it.ProductID)
+	}
 
-		productObj, err := u.productRepo.GetByID(ctx, it.ProductID)
-		if err != nil {
-			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: %v", i+1, err)
+	// Satu query untuk semua produk, bukan satu query per baris PO.
+	productList, err := u.productRepo.GetByIDs(ctx, productIDs)
+	if err != nil {
+		return err
+	}
+	productsByID := make(map[int64]domain.Product, len(productList))
+	for _, product := range productList {
+		productsByID[product.ID] = product
+	}
+
+	details := make([]domain.PurchaseOrderDetail, 0, len(req.Items))
+	var totalGrossItems float64
+	for i, it := range req.Items {
+		productObj, ok := productsByID[it.ProductID]
+		if !ok {
+			return domain.NewBusinessRuleError("barang pada baris ke-%d tidak valid: produk tidak ditemukan", i+1)
 		}
 
 		// Pengaman integritas: barang harus milik rekanan PO. Tanpa ini klien

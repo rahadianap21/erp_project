@@ -28,9 +28,8 @@ import {
   ReceiptTextIcon,
   Users2Icon,
   CreditCardIcon,
+  TicketPercentIcon,
 } from "lucide-react";
-import Cookies from "js-cookie";
-
 interface SubMenuItem {
   title: string;
   url: string;
@@ -88,6 +87,12 @@ const ALL_MENU_ITEMS: MenuItem[] = [
         url: "/payment-methods",
         icon: CreditCardIcon,
         permission: "payment-methods:read",
+      },
+      {
+        title: "Vouchers",
+        url: "/vouchers",
+        icon: TicketPercentIcon,
+        permission: "vouchers:read",
       },
     ],
   },
@@ -189,75 +194,15 @@ export function AppSidebar({
   initialUser,
   ...props
 }: AppSidebarProps) {
-  const [permissions, setPermissions] = React.useState<string[]>(
-    () => initialPermissions ?? []
+  const permissions = React.useMemo(
+    () => initialPermissions ?? [],
+    [initialPermissions]
   );
-  const [user, setUser] = React.useState<{
-    name: string;
-    email: string;
-    avatar: string;
-  }>(() => ({
+  const user = {
     name: initialUser?.name || "Axion User",
     email: initialUser?.email || "user@axion.erp",
     avatar: initialUser?.avatar || "",
-  }));
-
-  React.useEffect(() => {
-    // Sinkronkan kuki jika ada perubahan di client-side
-    const savedPermissions = Cookies.get("user_permissions");
-    if (savedPermissions) {
-      try {
-        // 1. Lakukan decode URI secara aman
-        const decodedString = decodeURIComponent(savedPermissions);
-
-        // 2. Tambahkan pembersihan spasi/karakter tak terlihat yang merusak JSON
-        const cleanedString = decodedString.trim();
-
-        // 3. Eksekusi parsing JSON
-        const parsed = JSON.parse(cleanedString);
-
-        if (Array.isArray(parsed)) {
-          setPermissions(parsed);
-        }
-      } catch (e) {
-        console.error(
-          "Gagal membaca cookie permissions akibat format rusak:",
-          e
-        );
-
-        // Fallback: Jika string JSON rusak total, coba lakukan parsing manual berbasis pemisahan koma/string biasa
-        try {
-          // Menghilangkan karakter kurung siku [ ] dan tanda kutip jika string berantakan
-          const cleanArrayStr = savedPermissions.replace(/[\[\]"]/g, "");
-          if (cleanArrayStr) {
-            const fallbackList = cleanArrayStr.split(",");
-            setPermissions(fallbackList);
-          }
-        } catch {
-          // Jika fallback juga gagal, set array kosong agar aplikasi tidak crash
-          setPermissions([]);
-        }
-      }
-    }
-
-    const storedEmail = Cookies.get("user_email");
-    const storedName = Cookies.get("user_name");
-    if (storedEmail || storedName) {
-      let displayName = storedName;
-      if (!displayName && storedEmail) {
-        const username = storedEmail.split("@")[0];
-        displayName = username
-          .replace(/[-_.]/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase());
-      }
-
-      setUser({
-        name: displayName || "Admin User",
-        email: storedEmail || "",
-        avatar: "",
-      });
-    }
-  }, []);
+  };
 
   const filteredNavMain = React.useMemo(() => {
     return ALL_MENU_ITEMS.map((parent) => {

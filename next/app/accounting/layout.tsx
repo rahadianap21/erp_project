@@ -5,5 +5,9 @@ export default async function AccountingLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Accounting">{children}</RouteShell>;
+  return (
+    <RouteShell title="Accounting" permission="accounting:read">
+      {children}
+    </RouteShell>
+  );
 }

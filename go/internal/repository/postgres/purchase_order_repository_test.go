@@ -15,8 +15,11 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
+
+	"go_backend/internal/domain"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -120,6 +123,26 @@ func TestTransitionStatus_DuaPuluhPermintaanParalel(t *testing.T) {
 	repo := NewSQLPurchaseOrderRepository(pool)
 	poID := poUji(t, pool, "PARALEL")
 
+	// approved_by punya foreign key ke s_users. Ambil id yang benar-benar ada
+	// supaya hasil test tidak bergantung pada jumlah/urutan data pengguna.
+	userRows, err := pool.Query(context.Background(), `SELECT id FROM s_users ORDER BY id`)
+	if err != nil {
+		t.Fatalf("gagal membaca pengguna: %v", err)
+	}
+	var userIDs []int64
+	for userRows.Next() {
+		var id int64
+		if err := userRows.Scan(&id); err != nil {
+			userRows.Close()
+			t.Fatalf("gagal scan pengguna: %v", err)
+		}
+		userIDs = append(userIDs, id)
+	}
+	userRows.Close()
+	if len(userIDs) == 0 {
+		t.Skip("tidak ada pengguna untuk menguji approve paralel")
+	}
+
 	var (
 		mu       sync.Mutex
 		success  int
@@ -136,7 +159,7 @@ func TestTransitionStatus_DuaPuluhPermintaanParalel(t *testing.T) {
 			<-start // dilepas semua sekaligus supaya balapan benar-benar terjadi
 
 			rows, err := repo.TransitionStatus(context.Background(), poID,
-				[]string{"PENDING"}, nil, "APPROVED", int64(n+1), "")
+				[]string{"PENDING"}, nil, "APPROVED", userIDs[n%len(userIDs)], "")
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -212,5 +235,114 @@ func TestConstraintStatus_MenolakNilaiAsing(t *testing.T) {
 				t.Fatalf("status %q seharusnya ditolak CHECK constraint", tidakSah)
 			}
 		})
+	}
+}
+
+// TestUpdatePO_MenolakStatusBaruSetelahLock meniru race yang tidak bisa ditutup
+// oleh pengecekan usecase saja: usecase sempat membaca PENDING, lalu approve
+// menang balapan. Repository harus membaca ulang status setelah mengunci header
+// dan menolak koreksi, bukan menimpa dokumen yang sudah APPROVED.
+func TestUpdatePO_MenolakStatusBaruSetelahLock(t *testing.T) {
+	pool := newTestPool(t)
+	repo := NewSQLPurchaseOrderRepository(pool)
+	ctx := context.Background()
+	poID := poUji(t, pool, "UPD-LOCK")
+
+	if _, err := pool.Exec(ctx, `UPDATE t_purchase_orders SET total_amount = 100 WHERE id = $1`, poID); err != nil {
+		t.Fatalf("gagal menyiapkan total awal: %v", err)
+	}
+	if rows, err := repo.TransitionStatus(ctx, poID, []string{"PENDING"}, nil, "APPROVED", 1, ""); err != nil || rows != 1 {
+		t.Fatalf("approve harus berhasil, rows=%d err=%v", rows, err)
+	}
+
+	err := repo.Update(ctx, &domain.PurchaseOrder{
+		ID:          poID,
+		TaxType:     "NON_PPN",
+		DppAmount:   999,
+		TotalAmount: 999,
+	})
+	if err == nil {
+		t.Fatal("koreksi PO APPROVED harus ditolak")
+	}
+	var rule *domain.BusinessRuleError
+	if !errors.As(err, &rule) {
+		t.Fatalf("penolakan harus BusinessRuleError, dapat %T: %v", err, err)
+	}
+
+	var total float64
+	var status string
+	if err := pool.QueryRow(ctx,
+		`SELECT total_amount::float8, status FROM t_purchase_orders WHERE id = $1`, poID).
+		Scan(&total, &status); err != nil {
+		t.Fatalf("gagal membaca PO: %v", err)
+	}
+	if total != 100 {
+		t.Fatalf("total tidak boleh berubah setelah approve, dapat %v", total)
+	}
+	if status != "APPROVED" {
+		t.Fatalf("status harus tetap APPROVED, dapat %s", status)
+	}
+}
+
+// TestSoftDeletePO_MenolakStatusBaruSetelahLock menutup race yang sama pada
+// pencabutan: approve yang menang balapan tidak boleh diikuti soft delete.
+func TestSoftDeletePO_MenolakStatusBaruSetelahLock(t *testing.T) {
+	pool := newTestPool(t)
+	repo := NewSQLPurchaseOrderRepository(pool)
+	ctx := context.Background()
+	poID := poUji(t, pool, "DEL-LOCK")
+
+	if rows, err := repo.TransitionStatus(ctx, poID, []string{"PENDING"}, nil, "APPROVED", 1, ""); err != nil || rows != 1 {
+		t.Fatalf("approve harus berhasil, rows=%d err=%v", rows, err)
+	}
+
+	err := repo.SoftDelete(ctx, poID, 1)
+	if err == nil {
+		t.Fatal("pencabutan PO APPROVED harus ditolak")
+	}
+	var rule *domain.BusinessRuleError
+	if !errors.As(err, &rule) {
+		t.Fatalf("penolakan harus BusinessRuleError, dapat %T: %v", err, err)
+	}
+
+	var deleted bool
+	var status string
+	if err := pool.QueryRow(ctx,
+		`SELECT deleted_at IS NOT NULL, status FROM t_purchase_orders WHERE id = $1`, poID).
+		Scan(&deleted, &status); err != nil {
+		t.Fatalf("gagal membaca PO: %v", err)
+	}
+	if deleted {
+		t.Fatal("PO APPROVED tidak boleh ter-soft-delete")
+	}
+	if status != "APPROVED" {
+		t.Fatalf("status harus tetap APPROVED, dapat %s", status)
+	}
+}
+
+// TestUpdatePO_PendingTetapBoleh adalah kontrol positif: lock dan validasi baru
+// tidak boleh memblokir koreksi yang memang masih sah.
+func TestUpdatePO_PendingTetapBoleh(t *testing.T) {
+	pool := newTestPool(t)
+	repo := NewSQLPurchaseOrderRepository(pool)
+	ctx := context.Background()
+	poID := poUji(t, pool, "UPD-OK")
+
+	if err := repo.Update(ctx, &domain.PurchaseOrder{
+		ID:          poID,
+		TaxType:     "NON_PPN",
+		DppAmount:   250,
+		TotalAmount: 250,
+	}); err != nil {
+		t.Fatalf("koreksi PO PENDING harus berhasil: %v", err)
+	}
+
+	var total float64
+	if err := pool.QueryRow(ctx,
+		`SELECT total_amount::float8 FROM t_purchase_orders WHERE id = $1`, poID).Scan(&total); err != nil {
+		t.Fatalf("gagal membaca total: %v", err)
+	}
+	if total != 250 {
+		t.Fatalf("total harus berubah menjadi 250, dapat %v", total)
 	}
 }

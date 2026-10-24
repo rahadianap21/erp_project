@@ -1,4 +1,4 @@
-import { getSessionData } from "@/lib/session";
+import { requirePermission } from "@/lib/dal";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/breadcrumb";
 
 // RouteShell adalah satu-satunya layout halaman ber-sidebar: sidebar + header
-// sticky + breadcrumb. Halaman cukup meneruskan judul (dan opsional aksi
-// header) alih-alih menyalin komposisi ini.
+// sticky + breadcrumb. Halaman cukup meneruskan judul dan permission yang
+// diperlukan; layout akan memverifikasinya ke server sebelum merender konten.
 interface RouteShellProps {
   /** Label breadcrumb terakhir, mis. "Users Management". */
   title: string;
+  /** Permission yang wajib dimiliki untuk membuka halaman ini. */
+  permission: string;
   children: React.ReactNode;
   /** Konten opsional di ujung kanan header (mis. kotak pencarian). */
   headerActions?: React.ReactNode;
@@ -28,14 +30,22 @@ interface RouteShellProps {
 
 export async function RouteShell({
   title,
+  permission,
   children,
   headerActions,
 }: RouteShellProps) {
-  const { permissions, user } = await getSessionData();
+  const session = await requirePermission(permission);
 
   return (
     <SidebarProvider>
-      <AppSidebar initialPermissions={permissions} initialUser={user} />
+      <AppSidebar
+        initialPermissions={session.permissions}
+        initialUser={{
+          name: session.name,
+          email: session.email,
+          avatar: "",
+        }}
+      />
       <SidebarInset className="bg-muted/15 min-h-screen">
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-md transition-[width,height] ease-linear">
           <div className="flex items-center gap-2">

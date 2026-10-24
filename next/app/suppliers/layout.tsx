@@ -5,5 +5,9 @@ export default async function SuppliersLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Suppliers Management">{children}</RouteShell>;
+  return (
+    <RouteShell title="Suppliers Management" permission="suppliers:read">
+      {children}
+    </RouteShell>
+  );
 }

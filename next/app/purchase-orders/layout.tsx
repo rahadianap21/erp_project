@@ -5,5 +5,9 @@ export default async function PurchaseOrdersLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Purchase Orders">{children}</RouteShell>;
+  return (
+    <RouteShell title="Purchase Orders" permission="po:read">
+      {children}
+    </RouteShell>
+  );
 }

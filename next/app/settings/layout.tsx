@@ -5,5 +5,9 @@ export default async function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Pengaturan Pajak">{children}</RouteShell>;
+  return (
+    <RouteShell title="Pengaturan Pajak" permission="settings:read">
+      {children}
+    </RouteShell>
+  );
 }

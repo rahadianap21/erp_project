@@ -1,6 +1,7 @@
 "use client";
 
 import { apiGet, apiPost } from "@/lib/api-client";
+import { createIdempotencyKey } from "@/lib/idempotency";
 import * as React from "react";
 import {
   MinusIcon,
@@ -8,6 +9,7 @@ import {
   ScanLineIcon,
   SearchIcon,
   ShoppingCartIcon,
+  TicketPercentIcon,
   Trash2Icon,
   UserIcon,
   XIcon,
@@ -26,23 +28,18 @@ import {
   POSProduct,
   PaymentDraft,
   Sale,
+  Voucher,
   formatRupiah,
   round2,
 } from "./types";
 
-const DISCOUNT_OPTIONS = [
-  { value: "NONE", label: "Tanpa Diskon" },
-  { value: "PERCENT", label: "Persen (%)" },
-  { value: "AMOUNT", label: "Nominal (Rp)" },
-];
-
 interface Totals {
   subtotal: number;
   itemDiscount: number;
-  invoiceDiscount: number;
   dpp: number;
   tax: number;
   total: number;
+  voucherDiscount: number;
   redeemAmount: number;
   usedPoints: number;
   maxRedeemPoints: number;
@@ -50,24 +47,27 @@ interface Totals {
 }
 
 const POINT_VALUE = 100;
-const POINT_EARN_PER = 100000;
+const POINT_EARN_PER = 10000;
 const REDEEM_MAX_RATIO = 0.5;
 
 function calculateTotals(
   cart: CartLine[],
   taxMode: string,
-  discountType: string,
-  discountValue: number,
   taxRate: number,
   redeemPoints = 0,
-  availablePoints = 0
+  availablePoints = 0,
+  voucher: Voucher | null = null
 ): Totals {
   const lineNet: number[] = [];
   let subtotal = 0;
   let itemDiscount = 0;
   for (const line of cart) {
-    const gross = round2(line.qty * line.unitPrice);
-    const disc = lineDiscount(line.discountType, line.discountValue, gross);
+    const gross = round2(line.qty * line.product.selling_price);
+    const disc = lineDiscount(
+      line.product.discount_type,
+      line.product.discount_value,
+      gross
+    );
     subtotal += gross;
     itemDiscount += disc;
     lineNet.push(round2(gross - disc));
@@ -75,10 +75,21 @@ function calculateTotals(
   subtotal = round2(subtotal);
   itemDiscount = round2(itemDiscount);
 
-  const netBefore = round2(subtotal - itemDiscount);
-  const invoiceDiscount = lineDiscount(discountType, discountValue, netBefore);
-  const invAlloc = allocateProportional(invoiceDiscount, lineNet);
-  const postInvNet = lineNet.map((n, i) => round2(n - invAlloc[i]));
+  // Voucher dihitung dari nilai setelah diskon item lalu dialokasikan
+  // proporsional, sama seperti perhitungan server.
+  let voucherDiscount = 0;
+  if (voucher) {
+    voucherDiscount = voucherDiscountAmount(
+      voucher,
+      round2(subtotal - itemDiscount)
+    );
+    const voucherAlloc = allocateProportional(voucherDiscount, lineNet);
+    for (let i = 0; i < lineNet.length; i++) {
+      lineNet[i] = round2(lineNet[i] - voucherAlloc[i]);
+    }
+  }
+
+  const postInvNet = lineNet;
 
   // Pajak dihitung PER BARIS: hanya produk ber-flag is_taxable yang dikenai PPN.
   const lineTax = (net: number, taxable: boolean) => {
@@ -120,7 +131,7 @@ function calculateTotals(
   return {
     subtotal,
     itemDiscount,
-    invoiceDiscount,
+    voucherDiscount,
     dpp,
     tax,
     total,
@@ -166,6 +177,18 @@ function allocateProportional(total: number, weights: number[]): number[] {
   return out;
 }
 
+function voucherDiscountAmount(voucher: Voucher, base: number): number {
+  if (base <= 0) return 0;
+  if (voucher.discount_type === "PERCENT") {
+    let amount = round2((base * Math.min(Math.max(voucher.discount_value, 0), 100)) / 100);
+    if (voucher.max_discount > 0 && amount > voucher.max_discount) {
+      amount = round2(voucher.max_discount);
+    }
+    return Math.min(amount, base);
+  }
+  return round2(Math.min(Math.max(voucher.discount_value, 0), base));
+}
+
 function lineDiscount(type: string, value: number, base: number): number {
   if (type === "PERCENT") {
     const pct = Math.min(Math.max(value, 0), 100);
@@ -189,15 +212,19 @@ export function PosTerminal() {
   const [memberResults, setMemberResults] = React.useState<Member[]>([]);
   const [showMemberResults, setShowMemberResults] = React.useState(false);
   const [redeemPoints, setRedeemPoints] = React.useState(0);
-
-  const [discountType, setDiscountType] = React.useState("NONE");
-  const [discountValue, setDiscountValue] = React.useState(0);
+  const [voucher, setVoucher] = React.useState<Voucher | null>(null);
+  const [voucherQuery, setVoucherQuery] = React.useState("");
+  const [voucherLoading, setVoucherLoading] = React.useState(false);
 
   const [paymentOpen, setPaymentOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [receipt, setReceipt] = React.useState<Sale | null>(null);
 
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const saleRequestRef = React.useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
 
   const showProducts = search.trim().length > 0;
 
@@ -270,18 +297,32 @@ export function PosTerminal() {
 
   const taxRate = bootstrap?.tax_rate ?? 0.12;
   const taxMode = bootstrap?.tax_mode ?? "INCLUSIVE";
+  const cartSubtotal = React.useMemo(
+    () =>
+      round2(
+        cart.reduce(
+          (sum, line) =>
+            sum + round2(line.qty * line.product.selling_price),
+          0
+        )
+      ),
+    [cart]
+  );
+  // Minimal belanja diukur dari subtotal sebelum diskon item, sama seperti server.
+  const voucherEligible =
+    voucher === null || cartSubtotal + 1e-9 >= voucher.min_purchase;
+  const appliedVoucher = voucherEligible ? voucher : null;
   const totals = React.useMemo(
     () =>
       calculateTotals(
         cart,
         taxMode,
-        discountType,
-        discountValue,
         taxRate,
         redeemPoints,
-        member?.points ?? 0
+        member?.points ?? 0,
+        appliedVoucher
       ),
-    [cart, taxMode, discountType, discountValue, taxRate, redeemPoints, member]
+    [cart, taxMode, taxRate, redeemPoints, member, appliedVoucher]
   );
 
   // Tukar poin tidak sah bila jumlah yang diminta melebihi batas (saldo/50% nota).
@@ -304,16 +345,7 @@ export function PosTerminal() {
           l.product.id === product.id ? { ...l, qty: l.qty + 1 } : l
         );
       }
-      return [
-        ...prev,
-        {
-          product,
-          qty: 1,
-          unitPrice: product.selling_price,
-          discountType: product.discount_type || "NONE",
-          discountValue: product.discount_value || 0,
-        },
-      ];
+      return [...prev, { product, qty: 1 }];
     });
   };
 
@@ -340,21 +372,18 @@ export function PosTerminal() {
 
   const clearCart = () => {
     setCart([]);
-    setDiscountType("NONE");
-    setDiscountValue(0);
     setMember(null);
     setRedeemPoints(0);
     setMemberQuery("");
     setMemberResults([]);
+    setVoucher(null);
+    setVoucherQuery("");
   };
 
   const buildItems = () =>
     cart.map((l) => ({
       product_id: l.product.id,
       qty: l.qty,
-      unit_price: l.unitPrice,
-      discount_type: l.discountType,
-      discount_value: l.discountValue,
     }));
 
   const submitSale = async (payments: PaymentDraft[], notes: string) => {
@@ -371,8 +400,7 @@ export function PosTerminal() {
       const payload = {
         member_id: member?.id ?? 0,
         redeem_points: totals.usedPoints,
-        discount_type: discountType,
-        discount_value: discountValue,
+        voucher_code: appliedVoucher?.code ?? "",
         due_date: null,
         notes,
         items: buildItems(),
@@ -382,7 +410,20 @@ export function PosTerminal() {
           reference_number: p.referenceNumber,
         })),
       };
-      const body = await apiPost<Sale>(`/api/sales`, payload);
+      const fingerprint = JSON.stringify(payload);
+      if (
+        !saleRequestRef.current ||
+        saleRequestRef.current.fingerprint !== fingerprint
+      ) {
+        saleRequestRef.current = {
+          fingerprint,
+          key: createIdempotencyKey(),
+        };
+      }
+      const body = await apiPost<Sale>(`/api/sales`, payload, {
+        headers: { "Idempotency-Key": saleRequestRef.current.key },
+      });
+      saleRequestRef.current = null;
       setPaymentOpen(false);
       setReceipt(body.data);
       clearCart();
@@ -402,6 +443,27 @@ export function PosTerminal() {
     setMemberResults([]);
     setShowMemberResults(false);
     setRedeemPoints(0);
+  };
+
+  const lookupVoucher = async () => {
+    const code = voucherQuery.trim();
+    if (!code) return;
+    setVoucherLoading(true);
+    try {
+      const body = await apiGet<Voucher>(
+        `/api/pos/vouchers?code=${encodeURIComponent(code)}`
+      );
+      if (!body.data) throw new Error("Voucher tidak ditemukan");
+      setVoucher(body.data);
+      setVoucherQuery("");
+      toast.success(`Voucher ${body.data.code} diterapkan`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Voucher tidak dapat dipakai"
+      );
+    } finally {
+      setVoucherLoading(false);
+    }
   };
 
   return (
@@ -590,6 +652,60 @@ export function PosTerminal() {
               ) : null}
             </div>
           )}
+
+          <div className="space-y-1">
+            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+              <TicketPercentIcon className="size-3.5" /> Voucher
+            </Label>
+            {voucher ? (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-blue-900">
+                    {voucher.code}
+                  </p>
+                  <p className="text-[10px] text-blue-700">
+                    {voucher.name} ·{" "}
+                    {voucher.discount_type === "PERCENT"
+                      ? `${voucher.discount_value}%`
+                      : formatRupiah(voucher.discount_value)}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="cursor-pointer text-blue-900"
+                  onClick={() => setVoucher(null)}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <TicketPercentIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={voucherQuery}
+                  onChange={(e) => setVoucherQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      lookupVoucher();
+                    }
+                  }}
+                  placeholder={
+                    voucherLoading ? "Mencari voucher..." : "Scan / ketik kode voucher..."
+                  }
+                  disabled={voucherLoading}
+                  className="h-10 pl-9 font-mono 4xl:h-12 4xl:pl-10 4xl:text-base"
+                />
+              </div>
+            )}
+            {voucher && !voucherEligible && (
+              <p className="text-[10px] font-medium text-rose-600">
+                Minimal belanja {formatRupiah(voucher.min_purchase)} untuk
+                memakai voucher ini.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-4 3xl:p-5 4xl:p-6">
@@ -613,7 +729,7 @@ export function PosTerminal() {
                         {line.product.name}
                       </p>
                       <p className="text-xs text-muted-foreground 4xl:text-sm">
-                        {formatRupiah(line.unitPrice)} /{" "}
+                        {formatRupiah(line.product.selling_price)} /{" "}
                         {line.product.selling_unit || "pcs"}
                       </p>
                     </div>
@@ -651,24 +767,25 @@ export function PosTerminal() {
                     <span className="text-sm font-semibold 4xl:text-base">
                       {formatRupiah(
                         round2(
-                          line.qty * line.unitPrice -
+                          line.qty * line.product.selling_price -
                             lineDiscount(
-                              line.discountType,
-                              line.discountValue,
-                              round2(line.qty * line.unitPrice)
+                              line.product.discount_type,
+                              line.product.discount_value,
+                              round2(line.qty * line.product.selling_price)
                             )
                         )
                       )}
                     </span>
                   </div>
-                  {line.discountType !== "NONE" && line.discountValue > 0 && (
-                    <p className="mt-2 text-xs text-muted-foreground 4xl:text-sm">
-                      Diskon item:{" "}
-                      {line.discountType === "PERCENT"
-                        ? `${line.discountValue}%`
-                        : formatRupiah(line.discountValue)}
-                    </p>
-                  )}
+                  {line.product.discount_type !== "NONE" &&
+                    line.product.discount_value > 0 && (
+                      <p className="mt-2 text-xs text-muted-foreground 4xl:text-sm">
+                        Diskon item:{" "}
+                        {line.product.discount_type === "PERCENT"
+                          ? `${line.product.discount_value}%`
+                          : formatRupiah(line.product.discount_value)}
+                      </p>
+                    )}
                 </div>
               ))}
             </div>
@@ -676,34 +793,6 @@ export function PosTerminal() {
         </div>
 
         <div className="space-y-3 border-t p-4 3xl:p-5 4xl:space-y-4 4xl:p-6">
-          <div className="grid gap-1">
-            <Label className="text-xs text-muted-foreground 4xl:text-sm">
-              Diskon Nota
-            </Label>
-            <div className="flex gap-1">
-              <select
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-                className="h-9 flex-1 rounded-md border bg-background px-2 text-sm 4xl:h-11 4xl:text-base"
-              >
-                {DISCOUNT_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-              {discountType !== "NONE" && (
-                <Input
-                  type="number"
-                  min={0}
-                  value={discountValue}
-                  onChange={(e) => setDiscountValue(Number(e.target.value))}
-                  className="h-9 w-24 text-sm 4xl:h-11 4xl:w-28 4xl:text-base"
-                />
-              )}
-            </div>
-          </div>
-
           <div className="space-y-1 text-sm 4xl:space-y-2 4xl:text-base">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
@@ -711,10 +800,14 @@ export function PosTerminal() {
             </div>
             <div className="flex justify-between text-muted-foreground">
               <span>Diskon</span>
-              <span>
-                -{formatRupiah(totals.itemDiscount + totals.invoiceDiscount)}
-              </span>
+              <span>-{formatRupiah(totals.itemDiscount)}</span>
             </div>
+            {totals.voucherDiscount > 0 && (
+              <div className="flex justify-between text-blue-700">
+                <span>Voucher {voucher?.code}</span>
+                <span>-{formatRupiah(totals.voucherDiscount)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-muted-foreground">
               <span>DPP</span>
               <span>{formatRupiah(totals.dpp)}</span>
@@ -754,7 +847,9 @@ export function PosTerminal() {
             </Button> */}
             <Button
               className="w-full h-14 cursor-pointer text-base 4xl:h-16 4xl:text-lg"
-              disabled={cart.length === 0 || redeemInvalid}
+              disabled={
+                cart.length === 0 || redeemInvalid || !voucherEligible
+              }
               onClick={() => setPaymentOpen(true)}
             >
               Bayar · {formatRupiah(totals.total)}

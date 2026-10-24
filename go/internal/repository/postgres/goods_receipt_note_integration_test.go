@@ -190,12 +190,55 @@ func TestGRNStokBaruBertambahSaatPenerimaanDitutup(t *testing.T) {
 	}
 
 	// Menutup penerimaan baru menambahkan stok.
-	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0); err != nil {
+	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0, 1); err != nil {
 		t.Fatalf("FinishReceiving gagal: %v", err)
 	}
 	stokAkhir, _ := s.stokDanQty(ctx, t, pool)
 	if want := stokAwal + 4*12; stokAkhir != want {
 		t.Fatalf("stok harus %d (%d + 4*12) setelah ditutup, dapat %d", want, stokAwal, stokAkhir)
+	}
+}
+
+// TestGRNFinishMenolakDaftarBerubah membuktikan celah antara pembacaan daftar
+// GRN di usecase dan penutupan stok di repository sudah tertutup. Bila sebuah
+// GRN baru muncul setelah jurnal GRN lama terbit, penutupan harus batal: GRN
+// baru itu belum berjurnal, sehingga stoknya tidak boleh ikut dimasukkan.
+func TestGRNFinishMenolakDaftarBerubah(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+	repo := NewSQLGoodsReceiptNoteRepository(pool)
+
+	s := siapkanSkenarioGRN(t, ctx, pool, 4, 12)
+	stokAwal, _ := s.stokDanQty(ctx, t, pool)
+
+	if _, err := repo.CreateGRN(ctx, s.input(4)); err != nil {
+		t.Fatalf("CreateGRN gagal: %v", err)
+	}
+
+	// usecase membaca 0 GRN, tetapi satu GRN sudah ada saat repository mengunci.
+	err := repo.FinishReceiving(ctx, s.poID, 0, 1.0, 0)
+	if !errors.Is(err, domain.ErrGRNReceiptChanged) {
+		t.Fatalf("harus menolak daftar GRN yang berubah, dapat %v", err)
+	}
+
+	stokSetelahTolak, qtyReceived := s.stokDanQty(ctx, t, pool)
+	if stokSetelahTolak != stokAwal {
+		t.Fatalf("stok tidak boleh berubah saat penutupan ditolak, awal %d jadi %d", stokAwal, stokSetelahTolak)
+	}
+	if qtyReceived != 4 {
+		t.Fatalf("qty_received harus tetap 4, dapat %d", qtyReceived)
+	}
+	if got := statusPO(ctx, pool, s.poID); got != "APPROVED" {
+		t.Fatalf("status PO harus tetap APPROVED, dapat %s", got)
+	}
+
+	// Setelah daftar dibaca ulang, penutupan dengan jumlah yang benar berhasil.
+	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0, 1); err != nil {
+		t.Fatalf("penutupan ulang dengan jumlah GRN benar gagal: %v", err)
+	}
+	stokAkhir, _ := s.stokDanQty(ctx, t, pool)
+	if want := stokAwal + 4*12; stokAkhir != want {
+		t.Fatalf("stok harus %d setelah penutupan ulang, dapat %d", want, stokAkhir)
 	}
 }
 
@@ -387,7 +430,7 @@ func TestGRNGabungDeltaProdukSama(t *testing.T) {
 		t.Fatalf("stok tidak boleh berubah saat GRN dibuat, awal %d jadi %d", stokAwal, stokSetelahGRN)
 	}
 
-	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0); err != nil {
+	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0, 1); err != nil {
 		t.Fatalf("FinishReceiving gagal: %v", err)
 	}
 
@@ -499,7 +542,7 @@ func TestGRNHargaPokokRataRataMenimbangDuaPenerimaan(t *testing.T) {
 	if _, err := repo.CreateGRN(ctx, s.input(10)); err != nil {
 		t.Fatalf("GRN-1 gagal: %v", err)
 	}
-	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0); err != nil {
+	if err := repo.FinishReceiving(ctx, s.poID, 0, 1.0, 1); err != nil {
 		t.Fatalf("FinishReceiving-1 gagal: %v", err)
 	}
 	avg1, stok1 := bacaAvgCostStok(ctx, t, pool, s.productID)
@@ -514,7 +557,7 @@ func TestGRNHargaPokokRataRataMenimbangDuaPenerimaan(t *testing.T) {
 	if _, err := repo.CreateGRN(ctx, po2.input(10)); err != nil {
 		t.Fatalf("GRN-2 gagal: %v", err)
 	}
-	if err := repo.FinishReceiving(ctx, po2.poID, 0, 1.0); err != nil {
+	if err := repo.FinishReceiving(ctx, po2.poID, 0, 1.0, 1); err != nil {
 		t.Fatalf("FinishReceiving-2 gagal: %v", err)
 	}
 	avg2, stok2 := bacaAvgCostStok(ctx, t, pool, s.productID)

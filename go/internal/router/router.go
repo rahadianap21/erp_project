@@ -2,30 +2,117 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
 	"go_backend/internal/config"
 	"go_backend/internal/domain"
 	"go_backend/internal/handler"
 	"go_backend/internal/middleware"
 	"go_backend/internal/middleware/limiter"
-	"net/http"
-	"time"
 
 	"golang.org/x/time/rate"
 )
 
-// RegisterRoutes mengelompokkan dan mendaftarkan seluruh endpoint API sistem
-func RegisterRoutes(cfg *config.Config, resolver domain.PermissionResolver, userHandler *handler.UserHandler, roleHandler *handler.RoleHandler, regionHandler *handler.RegionHandler, supplierHandler *handler.SupplierHandler, bankHandler *handler.BankHandler, catHandler *handler.ProductCategoryHandler, productHandler *handler.ProductHandler, unitHandler *handler.UnitHandler, poHandler *handler.PurchaseOrderHandler, lookupHandler *handler.LookupHandler, grnHandler *handler.GoodsReceiptNoteHandler, dashboardHandler *handler.DashboardHandler, accountingHandler *handler.AccountingHandler, saleHandler *handler.SaleHandler, memberHandler *handler.MemberHandler, paymentMethodHandler *handler.PaymentMethodHandler, settingsHandler *handler.SettingsHandler) {
+const (
+	loginPerMinute  = 5
+	globalPerMinute = 120
+	readPerMinute   = 120
+	writePerMinute  = 30
+	reportPerMinute = 20
+)
+
+func perMinute(n int) rate.Limit {
+	return rate.Every(time.Minute / time.Duration(n))
+}
+
+func writeRateLimited(w http.ResponseWriter, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Retry-After", "1")
+	w.WriteHeader(http.StatusTooManyRequests)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// RegisterRoutes mengelompokkan dan mendaftarkan seluruh endpoint API sistem.
+// Fungsi mengembalikan handler lengkap (sudah dilapisi rate limit global) agar
+// cmd/api bisa memakainya langsung sebagai http.Server.Handler.
+func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.PermissionResolver, userHandler *handler.UserHandler, roleHandler *handler.RoleHandler, regionHandler *handler.RegionHandler, supplierHandler *handler.SupplierHandler, bankHandler *handler.BankHandler, catHandler *handler.ProductCategoryHandler, productHandler *handler.ProductHandler, unitHandler *handler.UnitHandler, poHandler *handler.PurchaseOrderHandler, lookupHandler *handler.LookupHandler, grnHandler *handler.GoodsReceiptNoteHandler, dashboardHandler *handler.DashboardHandler, accountingHandler *handler.AccountingHandler, saleHandler *handler.SaleHandler, memberHandler *handler.MemberHandler, paymentMethodHandler *handler.PaymentMethodHandler, voucherHandler *handler.VoucherHandler, settingsHandler *handler.SettingsHandler) http.Handler {
 	// 0. Terapkan origin CORS dari konfigurasi (default localhost:3000).
 	middleware.SetAllowedOrigin(cfg.CORSOrigin)
 
+	trustedProxies := limiter.ParseTrustedProxies(cfg.TrustedProxies)
+	keyByIP := func(r *http.Request) string {
+		return limiter.ClientIP(r, trustedProxies)
+	}
+
+	// Rate limit berlapis:
+	//   - global per IP: mencegah banjir request sebelum autentikasi;
+	//   - per user untuk baca/tulis/laporan agar satu akun tidak menghabiskan
+	//     kuota pengguna lain.
+	loginLimiter := limiter.NewIPRateLimiter(
+		perMinute(loginPerMinute), loginPerMinute, 5*time.Minute, cfg.TrustedProxies,
+	)
+	globalLimiter := limiter.NewKeyedLimiter(
+		perMinute(globalPerMinute), 30, 5*time.Minute,
+	)
+	readLimiter := limiter.NewKeyedLimiter(
+		perMinute(readPerMinute), 30, 5*time.Minute,
+	)
+	writeLimiter := limiter.NewKeyedLimiter(
+		perMinute(writePerMinute), 10, 5*time.Minute,
+	)
+	reportLimiter := limiter.NewKeyedLimiter(
+		perMinute(reportPerMinute), 5, 5*time.Minute,
+	)
+
+	// protect membungkus handler dengan JWT + resolver permission, lalu
+	// menerapkan bucket per user sesuai jenis request. GetRequestAuth sudah
+	// terisi karena wrapper ini berada di dalam JWTMiddlewareWithResolver.
+	protect := func(next http.HandlerFunc) http.HandlerFunc {
+		limited := func(w http.ResponseWriter, r *http.Request) {
+			auth, ok := middleware.GetRequestAuth(r)
+			if !ok {
+				writeRateLimited(w, "Sesi otorisasi tidak ditemukan")
+				return
+			}
+
+			var bucket *limiter.KeyedLimiter
+			var key string
+			switch {
+			case strings.Contains(r.URL.Path, "/reports/"):
+				bucket = reportLimiter
+				key = fmt.Sprintf("user:%d:report", auth.UserID)
+			case r.Method != http.MethodGet:
+				bucket = writeLimiter
+				key = fmt.Sprintf("user:%d:write", auth.UserID)
+			default:
+				bucket = readLimiter
+				key = fmt.Sprintf("user:%d:read", auth.UserID)
+			}
+
+			if !bucket.Allow(key) {
+				writeRateLimited(w, "Terlalu banyak permintaan. Coba beberapa saat lagi.")
+				return
+			}
+			next(w, r)
+		}
+		return middleware.EnableCORS(
+			middleware.JWTMiddlewareWithResolver(cfg, resolver, limited),
+		)
+	}
+
+	handle := func(path string, h http.HandlerFunc) {
+		mux.HandleFunc(path, h)
+	}
+
 	// 1. Endpoint Otentikasi Publik
-	loginLimiter := limiter.NewIPRateLimiter(rate.Every(time.Second), 5, 5*time.Minute)
-	http.HandleFunc("/api/login", middleware.EnableCORS(loginLimiter.Middleware(userHandler.Login)))
-	http.HandleFunc("/api/logout", middleware.EnableCORS(userHandler.Logout))
+	handle("/api/login", middleware.EnableCORS(loginLimiter.Middleware(userHandler.Login)))
+	handle("/api/logout", middleware.EnableCORS(userHandler.Logout))
 
 	// 2. Endpoint Profil Terproteksi JWT
-	protectedProfileHandler := middleware.JWTMiddlewareWithResolver(cfg, resolver, userHandler.GetProfile)
-	http.HandleFunc("/api/me", middleware.EnableCORS(protectedProfileHandler))
+	handle("/api/me", protect(userHandler.GetProfile))
 
 	// 3. Endpoint Admin Lama (Opsional dipisahkan atau dipertahankan)
 	adminDashboardHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -33,146 +120,109 @@ func RegisterRoutes(cfg *config.Config, resolver domain.PermissionResolver, user
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "Selamat datang Super Admin! Ini area rahasia sistem."})
 	}
-	protectedAdminRoute := middleware.JWTMiddlewareWithResolver(cfg, resolver, func(w http.ResponseWriter, r *http.Request) {
+	handle("/api/admin/dashboard", protect(func(w http.ResponseWriter, r *http.Request) {
 		middleware.RequireRole([]int32{1}, adminDashboardHandler)(w, r)
-	})
-	http.HandleFunc("/api/admin/dashboard", middleware.EnableCORS(protectedAdminRoute))
+	}))
 
 	// 4. Endpoint Utama Modul CRUD Users Terproteksi JWT & RBAC
-	protectedUsersRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, userHandler.UsersCRUDHandler))
-	http.HandleFunc("/api/users", protectedUsersRoute)
+	handle("/api/users", protect(userHandler.UsersCRUDHandler))
 
-	// 5. 🌟 PERBAIKAN UTAMA: Satukan Rute GET, POST, PUT, DELETE Master Peran ke Dalam 1 Alamat Bersih
-	protectedRolesRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, roleHandler.RolesCRUDHandler))
-	http.HandleFunc("/api/roles", protectedRolesRoute)
+	// 5. Satukan Rute GET, POST, PUT, DELETE Master Peran ke Dalam 1 Alamat Bersih
+	handle("/api/roles", protect(roleHandler.RolesCRUDHandler))
 
 	// 6. Jalur Opsi Pengambilan Master Permissions
-	protectedPermsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, roleHandler.GetAllMasterPermissions))
-	http.HandleFunc("/api/permissions", protectedPermsRoute)
+	handle("/api/permissions", protect(roleHandler.GetAllMasterPermissions))
 
 	// Data referensi. Keduanya GET dan dipakai form Supplier (dropdown bank &
 	// wilayah), jadi dijaga permission baca sendiri-sendiri, bukan sekadar JWT.
-	protectedRegionsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, middleware.RequirePermission("regions:read", regionHandler.HandleRegions)))
-	http.HandleFunc("/api/regions", protectedRegionsRoute)
+	handle("/api/regions", protect(middleware.RequirePermission("regions:read", regionHandler.HandleRegions)))
 
-	protectedSuppliersRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, supplierHandler.SuppliersCRUDHandler))
-	http.HandleFunc("/api/suppliers", protectedSuppliersRoute)
+	handle("/api/suppliers", protect(supplierHandler.SuppliersCRUDHandler))
 
-	protectedBanksRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, middleware.RequirePermission("banks:read", bankHandler.HandleGetBanks)))
-	http.HandleFunc("/api/banks", protectedBanksRoute)
+	handle("/api/banks", protect(middleware.RequirePermission("banks:read", bankHandler.HandleGetBanks)))
 
-	protectedCatsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, catHandler.CategoriesCRUDHandler))
-	http.HandleFunc("/api/categories", protectedCatsRoute)
+	handle("/api/categories", protect(catHandler.CategoriesCRUDHandler))
 
-	protectedProductRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, productHandler.ProductsCRUDHandler))
-	http.HandleFunc("/api/products", protectedProductRoute)
+	handle("/api/products", protect(productHandler.ProductsCRUDHandler))
 
-	protectedUnitsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, unitHandler.HandleGetUnits))
-	http.HandleFunc("/api/units", protectedUnitsRoute)
+	handle("/api/units", protect(unitHandler.HandleGetUnits))
 
-	protectedPORoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, poHandler.HandlePurchaseOrders))
-	http.HandleFunc("/api/purchase-orders", protectedPORoute)
+	handle("/api/purchase-orders", protect(poHandler.HandlePurchaseOrders))
 
 	// Sub-rute aksi dokumen PO. Terpisah dari /api/purchase-orders karena frontend
 	// memanggilnya lewat path sendiri; method tetap PUT + penanda ?id=.
-	protectedPOApproveRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, poHandler.HandleApprovePO))
-	http.HandleFunc("/api/purchase-orders/approve", protectedPOApproveRoute)
+	handle("/api/purchase-orders/approve", protect(poHandler.HandleApprovePO))
 
-	protectedPOCancelRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, poHandler.HandleCancelPO))
-	http.HandleFunc("/api/purchase-orders/cancel", protectedPOCancelRoute)
-	protectedPORejectRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, poHandler.HandleRejectPO))
-	http.HandleFunc("/api/purchase-orders/reject", protectedPORejectRoute)
-	http.HandleFunc("/api/goods-receipt-notes", protectedGRNsRoute(cfg, resolver, grnHandler))
-	http.HandleFunc("/api/purchase-orders/finish-receiving", protectedPOFinishReceivingRoute(cfg, resolver, grnHandler))
+	handle("/api/purchase-orders/cancel", protect(poHandler.HandleCancelPO))
+	handle("/api/purchase-orders/reject", protect(poHandler.HandleRejectPO))
+	handle("/api/goods-receipt-notes", protect(grnHandler.HandleGRNs))
+	handle("/api/purchase-orders/finish-receiving", protect(grnHandler.HandleFinishReceiving))
 
 	// 12. Lookup ringkasan untuk form Purchase Order. Dipisah dari /api/suppliers
 	// dan /api/products agar form PO tidak bergantung pada permission modul master.
-	protectedPOSupplierLookupRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, lookupHandler.HandleLookupSuppliers))
-	http.HandleFunc("/api/po-lookup/suppliers", protectedPOSupplierLookupRoute)
+	handle("/api/po-lookup/suppliers", protect(lookupHandler.HandleLookupSuppliers))
 
-	protectedPOProductLookupRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, lookupHandler.HandleLookupProducts))
-	http.HandleFunc("/api/po-lookup/products", protectedPOProductLookupRoute)
+	handle("/api/po-lookup/products", protect(lookupHandler.HandleLookupProducts))
 
 	// 13. Agregat ringkas dashboard. Cukup JWT tanpa permission modul karena
 	// halaman Dashboard tampil untuk semua pengguna yang sudah login.
-	protectedDashboardRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, middleware.RequirePermission("dashboard:read", dashboardHandler.HandleDashboard)))
-	http.HandleFunc("/api/dashboard", protectedDashboardRoute)
+	handle("/api/dashboard", protect(middleware.RequirePermission("dashboard:read", dashboardHandler.HandleDashboard)))
 
 	// 14. Modul Akuntansi — bagan akun, periode fiskal, jurnal umum.
-	protectedCoaRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.AccountsCRUDHandler))
-	http.HandleFunc("/api/chart-of-accounts", protectedCoaRoute)
+	handle("/api/chart-of-accounts", protect(accountingHandler.AccountsCRUDHandler))
 
-	protectedPeriodsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.PeriodsCRUDHandler))
-	http.HandleFunc("/api/accounting-periods", protectedPeriodsRoute)
+	handle("/api/accounting-periods", protect(accountingHandler.PeriodsCRUDHandler))
 
-	protectedPeriodCloseRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleClosePeriod))
-	http.HandleFunc("/api/accounting-periods/close", protectedPeriodCloseRoute)
+	handle("/api/accounting-periods/close", protect(accountingHandler.HandleClosePeriod))
 
-	protectedPeriodReopenRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleReopenPeriod))
-	http.HandleFunc("/api/accounting-periods/reopen", protectedPeriodReopenRoute)
+	handle("/api/accounting-periods/reopen", protect(accountingHandler.HandleReopenPeriod))
 
-	protectedJournalsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.JournalsCRUDHandler))
-	http.HandleFunc("/api/journals", protectedJournalsRoute)
+	handle("/api/journals", protect(accountingHandler.JournalsCRUDHandler))
 
-	protectedJournalPostRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandlePostJournal))
-	http.HandleFunc("/api/journals/post", protectedJournalPostRoute)
+	handle("/api/journals/post", protect(accountingHandler.HandlePostJournal))
 
-	protectedJournalVoidRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleVoidJournal))
-	http.HandleFunc("/api/journals/void", protectedJournalVoidRoute)
+	handle("/api/journals/void", protect(accountingHandler.HandleVoidJournal))
 
-	protectedJournalReverseRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleReverseJournal))
-	http.HandleFunc("/api/journals/reverse", protectedJournalReverseRoute)
+	handle("/api/journals/reverse", protect(accountingHandler.HandleReverseJournal))
 
 	// 14b. Laporan keuangan — hanya membaca jurnal berstatus POSTED dan hanya
 	// menuntut accounting:read.
-	protectedBalanceSheetRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleBalanceSheet))
-	http.HandleFunc("/api/accounting/reports/balance-sheet", protectedBalanceSheetRoute)
+	handle("/api/accounting/reports/balance-sheet", protect(accountingHandler.HandleBalanceSheet))
 
-	protectedIncomeStatementRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleIncomeStatement))
-	http.HandleFunc("/api/accounting/reports/income-statement", protectedIncomeStatementRoute)
+	handle("/api/accounting/reports/income-statement", protect(accountingHandler.HandleIncomeStatement))
 
-	protectedTrialBalanceRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleTrialBalance))
-	http.HandleFunc("/api/accounting/reports/trial-balance", protectedTrialBalanceRoute)
+	handle("/api/accounting/reports/trial-balance", protect(accountingHandler.HandleTrialBalance))
 
-	protectedGeneralLedgerRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, accountingHandler.HandleGeneralLedger))
-	http.HandleFunc("/api/accounting/reports/general-ledger", protectedGeneralLedgerRoute)
+	handle("/api/accounting/reports/general-ledger", protect(accountingHandler.HandleGeneralLedger))
 
 	// 15. Modul Penjualan & POS — master member, metode pembayaran, nota
 	// penjualan, dan endpoint khusus layar kasir.
-	protectedMembersRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, memberHandler.MembersCRUDHandler))
-	http.HandleFunc("/api/members", protectedMembersRoute)
+	handle("/api/members", protect(memberHandler.MembersCRUDHandler))
 
-	protectedMembersPointsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, memberHandler.MembersPointsHandler))
-	http.HandleFunc("/api/members/points", protectedMembersPointsRoute)
+	handle("/api/members/points", protect(memberHandler.MembersPointsHandler))
 
-	protectedPaymentMethodsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, paymentMethodHandler.PaymentMethodsCRUDHandler))
-	http.HandleFunc("/api/payment-methods", protectedPaymentMethodsRoute)
+	handle("/api/payment-methods", protect(paymentMethodHandler.PaymentMethodsCRUDHandler))
 
-	protectedSalesRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, saleHandler.HandleSales))
-	http.HandleFunc("/api/sales", protectedSalesRoute)
+	handle("/api/vouchers", protect(voucherHandler.VouchersCRUDHandler))
 
-	protectedSaleVoidRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, saleHandler.HandleSaleVoid))
-	http.HandleFunc("/api/sales/void", protectedSaleVoidRoute)
+	handle("/api/sales", protect(saleHandler.HandleSales))
 
-	protectedPOSBootstrapRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, saleHandler.HandlePOSBootstrap))
-	http.HandleFunc("/api/pos/bootstrap", protectedPOSBootstrapRoute)
+	handle("/api/sales/void", protect(saleHandler.HandleSaleVoid))
 
-	protectedPOSProductsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, saleHandler.HandlePOSProducts))
-	http.HandleFunc("/api/pos/products", protectedPOSProductsRoute)
+	handle("/api/pos/bootstrap", protect(saleHandler.HandlePOSBootstrap))
 
-	protectedPOSMembersRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, saleHandler.HandlePOSMembers))
-	http.HandleFunc("/api/pos/members", protectedPOSMembersRoute)
+	handle("/api/pos/products", protect(saleHandler.HandlePOSProducts))
+
+	handle("/api/pos/members", protect(saleHandler.HandlePOSMembers))
+
+	handle("/api/pos/vouchers", protect(voucherHandler.HandlePOSLookupVoucher))
 
 	// 16. Pengaturan aplikasi (tarif PPN & mode harga).
-	protectedSettingsRoute := middleware.EnableCORS(middleware.JWTMiddlewareWithResolver(cfg, resolver, settingsHandler.HandleSettings))
-	http.HandleFunc("/api/settings", protectedSettingsRoute)
-}
-func protectedGRNsRoute(cfg *config.Config, resolver domain.PermissionResolver, grnHandler *handler.GoodsReceiptNoteHandler) http.HandlerFunc {
-	protected := middleware.JWTMiddlewareWithResolver(cfg, resolver, grnHandler.HandleGRNs)
-	return middleware.EnableCORS(protected)
-}
+	handle("/api/settings", protect(settingsHandler.HandleSettings))
 
-func protectedPOFinishReceivingRoute(cfg *config.Config, resolver domain.PermissionResolver, grnHandler *handler.GoodsReceiptNoteHandler) http.HandlerFunc {
-	protected := middleware.JWTMiddlewareWithResolver(cfg, resolver, grnHandler.HandleFinishReceiving)
-	return middleware.EnableCORS(protected)
+	return globalLimiter.Middleware(
+		keyByIP,
+		"Terlalu banyak permintaan. Coba beberapa saat lagi.",
+		mux.ServeHTTP,
+	)
 }

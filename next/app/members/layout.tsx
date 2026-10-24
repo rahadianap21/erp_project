@@ -5,5 +5,9 @@ export default async function MembersLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Master Member">{children}</RouteShell>;
+  return (
+    <RouteShell title="Master Member" permission="members:read">
+      {children}
+    </RouteShell>
+  );
 }

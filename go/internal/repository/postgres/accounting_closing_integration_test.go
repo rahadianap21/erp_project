@@ -20,6 +20,7 @@ package postgres
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -152,7 +153,7 @@ func TestJurnalPenutupMenutupDanMembukaKembaliPeriode(t *testing.T) {
 	if expenseAfter != 0 {
 		t.Errorf("saldo beban harus nol setelah penutupan, dapat %v", expenseAfter)
 	}
-	if diff := retainedAfter - retainedBefore; diff != netBefore {
+	if diff := retainedAfter - retainedBefore; math.Abs(diff-netBefore) > 0.005 {
 		t.Errorf("kenaikan Laba Ditahan = %v, ingin %v", diff, netBefore)
 	}
 

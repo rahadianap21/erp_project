@@ -1,4 +1,4 @@
-import { getSessionData } from "@/lib/session";
+import { requirePermission } from "@/lib/dal";
 import { PosTopbar } from "@/components/pos-topbar";
 
 export const metadata = {
@@ -10,11 +10,11 @@ export default async function PosLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = await getSessionData();
+  const session = await requirePermission("pos:read");
 
   return (
     <div className="flex min-h-svh flex-col bg-muted/30">
-      <PosTopbar user={user} />
+      <PosTopbar user={{ name: session.name, email: session.email }} />
       <main className="flex-1">{children}</main>
     </div>
   );

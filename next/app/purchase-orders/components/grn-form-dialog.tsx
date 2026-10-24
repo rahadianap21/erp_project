@@ -1,7 +1,8 @@
 "use client";
 
 import { apiGet, apiPost, messageFromError } from "@/lib/api-client";
-import { useEffect, useMemo, useState } from "react";
+import { createIdempotencyKey } from "@/lib/idempotency";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Cookies from "js-cookie";
 import { toast } from "sonner";
 import { Loader2, PackageCheck, TriangleAlert } from "lucide-react";
@@ -62,6 +63,9 @@ export function GRNFormDialog({
   // server dan client bisa berbeda, dan itu pemicu hydration mismatch.
   const [receivedDate, setReceivedDate] = useState("");
   const [notes, setNotes] = useState("");
+  const submitRequestRef = useRef<{ fingerprint: string; key: string } | null>(
+    null
+  );
 
   useEffect(() => {
     if (!open || !token) return;
@@ -155,18 +159,32 @@ export function GRNFormDialog({
 
     if (items.length === 0) return;
 
+    const payload = {
+      purchase_order_id: poId,
+      received_date: receivedDate,
+      notes,
+      items,
+    };
+    const fingerprint = JSON.stringify(payload);
+    if (
+      !submitRequestRef.current ||
+      submitRequestRef.current.fingerprint !== fingerprint
+    ) {
+      submitRequestRef.current = {
+        fingerprint,
+        key: createIdempotencyKey(),
+      };
+    }
+
     setSubmitting(true);
     try {
       const result = await apiPost<{ grn_number?: string }>(
         `/api/goods-receipt-notes`,
-        {
-          purchase_order_id: poId,
-          received_date: receivedDate,
-          notes,
-          items,
-        }
+        payload,
+        { headers: { "Idempotency-Key": submitRequestRef.current.key } }
       );
 
+      submitRequestRef.current = null;
       toast.success("Penerimaan Barang Tersimpan", {
         description: `Dokumen ${result.data?.grn_number ?? "GRN"} tercatat untuk PO ${poNumber}.`,
       });

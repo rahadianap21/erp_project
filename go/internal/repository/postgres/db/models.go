@@ -217,6 +217,27 @@ type MVillage struct {
 	DeletedBy  pgtype.Int8
 }
 
+type MVoucher struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+	DeletedAt     pgtype.Timestamptz
+	CreatedBy     pgtype.Int8
+	UpdatedBy     pgtype.Int8
+	DeletedBy     pgtype.Int8
+}
+
 type RolePermission struct {
 	RoleID       int32
 	PermissionID int32
@@ -315,6 +336,21 @@ type TGrnNumberCounter struct {
 	LastSeq int64
 }
 
+type TIdempotencyKey struct {
+	ID                  int64
+	UserID              int64
+	Scope               string
+	IdempotencyKey      string
+	RequestHash         string
+	Status              string
+	ResponseStatus      pgtype.Int4
+	ResponseBody        []byte
+	ResponseContentType pgtype.Text
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	ExpiresAt           pgtype.Timestamptz
+}
+
 type TJournalEntry struct {
 	ID              int64
 	EntryNumber     string
@@ -411,37 +447,40 @@ type TPurchaseOrderDetail struct {
 }
 
 type TSale struct {
-	ID             int64
-	SaleNumber     string
-	SaleDate       pgtype.Date
-	MemberID       pgtype.Int8
-	TaxType        string
-	Subtotal       pgtype.Numeric
-	ItemDiscount   pgtype.Numeric
-	DiscountType   string
-	DiscountValue  pgtype.Numeric
-	DiscountAmount pgtype.Numeric
-	DppAmount      pgtype.Numeric
-	TaxAmount      pgtype.Numeric
-	TotalAmount    pgtype.Numeric
-	PaidAmount     pgtype.Numeric
-	ChangeAmount   pgtype.Numeric
-	PointsEarned   int64
-	RedeemPoints   int64
-	RedeemAmount   pgtype.Numeric
-	CostTotal      pgtype.Numeric
-	PaymentStatus  string
-	Status         string
-	DueDate        pgtype.Date
-	Notes          string
-	JournalEntryID pgtype.Int8
-	VoidedAt       pgtype.Timestamptz
-	VoidedBy       pgtype.Int8
-	VoidReason     string
-	CreatedAt      pgtype.Timestamptz
-	UpdatedAt      pgtype.Timestamptz
-	CreatedBy      pgtype.Int8
-	UpdatedBy      pgtype.Int8
+	ID              int64
+	SaleNumber      string
+	SaleDate        pgtype.Date
+	MemberID        pgtype.Int8
+	TaxType         string
+	Subtotal        pgtype.Numeric
+	ItemDiscount    pgtype.Numeric
+	DiscountType    string
+	DiscountValue   pgtype.Numeric
+	DiscountAmount  pgtype.Numeric
+	DppAmount       pgtype.Numeric
+	TaxAmount       pgtype.Numeric
+	TotalAmount     pgtype.Numeric
+	PaidAmount      pgtype.Numeric
+	ChangeAmount    pgtype.Numeric
+	PointsEarned    int64
+	RedeemPoints    int64
+	RedeemAmount    pgtype.Numeric
+	VoucherID       pgtype.Int8
+	VoucherCode     string
+	VoucherDiscount pgtype.Numeric
+	CostTotal       pgtype.Numeric
+	PaymentStatus   string
+	Status          string
+	DueDate         pgtype.Date
+	Notes           string
+	JournalEntryID  pgtype.Int8
+	VoidedAt        pgtype.Timestamptz
+	VoidedBy        pgtype.Int8
+	VoidReason      string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+	CreatedBy       pgtype.Int8
+	UpdatedBy       pgtype.Int8
 }
 
 type TSalesDetail struct {

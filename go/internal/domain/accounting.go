@@ -92,6 +92,23 @@ type AccountingPeriod struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+// AccountingTx adalah permukaan sempit operasi akuntansi yang harus berjalan
+// dalam satu transaksi database. Dipakai oleh tutup/buka buku agar jurnal
+// penutup, pembalik, dan perubahan status periode tidak pernah terpisah.
+type AccountingTx interface {
+	LockPeriod(ctx context.Context, year, month int) (*AccountingPeriod, error)
+	CreatePeriod(ctx context.Context, year, month int, actorID int64) (*AccountingPeriod, error)
+	AccountBalances(ctx context.Context, from, to time.Time) ([]AccountBalance, error)
+	GetAccountsByIDs(ctx context.Context, ids []int64) ([]ChartOfAccount, error)
+	ListAccountingSettings(ctx context.Context) (map[string]int64, error)
+	NextJournalSeq(ctx context.Context, prefix string) (int64, error)
+	GetPostedJournalIDBySource(ctx context.Context, sourceType string, sourceID int64) (int64, error)
+	CreatePostedJournal(ctx context.Context, entry *JournalEntry) error
+	ReverseJournal(ctx context.Context, originalID int64, entryDate time.Time, reason string, actorID int64) (*JournalEntry, error)
+	ClosePeriod(ctx context.Context, year, month, actorID int64) (int64, error)
+	ReopenPeriod(ctx context.Context, year, month int) (int64, error)
+}
+
 // AccountingPeriodRepository mengatur periode fiskal.
 type AccountingPeriodRepository interface {
 	Get(ctx context.Context, year, month int) (*AccountingPeriod, error)
@@ -99,6 +116,9 @@ type AccountingPeriodRepository interface {
 	Close(ctx context.Context, year, month, actorID int64) (int64, error)
 	Reopen(ctx context.Context, year, month int) (int64, error)
 	List(ctx context.Context, limit int) ([]AccountingPeriod, error)
+	// WithTx menjalankan fn dalam satu transaksi dan menyediakan operasi
+	// akuntansi yang terikat pada transaksi tersebut.
+	WithTx(ctx context.Context, fn func(tx AccountingTx) error) error
 }
 
 // AccountingSetting adalah satu baris pemetaan kunci transaksi ke akun CoA.
@@ -257,6 +277,10 @@ type JournalUsecase interface {
 	// periode dibuka kembali. Tidak melakukan apa pun bila periode belum pernah
 	// punya jurnal penutup.
 	ReverseClosingEntry(ctx context.Context, period *AccountingPeriod, actorID int64) error
+	// PostClosingEntryTx dan ReverseClosingEntryTx adalah varian yang memakai
+	// transaksi pemanggil, sehingga status periode dan jurnal tidak terpisah.
+	PostClosingEntryTx(ctx context.Context, tx AccountingTx, period *AccountingPeriod, actorID int64) error
+	ReverseClosingEntryTx(ctx context.Context, tx AccountingTx, period *AccountingPeriod, actorID int64) error
 	// PlanSaleJournal merencanakan jurnal penjualan (bukan menulisnya) agar
 	// repository penjualan dapat menuliskannya dalam transaksi nota yang sama.
 	PlanSaleJournal(ctx context.Context, sale *Sale, paymentAccounts map[int64]int64, actorID int64) (*SaleJournalPlan, error)

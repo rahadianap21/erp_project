@@ -1,13 +1,18 @@
 import { API_BASE_URL } from "@/lib/config";
+import { trustedForwardedFor } from "@/lib/client-ip";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();
+  const forwardedFor = trustedForwardedFor(request.headers);
 
   const res = await fetch(`${API_BASE_URL}/api/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(forwardedFor ? { "X-Forwarded-For": forwardedFor } : {}),
+    },
     body: JSON.stringify({ email, password }),
   });
 

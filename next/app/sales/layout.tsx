@@ -5,5 +5,9 @@ export default async function SalesLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <RouteShell title="Penjualan">{children}</RouteShell>;
+  return (
+    <RouteShell title="Penjualan" permission="sales:read">
+      {children}
+    </RouteShell>
+  );
 }

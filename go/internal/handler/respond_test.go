@@ -27,6 +27,8 @@ func TestStatusForError(t *testing.T) {
 		{"sentinel sale not found", domain.ErrSaleNotFound, http.StatusNotFound},
 		{"sentinel period not found", domain.ErrPeriodNotFound, http.StatusNotFound},
 		{"sentinel sale sudah void", domain.ErrSaleAlreadyVoid, http.StatusConflict},
+		{"sentinel snapshot penjualan berubah", domain.ErrSaleSnapshotChanged, http.StatusConflict},
+		{"sentinel daftar grn berubah", domain.ErrGRNReceiptChanged, http.StatusConflict},
 		{"sentinel nomor po bentrok", domain.ErrNomorPOBentrok, http.StatusConflict},
 		{"sentinel stok tidak cukup", domain.ErrSaleStokTidakCukup, http.StatusUnprocessableEntity},
 		{"sentinel grn ditolak", domain.ErrGRNOverReceipt, http.StatusUnprocessableEntity},

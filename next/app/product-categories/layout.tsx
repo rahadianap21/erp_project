@@ -6,6 +6,11 @@ export default async function ProductCategoriesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <RouteShell title="Product Categories Management">{children}</RouteShell>
+    <RouteShell
+      title="Product Categories Management"
+      permission="categories:read"
+    >
+      {children}
+    </RouteShell>
   );
 }

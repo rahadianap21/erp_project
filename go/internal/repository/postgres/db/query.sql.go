@@ -67,6 +67,28 @@ func (q *Queries) CountChartOfAccounts(ctx context.Context, searchQuery string) 
 	return total_count, err
 }
 
+const countGRNsByPOID = `-- name: CountGRNsByPOID :one
+SELECT COUNT(*)::bigint AS total
+FROM t_goods_receipt_notes g
+WHERE g.purchase_order_id = $1::bigint
+`
+
+// Menghitung GRN yang menempel pada satu PO. Dipakai saat MENUTUP penerimaan
+// untuk memastikan daftar GRN yang jurnalnya sudah diterbitkan usecase masih
+// sama dengan daftar yang stoknya akan ditambahkan repository.
+//
+// Tanpa pemeriksaan ini, GRN baru yang dibuat setelah usecase membaca daftar
+// tetapi sebelum repository mengunci header akan ikut dijumlahkan stoknya
+// padahal jurnalnya belum pernah diterbitkan. Lock header membuat GRN baru
+// setelah pemeriksaan ini menunggu sampai transaksi selesai, lalu ditolak
+// karena status PO sudah RECEIVED.
+func (q *Queries) CountGRNsByPOID(ctx context.Context, purchaseOrderID int64) (int64, error) {
+	row := q.db.QueryRow(ctx, countGRNsByPOID, purchaseOrderID)
+	var total int64
+	err := row.Scan(&total)
+	return total, err
+}
+
 const countGRNsTotal = `-- name: CountGRNsTotal :one
 SELECT COUNT(*) AS total_count
 FROM t_goods_receipt_notes g
@@ -279,6 +301,22 @@ type CountUsersParams struct {
 
 func (q *Queries) CountUsers(ctx context.Context, arg CountUsersParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countUsers, arg.SearchQuery, arg.RoleFilter)
+	var total_count int64
+	err := row.Scan(&total_count)
+	return total_count, err
+}
+
+const countVouchers = `-- name: CountVouchers :one
+SELECT COUNT(*)::bigint AS total_count
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND ($1::text = ''
+       OR name ILIKE '%' || $1::text || '%'
+       OR code ILIKE '%' || $1::text || '%')
+`
+
+func (q *Queries) CountVouchers(ctx context.Context, searchQuery string) (int64, error) {
+	row := q.db.QueryRow(ctx, countVouchers, searchQuery)
 	var total_count int64
 	err := row.Scan(&total_count)
 	return total_count, err
@@ -789,7 +827,8 @@ INSERT INTO t_journal_entries (
     entry_number, entry_date, description, source_type, source_id, source_reference,
     status, total_debit, total_credit, period_year, period_month, reversal_of_id,
     posted_at, posted_by, created_by, updated_by
-) VALUES (
+)
+SELECT
     $1::varchar,
     $2::date,
     $3::text,
@@ -806,7 +845,11 @@ INSERT INTO t_journal_entries (
     $12::bigint,
     $13::bigint,
     $14::bigint
-)
+FROM m_accounting_periods p
+WHERE p.period_year = $9::int
+  AND p.period_month = $10::int
+  AND p.status = 'OPEN'
+FOR SHARE
 RETURNING id, entry_number, entry_date, description, status, total_debit, total_credit,
           period_year, period_month, posted_at, posted_by, voided_at, voided_by,
           void_reason, reversal_of_id, reversed_by_id, created_at, updated_at, created_by
@@ -861,6 +904,11 @@ type CreatePostedJournalEntryHeaderRow struct {
 // source_id) sudah punya jurnal POSTED — memakai unique index parsial itulah
 // auto-posting dijamin idempoten. Pelanggaran pada nomor jurnal meminta
 // pemanggil mengambil nomor berikutnya.
+//
+// INSERT ... SELECT ini juga mengunci baris periode dengan FOR SHARE dan hanya
+// menghasilkan baris bila periode masih OPEN. Dengan begitu penutupan buku yang
+// memegang FOR UPDATE tidak bisa berlomba dengan auto-posting: salah satunya
+// menunggu, dan bila periode sudah ditutup, INSERT tidak menulis apa pun.
 func (q *Queries) CreatePostedJournalEntryHeader(ctx context.Context, arg CreatePostedJournalEntryHeaderParams) (CreatePostedJournalEntryHeaderRow, error) {
 	row := q.db.QueryRow(ctx, createPostedJournalEntryHeader,
 		arg.EntryNumber,
@@ -1198,6 +1246,7 @@ INSERT INTO t_sales (
     subtotal, item_discount, discount_type, discount_value, discount_amount,
     dpp_amount, tax_amount, total_amount, paid_amount, change_amount, cost_total,
     points_earned, redeem_points, redeem_amount,
+    voucher_id, voucher_code, voucher_discount,
     payment_status, status, due_date, notes, created_by, updated_by
 ) VALUES (
     $1::varchar,
@@ -1218,71 +1267,81 @@ INSERT INTO t_sales (
     $16::bigint,
     $17::bigint,
     $18::numeric,
-    $19::varchar,
+    $19::bigint,
     $20::varchar,
-    $21::date,
-    $22::text,
-    $23::bigint,
-    $24::bigint
+    $21::numeric,
+    $22::varchar,
+    $23::varchar,
+    $24::date,
+    $25::text,
+    $26::bigint,
+    $27::bigint
 )
 RETURNING id, sale_number, sale_date, member_id, tax_type, subtotal, item_discount,
           discount_type, discount_value, discount_amount, dpp_amount, tax_amount,
           total_amount, paid_amount, change_amount, cost_total, points_earned, redeem_points,
-          redeem_amount, payment_status, status, due_date, notes, created_at
+          redeem_amount, voucher_id, voucher_code, voucher_discount,
+          payment_status, status, due_date, notes, created_at
 `
 
 type CreateSaleParams struct {
-	SaleNumber     string
-	SaleDate       pgtype.Date
-	MemberID       pgtype.Int8
-	TaxType        string
-	Subtotal       pgtype.Numeric
-	ItemDiscount   pgtype.Numeric
-	DiscountType   string
-	DiscountValue  pgtype.Numeric
-	DiscountAmount pgtype.Numeric
-	DppAmount      pgtype.Numeric
-	TaxAmount      pgtype.Numeric
-	TotalAmount    pgtype.Numeric
-	PaidAmount     pgtype.Numeric
-	ChangeAmount   pgtype.Numeric
-	CostTotal      pgtype.Numeric
-	PointsEarned   int64
-	RedeemPoints   int64
-	RedeemAmount   pgtype.Numeric
-	PaymentStatus  string
-	Status         string
-	DueDate        pgtype.Date
-	Notes          string
-	CreatedBy      pgtype.Int8
-	UpdatedBy      pgtype.Int8
+	SaleNumber      string
+	SaleDate        pgtype.Date
+	MemberID        pgtype.Int8
+	TaxType         string
+	Subtotal        pgtype.Numeric
+	ItemDiscount    pgtype.Numeric
+	DiscountType    string
+	DiscountValue   pgtype.Numeric
+	DiscountAmount  pgtype.Numeric
+	DppAmount       pgtype.Numeric
+	TaxAmount       pgtype.Numeric
+	TotalAmount     pgtype.Numeric
+	PaidAmount      pgtype.Numeric
+	ChangeAmount    pgtype.Numeric
+	CostTotal       pgtype.Numeric
+	PointsEarned    int64
+	RedeemPoints    int64
+	RedeemAmount    pgtype.Numeric
+	VoucherID       pgtype.Int8
+	VoucherCode     string
+	VoucherDiscount pgtype.Numeric
+	PaymentStatus   string
+	Status          string
+	DueDate         pgtype.Date
+	Notes           string
+	CreatedBy       pgtype.Int8
+	UpdatedBy       pgtype.Int8
 }
 
 type CreateSaleRow struct {
-	ID             int64
-	SaleNumber     string
-	SaleDate       pgtype.Date
-	MemberID       pgtype.Int8
-	TaxType        string
-	Subtotal       pgtype.Numeric
-	ItemDiscount   pgtype.Numeric
-	DiscountType   string
-	DiscountValue  pgtype.Numeric
-	DiscountAmount pgtype.Numeric
-	DppAmount      pgtype.Numeric
-	TaxAmount      pgtype.Numeric
-	TotalAmount    pgtype.Numeric
-	PaidAmount     pgtype.Numeric
-	ChangeAmount   pgtype.Numeric
-	CostTotal      pgtype.Numeric
-	PointsEarned   int64
-	RedeemPoints   int64
-	RedeemAmount   pgtype.Numeric
-	PaymentStatus  string
-	Status         string
-	DueDate        pgtype.Date
-	Notes          string
-	CreatedAt      pgtype.Timestamptz
+	ID              int64
+	SaleNumber      string
+	SaleDate        pgtype.Date
+	MemberID        pgtype.Int8
+	TaxType         string
+	Subtotal        pgtype.Numeric
+	ItemDiscount    pgtype.Numeric
+	DiscountType    string
+	DiscountValue   pgtype.Numeric
+	DiscountAmount  pgtype.Numeric
+	DppAmount       pgtype.Numeric
+	TaxAmount       pgtype.Numeric
+	TotalAmount     pgtype.Numeric
+	PaidAmount      pgtype.Numeric
+	ChangeAmount    pgtype.Numeric
+	CostTotal       pgtype.Numeric
+	PointsEarned    int64
+	RedeemPoints    int64
+	RedeemAmount    pgtype.Numeric
+	VoucherID       pgtype.Int8
+	VoucherCode     string
+	VoucherDiscount pgtype.Numeric
+	PaymentStatus   string
+	Status          string
+	DueDate         pgtype.Date
+	Notes           string
+	CreatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) CreateSale(ctx context.Context, arg CreateSaleParams) (CreateSaleRow, error) {
@@ -1305,6 +1364,9 @@ func (q *Queries) CreateSale(ctx context.Context, arg CreateSaleParams) (CreateS
 		arg.PointsEarned,
 		arg.RedeemPoints,
 		arg.RedeemAmount,
+		arg.VoucherID,
+		arg.VoucherCode,
+		arg.VoucherDiscount,
 		arg.PaymentStatus,
 		arg.Status,
 		arg.DueDate,
@@ -1333,6 +1395,9 @@ func (q *Queries) CreateSale(ctx context.Context, arg CreateSaleParams) (CreateS
 		&i.PointsEarned,
 		&i.RedeemPoints,
 		&i.RedeemAmount,
+		&i.VoucherID,
+		&i.VoucherCode,
+		&i.VoucherDiscount,
 		&i.PaymentStatus,
 		&i.Status,
 		&i.DueDate,
@@ -1618,6 +1683,97 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const createVoucher = `-- name: CreateVoucher :one
+
+INSERT INTO m_vouchers (
+    code, name, description, discount_type, discount_value,
+    min_purchase, max_discount, valid_from, valid_until, is_active,
+    created_by, updated_by
+) VALUES (
+    $1::varchar,
+    $2::varchar,
+    $3::text,
+    $4::varchar,
+    $5::numeric,
+    $6::numeric,
+    $7::numeric,
+    $8::date,
+    $9::date,
+    $10::boolean,
+    $11::bigint,
+    $12::bigint
+)
+RETURNING id, code, name, description, discount_type, discount_value,
+          min_purchase, max_discount, valid_from, valid_until, is_active,
+          used_at, created_at
+`
+
+type CreateVoucherParams struct {
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	CreatedBy     pgtype.Int8
+	UpdatedBy     pgtype.Int8
+}
+
+type CreateVoucherRow struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+// ------------------------------ MASTER VOUCHER ---------------------------
+func (q *Queries) CreateVoucher(ctx context.Context, arg CreateVoucherParams) (CreateVoucherRow, error) {
+	row := q.db.QueryRow(ctx, createVoucher,
+		arg.Code,
+		arg.Name,
+		arg.Description,
+		arg.DiscountType,
+		arg.DiscountValue,
+		arg.MinPurchase,
+		arg.MaxDiscount,
+		arg.ValidFrom,
+		arg.ValidUntil,
+		arg.IsActive,
+		arg.CreatedBy,
+		arg.UpdatedBy,
+	)
+	var i CreateVoucherRow
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.DiscountType,
+		&i.DiscountValue,
+		&i.MinPurchase,
+		&i.MaxDiscount,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.IsActive,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const decrementProductStock = `-- name: DecrementProductStock :execrows
 UPDATE m_products
 SET current_stock = current_stock - $1::int,
@@ -1750,9 +1906,9 @@ WHERE purchase_order_id = $1::bigint
 `
 
 // Hapus seluruh baris detail milik satu PO. Dipakai pada alur koreksi: detail
-// diganti utuh (delete + insert) di dalam satu transaksi. Pilihan ini aman karena
-// tidak ada tabel lain yang meng referensi t_purchase_order_details, dan usecase
-// sudah menolak update bila ada baris yang qty_received > 0.
+// diganti utuh (delete + insert) di dalam satu transaksi. Detail GRN
+// mereferensikan baris ini dengan ON DELETE RESTRICT, jadi koreksi baru aman
+// setelah repository memverifikasi qty_received = 0 (artinya belum ada GRN).
 func (q *Queries) DeletePurchaseOrderDetails(ctx context.Context, purchaseOrderID int64) error {
 	_, err := q.db.Exec(ctx, deletePurchaseOrderDetails, purchaseOrderID)
 	return err
@@ -1794,6 +1950,22 @@ WHERE id = $1 AND deleted_at IS NULL
 
 func (q *Queries) DeleteUser(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
+}
+
+const deleteVoucher = `-- name: DeleteVoucher :exec
+UPDATE m_vouchers
+SET deleted_at = NOW(), updated_at = NOW(), deleted_by = $1::bigint
+WHERE id = $2::bigint AND deleted_at IS NULL
+`
+
+type DeleteVoucherParams struct {
+	DeletedBy pgtype.Int8
+	ID        int64
+}
+
+func (q *Queries) DeleteVoucher(ctx context.Context, arg DeleteVoucherParams) error {
+	_, err := q.db.Exec(ctx, deleteVoucher, arg.DeletedBy, arg.ID)
 	return err
 }
 
@@ -1950,6 +2122,91 @@ type GetAccountPeriodRow struct {
 func (q *Queries) GetAccountPeriod(ctx context.Context, arg GetAccountPeriodParams) (GetAccountPeriodRow, error) {
 	row := q.db.QueryRow(ctx, getAccountPeriod, arg.PeriodYear, arg.PeriodMonth)
 	var i GetAccountPeriodRow
+	err := row.Scan(
+		&i.ID,
+		&i.PeriodYear,
+		&i.PeriodMonth,
+		&i.Status,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAccountPeriodForShare = `-- name: GetAccountPeriodForShare :one
+SELECT id, period_year, period_month, status, closed_at, closed_by, created_at, updated_at
+FROM m_accounting_periods
+WHERE period_year = $1::int
+  AND period_month = $2::int
+FOR SHARE
+`
+
+type GetAccountPeriodForShareParams struct {
+	PeriodYear  int32
+	PeriodMonth int32
+}
+
+type GetAccountPeriodForShareRow struct {
+	ID          int64
+	PeriodYear  int32
+	PeriodMonth int32
+	Status      string
+	ClosedAt    pgtype.Timestamptz
+	ClosedBy    pgtype.Int8
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+// Dipakai saat jurnal POSTED/pembalik akan ditulis. Kunci ini kompatibel
+// dengan beberapa penulis paralel, tetapi menunggu transaksi tutup buku yang
+// memegang FOR UPDATE.
+func (q *Queries) GetAccountPeriodForShare(ctx context.Context, arg GetAccountPeriodForShareParams) (GetAccountPeriodForShareRow, error) {
+	row := q.db.QueryRow(ctx, getAccountPeriodForShare, arg.PeriodYear, arg.PeriodMonth)
+	var i GetAccountPeriodForShareRow
+	err := row.Scan(
+		&i.ID,
+		&i.PeriodYear,
+		&i.PeriodMonth,
+		&i.Status,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAccountPeriodForUpdate = `-- name: GetAccountPeriodForUpdate :one
+SELECT id, period_year, period_month, status, closed_at, closed_by, created_at, updated_at
+FROM m_accounting_periods
+WHERE period_year = $1::int
+  AND period_month = $2::int
+FOR UPDATE
+`
+
+type GetAccountPeriodForUpdateParams struct {
+	PeriodYear  int32
+	PeriodMonth int32
+}
+
+type GetAccountPeriodForUpdateRow struct {
+	ID          int64
+	PeriodYear  int32
+	PeriodMonth int32
+	Status      string
+	ClosedAt    pgtype.Timestamptz
+	ClosedBy    pgtype.Int8
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+// Mengunci periode untuk operasi tutup/buka buku. Semua penulisan jurnal pada
+// periode ini memakai FOR SHARE, sehingga tidak bisa melewati status CLOSED.
+func (q *Queries) GetAccountPeriodForUpdate(ctx context.Context, arg GetAccountPeriodForUpdateParams) (GetAccountPeriodForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, getAccountPeriodForUpdate, arg.PeriodYear, arg.PeriodMonth)
+	var i GetAccountPeriodForUpdateRow
 	err := row.Scan(
 		&i.ID,
 		&i.PeriodYear,
@@ -2906,6 +3163,72 @@ func (q *Queries) GetGRNDetails(ctx context.Context, grnID int64) ([]GetGRNDetai
 	return items, nil
 }
 
+const getGRNDetailsByPOID = `-- name: GetGRNDetailsByPOID :many
+SELECT
+    gd.id,
+    gd.grn_id,
+    gd.purchase_order_detail_id,
+    gd.product_id,
+    gd.qty_received,
+    gd.conversion_rate,
+    gd.created_at,
+    p.sku,
+    p.name AS product_name,
+    u.kode AS purchase_unit_kode
+FROM t_goods_receipt_note_details gd
+JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+JOIN m_products p ON p.id = gd.product_id
+JOIN m_units u ON u.id = p.purchase_unit_id
+WHERE g.purchase_order_id = $1::bigint
+ORDER BY gd.grn_id ASC, gd.id ASC
+`
+
+type GetGRNDetailsByPOIDRow struct {
+	ID                    int64
+	GrnID                 int64
+	PurchaseOrderDetailID int64
+	ProductID             int64
+	QtyReceived           int32
+	ConversionRate        int32
+	CreatedAt             pgtype.Timestamp
+	Sku                   string
+	ProductName           string
+	PurchaseUnitKode      string
+}
+
+// Mengambil detail SELURUH GRN milik satu PO dalam satu query. Dipakai saat
+// menutup penerimaan supaya tidak perlu memanggil GetGRNDetails per GRN.
+func (q *Queries) GetGRNDetailsByPOID(ctx context.Context, purchaseOrderID int64) ([]GetGRNDetailsByPOIDRow, error) {
+	rows, err := q.db.Query(ctx, getGRNDetailsByPOID, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetGRNDetailsByPOIDRow
+	for rows.Next() {
+		var i GetGRNDetailsByPOIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GrnID,
+			&i.PurchaseOrderDetailID,
+			&i.ProductID,
+			&i.QtyReceived,
+			&i.ConversionRate,
+			&i.CreatedAt,
+			&i.Sku,
+			&i.ProductName,
+			&i.PurchaseUnitKode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGRNsByPOID = `-- name: GetGRNsByPOID :many
 SELECT
     g.id,
@@ -3614,6 +3937,7 @@ JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
 JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
 WHERE g.purchase_order_id = $2::bigint
 GROUP BY gd.product_id
+ORDER BY gd.product_id ASC
 `
 
 type GetPOReceivedDeltasParams struct {
@@ -3641,6 +3965,10 @@ type GetPOReceivedDeltasRow struct {
 // TAX_EXCLUSIVE karena harga terima di luar PPN, dan 1/(1+PPN) untuk
 // TAX_INCLUSIVE karena harga terima sudah termasuk PPN masukan, yang bukan
 // biaya perolehan barang melainkan tagihan yang diterima kembali.
+// Urutan produk ditentukan secara deterministik supaya penutupan dua PO yang
+// memuat produk sama selalu mengunci baris m_products dalam urutan yang sama.
+// Tanpa ORDER BY, urutan hasil GROUP BY bisa berbeda dan dua transaksi dapat
+// saling menunggu (deadlock) saat menaikkan stok.
 func (q *Queries) GetPOReceivedDeltas(ctx context.Context, arg GetPOReceivedDeltasParams) ([]GetPOReceivedDeltasRow, error) {
 	rows, err := q.db.Query(ctx, getPOReceivedDeltas, arg.NetCostFactor, arg.PurchaseOrderID)
 	if err != nil {
@@ -3694,6 +4022,54 @@ func (q *Queries) GetPaymentMethodByID(ctx context.Context, id int64) (GetPaymen
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getPaymentMethodsByIDs = `-- name: GetPaymentMethodsByIDs :many
+SELECT m.id, m.code, m.name, m.channel, m.account_id, m.is_cash, m.sort_order, m.is_active
+FROM m_payment_methods m
+WHERE m.id = ANY($1::bigint[]) AND m.deleted_at IS NULL
+`
+
+type GetPaymentMethodsByIDsRow struct {
+	ID        int64
+	Code      string
+	Name      string
+	Channel   string
+	AccountID pgtype.Int8
+	IsCash    bool
+	SortOrder int32
+	IsActive  bool
+}
+
+// Mengambil beberapa metode pembayaran sekaligus supaya pemetaan akun pada
+// transaksi penjualan tidak menembak satu query per metode.
+func (q *Queries) GetPaymentMethodsByIDs(ctx context.Context, ids []int64) ([]GetPaymentMethodsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getPaymentMethodsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPaymentMethodsByIDsRow
+	for rows.Next() {
+		var i GetPaymentMethodsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.Channel,
+			&i.AccountID,
+			&i.IsCash,
+			&i.SortOrder,
+			&i.IsActive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getPermissionsByRoleID = `-- name: GetPermissionsByRoleID :many
@@ -4070,6 +4446,109 @@ func (q *Queries) GetProductCategoryByID(ctx context.Context, id int32) (GetProd
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getProductsByIDs = `-- name: GetProductsByIDs :many
+SELECT
+    p.id, p.sku, p.barcode, p.name, p.description, p.category_id, p.supplier_id,
+    p.selling_unit_id, p.purchase_unit_id,
+    p.conversion_rate,
+    c.name as category_name, s.name as supplier_name,
+    u_sell.kode as selling_unit_kode, u_sell.name as selling_unit_name,
+    u_purch.kode as purchase_unit_kode, u_purch.name as purchase_unit_name,
+    p.purchase_price as prod_purchase_price,
+    p.selling_price as prod_selling_price,
+    p.min_stock_level as prod_min_stock,
+    p.discount_type as prod_discount_type,
+    p.discount_value as prod_discount_value,
+    p.current_stock as prod_current_stock,
+    p.avg_cost as prod_avg_cost,
+    p.is_taxable,
+    p.is_active, p.created_at
+FROM m_products p
+LEFT JOIN m_product_categories c ON p.category_id = c.id
+LEFT JOIN m_suppliers s ON p.supplier_id = s.id
+LEFT JOIN m_units u_sell ON p.selling_unit_id = u_sell.id
+LEFT JOIN m_units u_purch ON p.purchase_unit_id = u_purch.id
+WHERE p.id = ANY($1::bigint[]) AND p.deleted_at IS NULL
+`
+
+type GetProductsByIDsRow struct {
+	ID                int64
+	Sku               string
+	Barcode           pgtype.Text
+	Name              string
+	Description       pgtype.Text
+	CategoryID        int32
+	SupplierID        int64
+	SellingUnitID     int32
+	PurchaseUnitID    int32
+	ConversionRate    int32
+	CategoryName      pgtype.Text
+	SupplierName      pgtype.Text
+	SellingUnitKode   pgtype.Text
+	SellingUnitName   pgtype.Text
+	PurchaseUnitKode  pgtype.Text
+	PurchaseUnitName  pgtype.Text
+	ProdPurchasePrice pgtype.Numeric
+	ProdSellingPrice  pgtype.Numeric
+	ProdMinStock      int32
+	ProdDiscountType  string
+	ProdDiscountValue pgtype.Numeric
+	ProdCurrentStock  int32
+	ProdAvgCost       pgtype.Numeric
+	IsTaxable         bool
+	IsActive          bool
+	CreatedAt         pgtype.Timestamptz
+}
+
+// Mengambil beberapa produk sekaligus (satu query) untuk alur yang sebelumnya
+// memanggil GetProductByID per baris, misalnya validasi harga PO.
+func (q *Queries) GetProductsByIDs(ctx context.Context, ids []int64) ([]GetProductsByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getProductsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetProductsByIDsRow
+	for rows.Next() {
+		var i GetProductsByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Sku,
+			&i.Barcode,
+			&i.Name,
+			&i.Description,
+			&i.CategoryID,
+			&i.SupplierID,
+			&i.SellingUnitID,
+			&i.PurchaseUnitID,
+			&i.ConversionRate,
+			&i.CategoryName,
+			&i.SupplierName,
+			&i.SellingUnitKode,
+			&i.SellingUnitName,
+			&i.PurchaseUnitKode,
+			&i.PurchaseUnitName,
+			&i.ProdPurchasePrice,
+			&i.ProdSellingPrice,
+			&i.ProdMinStock,
+			&i.ProdDiscountType,
+			&i.ProdDiscountValue,
+			&i.ProdCurrentStock,
+			&i.ProdAvgCost,
+			&i.IsTaxable,
+			&i.IsActive,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getProductsCursorNext = `-- name: GetProductsCursorNext :many
@@ -4965,6 +5444,7 @@ SELECT
     s.tax_type, s.subtotal, s.item_discount, s.discount_type, s.discount_value,
     s.discount_amount, s.dpp_amount, s.tax_amount, s.total_amount, s.paid_amount,
     s.change_amount, s.cost_total, s.points_earned, s.redeem_points, s.redeem_amount,
+    s.voucher_id, s.voucher_code, s.voucher_discount,
     s.payment_status, s.status, s.due_date, s.notes, s.journal_entry_id,
     s.voided_at, s.void_reason, s.created_at, s.created_by
 FROM t_sales s
@@ -4973,35 +5453,38 @@ WHERE s.id = $1::bigint
 `
 
 type GetSaleByIDRow struct {
-	ID             int64
-	SaleNumber     string
-	SaleDate       pgtype.Date
-	MemberID       pgtype.Int8
-	MemberName     string
-	TaxType        string
-	Subtotal       pgtype.Numeric
-	ItemDiscount   pgtype.Numeric
-	DiscountType   string
-	DiscountValue  pgtype.Numeric
-	DiscountAmount pgtype.Numeric
-	DppAmount      pgtype.Numeric
-	TaxAmount      pgtype.Numeric
-	TotalAmount    pgtype.Numeric
-	PaidAmount     pgtype.Numeric
-	ChangeAmount   pgtype.Numeric
-	CostTotal      pgtype.Numeric
-	PointsEarned   int64
-	RedeemPoints   int64
-	RedeemAmount   pgtype.Numeric
-	PaymentStatus  string
-	Status         string
-	DueDate        pgtype.Date
-	Notes          string
-	JournalEntryID pgtype.Int8
-	VoidedAt       pgtype.Timestamptz
-	VoidReason     string
-	CreatedAt      pgtype.Timestamptz
-	CreatedBy      pgtype.Int8
+	ID              int64
+	SaleNumber      string
+	SaleDate        pgtype.Date
+	MemberID        pgtype.Int8
+	MemberName      string
+	TaxType         string
+	Subtotal        pgtype.Numeric
+	ItemDiscount    pgtype.Numeric
+	DiscountType    string
+	DiscountValue   pgtype.Numeric
+	DiscountAmount  pgtype.Numeric
+	DppAmount       pgtype.Numeric
+	TaxAmount       pgtype.Numeric
+	TotalAmount     pgtype.Numeric
+	PaidAmount      pgtype.Numeric
+	ChangeAmount    pgtype.Numeric
+	CostTotal       pgtype.Numeric
+	PointsEarned    int64
+	RedeemPoints    int64
+	RedeemAmount    pgtype.Numeric
+	VoucherID       pgtype.Int8
+	VoucherCode     string
+	VoucherDiscount pgtype.Numeric
+	PaymentStatus   string
+	Status          string
+	DueDate         pgtype.Date
+	Notes           string
+	JournalEntryID  pgtype.Int8
+	VoidedAt        pgtype.Timestamptz
+	VoidReason      string
+	CreatedAt       pgtype.Timestamptz
+	CreatedBy       pgtype.Int8
 }
 
 func (q *Queries) GetSaleByID(ctx context.Context, id int64) (GetSaleByIDRow, error) {
@@ -5028,6 +5511,9 @@ func (q *Queries) GetSaleByID(ctx context.Context, id int64) (GetSaleByIDRow, er
 		&i.PointsEarned,
 		&i.RedeemPoints,
 		&i.RedeemAmount,
+		&i.VoucherID,
+		&i.VoucherCode,
+		&i.VoucherDiscount,
 		&i.PaymentStatus,
 		&i.Status,
 		&i.DueDate,
@@ -5160,7 +5646,7 @@ func (q *Queries) GetSalePayments(ctx context.Context, saleID int64) ([]GetSaleP
 const getSalesCursorNext = `-- name: GetSalesCursorNext :many
 SELECT
     s.id, s.sale_number, s.sale_date, s.member_id, COALESCE(c.name, '') AS member_name,
-    s.total_amount, s.paid_amount, s.payment_status, s.status, s.tax_type, s.created_at
+    s.total_amount, s.paid_amount, s.voucher_code, s.payment_status, s.status, s.tax_type, s.created_at
 FROM t_sales s
 LEFT JOIN m_members c ON c.id = s.member_id
 WHERE ($1::text = ''
@@ -5187,6 +5673,7 @@ type GetSalesCursorNextRow struct {
 	MemberName    string
 	TotalAmount   pgtype.Numeric
 	PaidAmount    pgtype.Numeric
+	VoucherCode   string
 	PaymentStatus string
 	Status        string
 	TaxType       string
@@ -5215,6 +5702,7 @@ func (q *Queries) GetSalesCursorNext(ctx context.Context, arg GetSalesCursorNext
 			&i.MemberName,
 			&i.TotalAmount,
 			&i.PaidAmount,
+			&i.VoucherCode,
 			&i.PaymentStatus,
 			&i.Status,
 			&i.TaxType,
@@ -5233,7 +5721,7 @@ func (q *Queries) GetSalesCursorNext(ctx context.Context, arg GetSalesCursorNext
 const getSalesCursorPrev = `-- name: GetSalesCursorPrev :many
 SELECT
     s.id, s.sale_number, s.sale_date, s.member_id, COALESCE(c.name, '') AS member_name,
-    s.total_amount, s.paid_amount, s.payment_status, s.status, s.tax_type, s.created_at
+    s.total_amount, s.paid_amount, s.voucher_code, s.payment_status, s.status, s.tax_type, s.created_at
 FROM t_sales s
 LEFT JOIN m_members c ON c.id = s.member_id
 WHERE ($1::text = ''
@@ -5260,6 +5748,7 @@ type GetSalesCursorPrevRow struct {
 	MemberName    string
 	TotalAmount   pgtype.Numeric
 	PaidAmount    pgtype.Numeric
+	VoucherCode   string
 	PaymentStatus string
 	Status        string
 	TaxType       string
@@ -5288,6 +5777,7 @@ func (q *Queries) GetSalesCursorPrev(ctx context.Context, arg GetSalesCursorPrev
 			&i.MemberName,
 			&i.TotalAmount,
 			&i.PaidAmount,
+			&i.VoucherCode,
 			&i.PaymentStatus,
 			&i.Status,
 			&i.TaxType,
@@ -5865,6 +6355,237 @@ func (q *Queries) GetVillagesByDistrictID(ctx context.Context, districtID string
 	return items, nil
 }
 
+const getVoucherByCode = `-- name: GetVoucherByCode :one
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE UPPER(code) = UPPER($1::varchar) AND deleted_at IS NULL
+`
+
+type GetVoucherByCodeRow struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+// Pencarian kode untuk scan barcode; tidak sensitif huruf besar/kecil.
+func (q *Queries) GetVoucherByCode(ctx context.Context, code string) (GetVoucherByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getVoucherByCode, code)
+	var i GetVoucherByCodeRow
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.DiscountType,
+		&i.DiscountValue,
+		&i.MinPurchase,
+		&i.MaxDiscount,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.IsActive,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getVoucherByID = `-- name: GetVoucherByID :one
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE id = $1::bigint AND deleted_at IS NULL
+`
+
+type GetVoucherByIDRow struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) GetVoucherByID(ctx context.Context, id int64) (GetVoucherByIDRow, error) {
+	row := q.db.QueryRow(ctx, getVoucherByID, id)
+	var i GetVoucherByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.DiscountType,
+		&i.DiscountValue,
+		&i.MinPurchase,
+		&i.MaxDiscount,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.IsActive,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getVouchersCursorNext = `-- name: GetVouchersCursorNext :many
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND ($1::text = ''
+       OR name ILIKE '%' || $1::text || '%'
+       OR code ILIKE '%' || $1::text || '%')
+  AND ($2::bigint = 0 OR id < $2::bigint)
+ORDER BY id DESC
+LIMIT $3::int
+`
+
+type GetVouchersCursorNextParams struct {
+	SearchQuery string
+	CursorID    int64
+	ReqLimit    int32
+}
+
+type GetVouchersCursorNextRow struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) GetVouchersCursorNext(ctx context.Context, arg GetVouchersCursorNextParams) ([]GetVouchersCursorNextRow, error) {
+	rows, err := q.db.Query(ctx, getVouchersCursorNext, arg.SearchQuery, arg.CursorID, arg.ReqLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetVouchersCursorNextRow
+	for rows.Next() {
+		var i GetVouchersCursorNextRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.Description,
+			&i.DiscountType,
+			&i.DiscountValue,
+			&i.MinPurchase,
+			&i.MaxDiscount,
+			&i.ValidFrom,
+			&i.ValidUntil,
+			&i.IsActive,
+			&i.UsedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVouchersCursorPrev = `-- name: GetVouchersCursorPrev :many
+SELECT id, code, name, description, discount_type, discount_value,
+       min_purchase, max_discount, valid_from, valid_until, is_active,
+       used_at, created_at
+FROM m_vouchers
+WHERE deleted_at IS NULL
+  AND ($1::text = ''
+       OR name ILIKE '%' || $1::text || '%'
+       OR code ILIKE '%' || $1::text || '%')
+  AND id > $2::bigint
+ORDER BY id ASC
+LIMIT $3::int
+`
+
+type GetVouchersCursorPrevParams struct {
+	SearchQuery string
+	CursorID    int64
+	ReqLimit    int32
+}
+
+type GetVouchersCursorPrevRow struct {
+	ID            int64
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+func (q *Queries) GetVouchersCursorPrev(ctx context.Context, arg GetVouchersCursorPrevParams) ([]GetVouchersCursorPrevRow, error) {
+	rows, err := q.db.Query(ctx, getVouchersCursorPrev, arg.SearchQuery, arg.CursorID, arg.ReqLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetVouchersCursorPrevRow
+	for rows.Next() {
+		var i GetVouchersCursorPrevRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Code,
+			&i.Name,
+			&i.Description,
+			&i.DiscountType,
+			&i.DiscountValue,
+			&i.MinPurchase,
+			&i.MaxDiscount,
+			&i.ValidFrom,
+			&i.ValidUntil,
+			&i.IsActive,
+			&i.UsedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const incrementDetailQtyReceived = `-- name: IncrementDetailQtyReceived :one
 UPDATE t_purchase_order_details
 SET qty_received = qty_received + $1::int
@@ -6196,6 +6917,47 @@ func (q *Queries) ListPaymentMethods(ctx context.Context) ([]ListPaymentMethodsR
 	return items, nil
 }
 
+const lockJournalEntryPeriodForShare = `-- name: LockJournalEntryPeriodForShare :one
+SELECT p.id, p.period_year, p.period_month, p.status, p.closed_at, p.closed_by,
+       p.created_at, p.updated_at
+FROM t_journal_entries j
+JOIN m_accounting_periods p
+  ON p.period_year = j.period_year
+ AND p.period_month = j.period_month
+WHERE j.id = $1::bigint
+  AND p.status = 'OPEN'
+FOR SHARE OF p
+`
+
+type LockJournalEntryPeriodForShareRow struct {
+	ID          int64
+	PeriodYear  int32
+	PeriodMonth int32
+	Status      string
+	ClosedAt    pgtype.Timestamptz
+	ClosedBy    pgtype.Int8
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+// Mengunci periode milik jurnal DRAFT yang akan diposting. Baris jurnal sendiri
+// tidak dikunci di sini karena UPDATE ... status = 'DRAFT' menjadi CAS-nya.
+func (q *Queries) LockJournalEntryPeriodForShare(ctx context.Context, id int64) (LockJournalEntryPeriodForShareRow, error) {
+	row := q.db.QueryRow(ctx, lockJournalEntryPeriodForShare, id)
+	var i LockJournalEntryPeriodForShareRow
+	err := row.Scan(
+		&i.ID,
+		&i.PeriodYear,
+		&i.PeriodMonth,
+		&i.Status,
+		&i.ClosedAt,
+		&i.ClosedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const lockMemberPoints = `-- name: LockMemberPoints :one
 SELECT id, points FROM m_members WHERE id = $1::bigint AND deleted_at IS NULL FOR UPDATE
 `
@@ -6216,6 +6978,7 @@ const lockProductsForSale = `-- name: LockProductsForSale :many
 SELECT id, sku, name, selling_price, current_stock, avg_cost, discount_type, discount_value, is_taxable
 FROM m_products
 WHERE id = ANY($1::bigint[]) AND deleted_at IS NULL
+ORDER BY id
 FOR UPDATE
 `
 
@@ -6263,6 +7026,43 @@ func (q *Queries) LockProductsForSale(ctx context.Context, productIds []int64) (
 	return items, nil
 }
 
+const lockProductsForVoid = `-- name: LockProductsForVoid :many
+SELECT id, current_stock, avg_cost
+FROM m_products
+WHERE id = ANY($1::bigint[])
+ORDER BY id
+FOR UPDATE
+`
+
+type LockProductsForVoidRow struct {
+	ID           int64
+	CurrentStock int32
+	AvgCost      pgtype.Numeric
+}
+
+// Mengunci produk yang stoknya harus dikembalikan saat void, termasuk produk
+// yang sudah dinonaktifkan/di-soft-delete. ORDER BY id menjaga urutan kunci
+// tetap deterministik antar transaksi.
+func (q *Queries) LockProductsForVoid(ctx context.Context, productIds []int64) ([]LockProductsForVoidRow, error) {
+	rows, err := q.db.Query(ctx, lockProductsForVoid, productIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockProductsForVoidRow
+	for rows.Next() {
+		var i LockProductsForVoidRow
+		if err := rows.Scan(&i.ID, &i.CurrentStock, &i.AvgCost); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPurchaseOrderForReceiving = `-- name: LockPurchaseOrderForReceiving :one
 SELECT id, po_number, status
 FROM t_purchase_orders
@@ -6286,8 +7086,34 @@ func (q *Queries) LockPurchaseOrderForReceiving(ctx context.Context, id int64) (
 	return i, err
 }
 
+const lockPurchaseOrderForUpdate = `-- name: LockPurchaseOrderForUpdate :one
+SELECT id, status
+FROM t_purchase_orders
+WHERE id = $1::bigint AND deleted_at IS NULL
+FOR UPDATE
+`
+
+type LockPurchaseOrderForUpdateRow struct {
+	ID     int64
+	Status string
+}
+
+// Mengunci header PO sebelum koreksi/pencabutan. Lock ini diserialkan dengan
+// approve (TransitionPurchaseOrderStatus), pembuatan GRN, dan penutupan
+// penerimaan yang semuanya juga mengunci baris header yang sama.
+//
+// Tanpa lock ini, usecase bisa membaca PENDING lalu request approve menang
+// balapan, tetapi UPDATE detail tetap menimpa dokumen yang sudah APPROVED.
+func (q *Queries) LockPurchaseOrderForUpdate(ctx context.Context, id int64) (LockPurchaseOrderForUpdateRow, error) {
+	row := q.db.QueryRow(ctx, lockPurchaseOrderForUpdate, id)
+	var i LockPurchaseOrderForUpdateRow
+	err := row.Scan(&i.ID, &i.Status)
+	return i, err
+}
+
 const lockSaleForVoid = `-- name: LockSaleForVoid :one
-SELECT s.id, s.sale_number, s.member_id, s.points_earned, s.redeem_points, s.status, s.journal_entry_id
+SELECT s.id, s.sale_number, s.member_id, s.points_earned, s.redeem_points,
+       s.voucher_id, s.status, s.journal_entry_id
 FROM t_sales s
 WHERE s.id = $1::bigint
 FOR UPDATE
@@ -6299,6 +7125,7 @@ type LockSaleForVoidRow struct {
 	MemberID       pgtype.Int8
 	PointsEarned   int64
 	RedeemPoints   int64
+	VoucherID      pgtype.Int8
 	Status         string
 	JournalEntryID pgtype.Int8
 }
@@ -6312,8 +7139,50 @@ func (q *Queries) LockSaleForVoid(ctx context.Context, id int64) (LockSaleForVoi
 		&i.MemberID,
 		&i.PointsEarned,
 		&i.RedeemPoints,
+		&i.VoucherID,
 		&i.Status,
 		&i.JournalEntryID,
+	)
+	return i, err
+}
+
+const lockVoucherForSale = `-- name: LockVoucherForSale :one
+SELECT id, code, discount_type, discount_value, min_purchase, max_discount,
+       valid_from, valid_until, is_active, used_at
+FROM m_vouchers
+WHERE id = $1::bigint AND deleted_at IS NULL
+FOR UPDATE
+`
+
+type LockVoucherForSaleRow struct {
+	ID            int64
+	Code          string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UsedAt        pgtype.Timestamptz
+}
+
+// Mengunci voucher di dalam transaksi nota agar single-use tidak bisa
+// dilanggar oleh dua transaksi bersamaan.
+func (q *Queries) LockVoucherForSale(ctx context.Context, id int64) (LockVoucherForSaleRow, error) {
+	row := q.db.QueryRow(ctx, lockVoucherForSale, id)
+	var i LockVoucherForSaleRow
+	err := row.Scan(
+		&i.ID,
+		&i.Code,
+		&i.DiscountType,
+		&i.DiscountValue,
+		&i.MinPurchase,
+		&i.MaxDiscount,
+		&i.ValidFrom,
+		&i.ValidUntil,
+		&i.IsActive,
+		&i.UsedAt,
 	)
 	return i, err
 }
@@ -6554,6 +7423,25 @@ func (q *Queries) LookupSuppliersForPO(ctx context.Context) ([]LookupSuppliersFo
 	return items, nil
 }
 
+const markVoucherUsed = `-- name: MarkVoucherUsed :execrows
+UPDATE m_vouchers
+SET used_at = NOW(), updated_at = NOW(), updated_by = $1::bigint
+WHERE id = $2::bigint AND used_at IS NULL
+`
+
+type MarkVoucherUsedParams struct {
+	UpdatedBy pgtype.Int8
+	ID        int64
+}
+
+func (q *Queries) MarkVoucherUsed(ctx context.Context, arg MarkVoucherUsedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markVoucherUsed, arg.UpdatedBy, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const nextGRNSeq = `-- name: NextGRNSeq :one
 
 INSERT INTO t_grn_number_counters (prefix, last_seq)
@@ -6676,6 +7564,22 @@ func (q *Queries) PostJournalEntry(ctx context.Context, arg PostJournalEntryPara
 	return result.RowsAffected(), nil
 }
 
+const releaseVoucher = `-- name: ReleaseVoucher :exec
+UPDATE m_vouchers
+SET used_at = NULL, updated_at = NOW(), updated_by = $1::bigint
+WHERE id = $2::bigint
+`
+
+type ReleaseVoucherParams struct {
+	UpdatedBy pgtype.Int8
+	ID        int64
+}
+
+func (q *Queries) ReleaseVoucher(ctx context.Context, arg ReleaseVoucherParams) error {
+	_, err := q.db.Exec(ctx, releaseVoucher, arg.UpdatedBy, arg.ID)
+	return err
+}
+
 const reopenAccountPeriod = `-- name: ReopenAccountPeriod :execrows
 UPDATE m_accounting_periods
 SET status = 'OPEN',
@@ -6700,23 +7604,36 @@ func (q *Queries) ReopenAccountPeriod(ctx context.Context, arg ReopenAccountPeri
 	return result.RowsAffected(), nil
 }
 
-const restoreProductStock = `-- name: RestoreProductStock :exec
+const restoreProductStockWithValuation = `-- name: RestoreProductStockWithValuation :exec
 UPDATE m_products
 SET current_stock = current_stock + $1::int,
+    avg_cost = CASE
+        WHEN current_stock + $1::int > 0
+        THEN (current_stock * avg_cost + $2::numeric)
+             / (current_stock + $1::int)
+        ELSE avg_cost
+    END,
     updated_at = NOW(),
-    updated_by = $2::bigint
-WHERE id = $3::bigint
+    updated_by = $3::bigint
+WHERE id = $4::bigint
 `
 
-type RestoreProductStockParams struct {
+type RestoreProductStockWithValuationParams struct {
 	Qty       int32
+	CostTotal pgtype.Numeric
 	UpdatedBy pgtype.Int8
 	ID        int64
 }
 
-// Pengembalian stok saat penjualan dibatalkan (void).
-func (q *Queries) RestoreProductStock(ctx context.Context, arg RestoreProductStockParams) error {
-	_, err := q.db.Exec(ctx, restoreProductStock, arg.Qty, arg.UpdatedBy, arg.ID)
+// Mengembalikan stok sekaligus nilai persediaan pada harga pokok asli penjualan
+// memakai rata-rata tertimbang. RHS memakai nilai baris SEBELUM update.
+func (q *Queries) RestoreProductStockWithValuation(ctx context.Context, arg RestoreProductStockWithValuationParams) error {
+	_, err := q.db.Exec(ctx, restoreProductStockWithValuation,
+		arg.Qty,
+		arg.CostTotal,
+		arg.UpdatedBy,
+		arg.ID,
+	)
 	return err
 }
 
@@ -6777,13 +7694,15 @@ func (q *Queries) SetSaleJournal(ctx context.Context, arg SetSaleJournalParams) 
 	return err
 }
 
-const softDeletePurchaseOrder = `-- name: SoftDeletePurchaseOrder :exec
+const softDeletePurchaseOrder = `-- name: SoftDeletePurchaseOrder :execrows
 UPDATE t_purchase_orders
 SET
     deleted_at = NOW(),
     updated_at = NOW(),
     updated_by = $1::bigint
-WHERE id = $2::bigint AND deleted_at IS NULL
+WHERE id = $2::bigint
+  AND deleted_at IS NULL
+  AND status = 'PENDING'
 `
 
 type SoftDeletePurchaseOrderParams struct {
@@ -6795,9 +7714,15 @@ type SoftDeletePurchaseOrderParams struct {
 // diisi deleted_at. Seluruh query pembacaan PO sudah memfilter deleted_at IS NULL,
 // jadi dokumen ini langsung hilang dari daftar tanpa merusak riwayat keuangan.
 // Baris detail sengaja dibiarkan agar jejak audit barang tetap utuh.
-func (q *Queries) SoftDeletePurchaseOrder(ctx context.Context, arg SoftDeletePurchaseOrderParams) error {
-	_, err := q.db.Exec(ctx, softDeletePurchaseOrder, arg.UpdatedBy, arg.ID)
-	return err
+//
+// Syarat status=PENDING adalah pagar terakhir setelah header dikunci. Dokumen
+// yang sudah APPROVED/RECEIVED tidak boleh hilang dari daftar aktif.
+func (q *Queries) SoftDeletePurchaseOrder(ctx context.Context, arg SoftDeletePurchaseOrderParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeletePurchaseOrder, arg.UpdatedBy, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const transitionPurchaseOrderStatus = `-- name: TransitionPurchaseOrderStatus :execrows
@@ -7101,7 +8026,9 @@ SET
     notes        = $5::text,
     updated_at   = NOW(),
     updated_by   = $6::bigint
-WHERE id = $7::bigint AND deleted_at IS NULL
+WHERE id = $7::bigint
+  AND deleted_at IS NULL
+  AND status = 'PENDING'
 RETURNING id, po_number, supplier_id, tax_type, dpp_amount, tax_amount, total_amount, status, updated_at
 `
 
@@ -7130,6 +8057,11 @@ type UpdatePurchaseOrderHeaderRow struct {
 // Koreksi header PO. supplier_id SENGAJA tidak disentuh: di form edit kolom
 // supplier terkunci (rekanan tidak boleh dialihkan setelah PO terbit), jadi
 // kueri ini tidak menerima parameter supplier sama sekali.
+//
+// Syarat status=PENDING diulang di sini sebagai pagar terakhir. Pemeriksaan
+// utama dilakukan setelah LockPurchaseOrderForUpdate, tetapi menulis syaratnya
+// juga di statement UPDATE membuat jalur ini tetap aman kalau suatu saat ada
+// pemanggil baru yang lupa mengunci header lebih dulu.
 func (q *Queries) UpdatePurchaseOrderHeader(ctx context.Context, arg UpdatePurchaseOrderHeaderParams) (UpdatePurchaseOrderHeaderRow, error) {
 	row := q.db.QueryRow(ctx, updatePurchaseOrderHeader,
 		arg.TaxType,
@@ -7238,6 +8170,56 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.Name,
 		arg.Email,
 		arg.RoleID,
+		arg.ID,
+	)
+	return err
+}
+
+const updateVoucher = `-- name: UpdateVoucher :exec
+UPDATE m_vouchers SET
+    code = $1::varchar,
+    name = $2::varchar,
+    description = $3::text,
+    discount_type = $4::varchar,
+    discount_value = $5::numeric,
+    min_purchase = $6::numeric,
+    max_discount = $7::numeric,
+    valid_from = $8::date,
+    valid_until = $9::date,
+    is_active = $10::boolean,
+    updated_at = NOW(),
+    updated_by = $11::bigint
+WHERE id = $12::bigint AND deleted_at IS NULL
+`
+
+type UpdateVoucherParams struct {
+	Code          string
+	Name          string
+	Description   string
+	DiscountType  string
+	DiscountValue pgtype.Numeric
+	MinPurchase   pgtype.Numeric
+	MaxDiscount   pgtype.Numeric
+	ValidFrom     pgtype.Date
+	ValidUntil    pgtype.Date
+	IsActive      bool
+	UpdatedBy     pgtype.Int8
+	ID            int64
+}
+
+func (q *Queries) UpdateVoucher(ctx context.Context, arg UpdateVoucherParams) error {
+	_, err := q.db.Exec(ctx, updateVoucher,
+		arg.Code,
+		arg.Name,
+		arg.Description,
+		arg.DiscountType,
+		arg.DiscountValue,
+		arg.MinPurchase,
+		arg.MaxDiscount,
+		arg.ValidFrom,
+		arg.ValidUntil,
+		arg.IsActive,
+		arg.UpdatedBy,
 		arg.ID,
 	)
 	return err

@@ -1,6 +1,7 @@
 "use client";
 
 import { apiGet, apiPost } from "@/lib/api-client";
+import { createIdempotencyKey } from "@/lib/idempotency";
 import * as React from "react";
 import { readPermissionList } from "@/lib/permissions";
 import {
@@ -35,6 +36,8 @@ interface Sale {
   subtotal: number;
   item_discount: number;
   discount_amount: number;
+  voucher_code?: string;
+  voucher_discount?: number;
   dpp_amount: number;
   tax_amount: number;
   total_amount: number;
@@ -74,6 +77,10 @@ export function SalesView() {
   const [detail, setDetail] = React.useState<Sale | null>(null);
   const [voidReason, setVoidReason] = React.useState("");
   const [voiding, setVoiding] = React.useState(false);
+  const voidRequestRef = React.useRef<{
+    fingerprint: string;
+    key: string;
+  } | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -135,9 +142,23 @@ export function SalesView() {
 
   const handleVoid = async () => {
     if (!detail) return;
+    const payload = { reason: voidReason };
+    const fingerprint = `${detail.id}:${voidReason}`;
+    if (
+      !voidRequestRef.current ||
+      voidRequestRef.current.fingerprint !== fingerprint
+    ) {
+      voidRequestRef.current = {
+        fingerprint,
+        key: createIdempotencyKey(),
+      };
+    }
     setVoiding(true);
     try {
-      await apiPost(`/api/sales/void?id=${detail.id}`, { reason: voidReason });
+      await apiPost(`/api/sales/void?id=${detail.id}`, payload, {
+        headers: { "Idempotency-Key": voidRequestRef.current.key },
+      });
+      voidRequestRef.current = null;
       toast.success("Penjualan dibatalkan");
       setDetail(null);
       setVoidReason("");
@@ -322,6 +343,12 @@ export function SalesView() {
                   -{formatRupiah(detail.item_discount + detail.discount_amount)}
                 </span>
               </div>
+              {(detail.voucher_discount ?? 0) > 0 && (
+                <div className="flex justify-between text-blue-600">
+                  <span>Voucher {detail.voucher_code}</span>
+                  <span>-{formatRupiah(detail.voucher_discount ?? 0)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span>PPN</span>
                 <span>{formatRupiah(detail.tax_amount)}</span>

@@ -26,14 +26,16 @@ type fakeGRNRepo struct {
 	finishPOID          int64
 	finishUserID        int64
 	finishNetCostFactor float64
+	finishExpectedGRNs  int
 	finishErr           error
 }
 
-func (f *fakeGRNRepo) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64) error {
+func (f *fakeGRNRepo) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error {
 	f.finishCalls++
 	f.finishPOID = poID
 	f.finishUserID = updatedBy
 	f.finishNetCostFactor = netCostFactor
+	f.finishExpectedGRNs = expectedGRNCount
 	return f.finishErr
 }
 
@@ -164,6 +166,9 @@ func TestFinishReceivingPenuhMenutupPO(t *testing.T) {
 	}
 	if grnRepo.finishUserID != 99 {
 		t.Fatalf("updatedBy harus diteruskan, dapat %d", grnRepo.finishUserID)
+	}
+	if grnRepo.finishExpectedGRNs != 1 {
+		t.Fatalf("jumlah GRN yang sudah berjurnal harus diteruskan, dapat %d", grnRepo.finishExpectedGRNs)
 	}
 }
 
@@ -310,7 +315,11 @@ func (f *fakeGRNPoster) PostGRNJournal(ctx context.Context, grn *domain.GoodsRec
 // TestFinishReceivingMenerbitkanJurnal memastikan penutupan penerimaan menerbitkan
 // jurnal otomatis per GRN.
 func TestFinishReceivingMenerbitkanJurnal(t *testing.T) {
-	grn := domain.GoodsReceiptNote{ID: 1, GRNNumber: "GRN/20261014/0001"}
+	grn := domain.GoodsReceiptNote{
+		ID:        1,
+		GRNNumber: "GRN/20261014/0001",
+		Items:     []domain.GoodsReceiptNoteDetail{{ID: 1, GRNID: 1}},
+	}
 	grnRepo := &fakeGRNRepo{
 		byPO: []domain.GoodsReceiptNote{grn},
 		byID: map[int64]*domain.GoodsReceiptNote{1: &grn},
@@ -330,11 +339,39 @@ func TestFinishReceivingMenerbitkanJurnal(t *testing.T) {
 	}
 }
 
+// TestFinishReceivingGRNHilangMembatalkan memastikan daftar GRN yang sudah
+// dibaca tidak boleh "bolong" saat pembacaan detail. Kalau detail hilang dan
+// usecase diam-diam melanjutkan, repository tetap menambahkan stok untuk GRN
+// itu tanpa jurnal.
+func TestFinishReceivingGRNHilangMembatalkan(t *testing.T) {
+	grnRepo := &fakeGRNRepo{
+		byPO: []domain.GoodsReceiptNote{{ID: 1, GRNNumber: "GRN/20261014/0001"}},
+		byID: map[int64]*domain.GoodsReceiptNote{},
+	}
+	poRepo := &fakeReceivePORepo{po: approvedPO(detail(1, 10, 10)), transitionRows: 1}
+	poster := &fakeGRNPoster{}
+	uc := NewGoodsReceiptNoteUsecase(grnRepo, poRepo, poster)
+
+	if err := uc.FinishReceiving(context.Background(), 7, false, 99); err == nil {
+		t.Fatal("GRN yang hilang saat pembacaan detail harus membatalkan penutupan")
+	}
+	if len(poster.calls) != 0 {
+		t.Fatalf("tidak boleh ada jurnal yang diterbitkan, dapat %v", poster.calls)
+	}
+	if grnRepo.finishCalls != 0 {
+		t.Fatalf("stok tidak boleh berubah, finalisasi %d kali", grnRepo.finishCalls)
+	}
+}
+
 // TestFinishReceivingBatalBilaJurnalGagal menjaga agar stok dan status PO TIDAK
 // berubah ketika jurnal otomatis gagal: pengguna mengulang dan pada akhirnya
 // penerbitan per GRN yang idempoten menyelaraskan buku besar dengan stok.
 func TestFinishReceivingBatalBilaJurnalGagal(t *testing.T) {
-	grn := domain.GoodsReceiptNote{ID: 1, GRNNumber: "GRN/20261014/0001"}
+	grn := domain.GoodsReceiptNote{
+		ID:        1,
+		GRNNumber: "GRN/20261014/0001",
+		Items:     []domain.GoodsReceiptNoteDetail{{ID: 1, GRNID: 1}},
+	}
 	grnRepo := &fakeGRNRepo{
 		byPO: []domain.GoodsReceiptNote{grn},
 		byID: map[int64]*domain.GoodsReceiptNote{1: &grn},
