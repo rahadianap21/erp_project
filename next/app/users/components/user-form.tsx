@@ -128,7 +128,7 @@ export default function UserForm({
 
       {/* Konten Form */}
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[500px] p-6 border-t border-gray-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-gray-100" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} autoComplete="off" className="space-y-5">
           <div

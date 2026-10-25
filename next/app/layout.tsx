@@ -1,6 +1,7 @@
 import { Geist } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ErrorTracker } from "@/components/error-tracker";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionExtender from "@/features/session-extender";
@@ -14,6 +15,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
   colorScheme: "light dark",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f2f5f8" },
@@ -31,6 +35,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <TooltipProvider>
+          <ErrorTracker />
           {children}
           <Toaster richColors position="top-center" />
           <SessionExtender />

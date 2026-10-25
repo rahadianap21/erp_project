@@ -277,7 +277,7 @@ export default function SupplierForm({
 
       {/* Konten Form Ekpansi */}
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[800px] p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none border-t border-slate-100 p-6" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Baris 1: Informasi Kontak Utama */}
@@ -353,7 +353,7 @@ export default function SupplierForm({
           </div>
 
           {/* Baris 3: Cascading Dropdown Regional Indonesia */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 bg-slate-50/40 p-4 rounded-xl border border-slate-100">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50/40 p-4 rounded-xl border border-slate-100">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase">
                 Provinsi

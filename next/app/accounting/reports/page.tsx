@@ -43,7 +43,7 @@ export default function ReportsPage() {
       />
 
       <Tabs defaultValue="balance-sheet" className="gap-4">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-1 md:grid-cols-4">
           {TABS.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
               {tab.label}

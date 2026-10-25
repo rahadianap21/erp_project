@@ -51,8 +51,8 @@ export function SupplierTableSkeleton() {
   return (
     <div className="space-y-4">
       {/* Filter & Search Bar Skeleton */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-4 rounded-xl border shadow-sm">
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card p-4 rounded-xl border shadow-sm">
+        <div className="flex flex-1 flex-col md:flex-row items-stretch md:items-center gap-3">
           <Skeleton className="h-9 flex-1 max-w-md rounded-md" />
           <Skeleton className="h-9 w-44 rounded-md" />
         </div>
@@ -109,7 +109,7 @@ export function SupplierTableSkeleton() {
       </div>
 
       {/* Pagination Skeleton */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-2xs">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-2xs">
         <Skeleton className="h-5 w-48" />
         <div className="flex items-center gap-2">
           <Skeleton className="h-8 w-24 rounded-md" />

@@ -288,6 +288,10 @@ func TestUpdateUserSendiriDiizinkan(t *testing.T) {
 	if r.diperbarui[0].RoleID != 1 {
 		t.Fatalf("RoleID = %d, want 1", r.diperbarui[0].RoleID)
 	}
+	if r.diperbarui[0].ExpectedRoleID != 1 {
+		t.Fatalf("ExpectedRoleID = %d, want 1 (role hasil pemeriksaan)",
+			r.diperbarui[0].ExpectedRoleID)
+	}
 }
 
 // TestAktorTanpaLoginDitolak memastikan Actor kosong tidak bisa sneaking lewat.

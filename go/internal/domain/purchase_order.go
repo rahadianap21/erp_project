@@ -98,7 +98,7 @@ type PurchaseOrderRepository interface {
 	// Update mengoreksi header + mengganti SELURUH baris detail dalam satu transaksi.
 	//
 	// Pemeriksaan status & qty_received di usecase hanya untuk pesan yang ramah.
-	// Implementasi WAJIB mengunci header, lalu membaca ulang kedua syarat itu di
+	// Proses ini WAJIB mengunci header, lalu membaca ulang kedua syarat itu di
 	// dalam transaksi yang sama sebelum menulis. Tanpa itu, approve atau GRN yang
 	// datang bersamaan bisa lolos di antara pengecekan usecase dan penulisan.
 	Update(ctx context.Context, po *PurchaseOrder) error
@@ -106,7 +106,7 @@ type PurchaseOrderRepository interface {
 	// dipakai sebagai pengaman agar koreksi tidak menghapus riwayat penerimaan.
 	CountReceivedQty(ctx context.Context, id int64) (int64, error)
 	// SoftDelete mencabut dokumen dengan mengisi deleted_at, bukan menghapus fisik.
-	// Sama seperti Update, implementasi wajib mengunci header dan memverifikasi
+	// Sama seperti Update, proses ini wajib mengunci header dan memverifikasi
 	// status PENDING serta qty_received = 0 di dalam transaksi.
 	SoftDelete(ctx context.Context, id int64, deletedBy int64) error
 }

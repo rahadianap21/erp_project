@@ -136,7 +136,7 @@ export default function MasterProductsCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b pb-4">
         <div className="space-y-1">
           <h1 className="text-xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Package className="size-5 text-blue-600" /> Katalog Master Barang &

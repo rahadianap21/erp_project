@@ -287,5 +287,9 @@ func (u *userUsecase) UpdateUser(ctx context.Context, actor domain.Actor, id int
 		Name:   name,
 		Email:  email,
 		RoleID: roleID,
+		// Ikutkan role yang baru saja diperiksa. Repository memakai nilai ini
+		// sebagai compare-and-swap agar perubahan role oleh admin lain tidak
+		// lolos di antara pemeriksaan wewenang dan penulisan.
+		ExpectedRoleID: target.RoleID,
 	})
 }

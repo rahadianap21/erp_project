@@ -83,7 +83,7 @@ export function PaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl 4xl:max-w-4xl">
+      <DialogContent className="md:max-w-2xl 4xl:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="4xl:text-2xl">Pembayaran</DialogTitle>
           <DialogDescription className="4xl:text-base">
@@ -93,7 +93,7 @@ export function PaymentDialog({
         </DialogHeader>
 
         <div className="grid gap-4 4xl:gap-5">
-          <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/40 p-3 text-center 4xl:p-4">
+          <div className="grid grid-cols-1 gap-2 rounded-lg border bg-muted/40 p-3 text-center md:grid-cols-3 4xl:p-4">
             <div>
               <p className="text-xs text-muted-foreground 4xl:text-sm">Total</p>
               <p className="text-sm font-semibold 4xl:text-base">
@@ -122,7 +122,7 @@ export function PaymentDialog({
             <Label className="text-xs text-muted-foreground 4xl:text-sm">
               Metode pembayaran
             </Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 4xl:gap-3">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3 4xl:gap-3">
               {payMethods.map((m) => (
                 <Button
                   key={m.id}

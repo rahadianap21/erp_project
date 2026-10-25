@@ -182,7 +182,7 @@ export default function Page() {
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       {/* Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border border-primary/15 shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border border-primary/15 shadow-xs">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
             Axion ERP Command Center
@@ -216,7 +216,7 @@ export default function Page() {
       )}
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-xl border bg-card p-5 shadow-2xs">
@@ -254,7 +254,7 @@ export default function Page() {
       </div>
 
       {/* Quick Actions Shortcuts */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         {QUICK_ACTIONS.map((action) => (
           <Link
             key={action.href}
@@ -293,7 +293,7 @@ export default function Page() {
             </div>
             <Link
               href="/purchase-orders"
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-transparent px-2.5 text-xs font-medium text-primary hover:bg-muted/60 transition-colors"
+              className="inline-flex h-8 max-md:min-h-12 items-center gap-1 rounded-lg border border-transparent px-2.5 text-xs font-medium text-primary hover:bg-muted/60 transition-colors"
             >
               Lihat Semua
               <ArrowUpRightIcon className="size-3" />
@@ -428,7 +428,7 @@ export default function Page() {
               </h2>
               <Link
                 href="/goods-receipt-notes"
-                className="text-[11px] text-primary hover:underline"
+                className="text-[11px] text-primary hover:underline max-md:inline-flex max-md:min-h-12 max-md:items-center"
               >
                 Lihat Semua
               </Link>

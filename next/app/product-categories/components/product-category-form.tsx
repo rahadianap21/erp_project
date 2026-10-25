@@ -146,7 +146,7 @@ export function ProductCategoryForm({
       </button>
 
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[800px] p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

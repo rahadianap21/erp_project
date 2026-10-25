@@ -36,8 +36,8 @@ export function DataTablePagination({
   loading = false,
 }: DataTablePaginationProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-3xs mt-4">
-      <div className="flex flex-wrap items-center gap-4 order-2 sm:order-1 w-full sm:w-auto justify-between sm:justify-start">
+    <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border shadow-3xs mt-4">
+      <div className="flex flex-wrap items-center gap-4 order-2 md:order-1 w-full md:w-auto justify-between md:justify-start">
         <div className="flex items-center gap-2">
           <label
             htmlFor="rows-per-page"
@@ -70,7 +70,7 @@ export function DataTablePagination({
         </p>
       </div>
 
-      <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto justify-center sm:justify-end">
+      <div className="flex items-center gap-2 order-1 md:order-2 w-full md:w-auto justify-center md:justify-end">
         <Button
           type="button"
           variant="outline"

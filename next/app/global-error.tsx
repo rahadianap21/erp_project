@@ -1,6 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { ForbiddenView } from "@/components/forbidden-view";
+import { reportClientError } from "@/lib/error-tracking";
 
 export default function GlobalError({
   error,
@@ -9,6 +12,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    reportClientError(error);
+  }, [error]);
+
   const isForbidden =
     error.message?.includes("403") ||
     error.message?.toLowerCase().includes("forbidden");

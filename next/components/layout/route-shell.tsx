@@ -48,7 +48,7 @@ export async function RouteShell({
       />
       <SidebarInset className="bg-muted/15 min-h-screen">
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-md transition-[width,height] ease-linear">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
@@ -61,7 +61,7 @@ export async function RouteShell({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden sm:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold">
+                  <BreadcrumbPage className="truncate font-semibold">
                     {title}
                   </BreadcrumbPage>
                 </BreadcrumbItem>

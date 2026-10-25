@@ -172,7 +172,7 @@ export function MembersView() {
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
             <Users2Icon className="size-5 text-blue-600" /> Master Member
@@ -291,7 +291,7 @@ export function MembersView() {
               {editing ? "Ubah Member" : "Tambah Member"}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="grid gap-1">
               <Label>Kode</Label>
               <Input

@@ -4,7 +4,7 @@ export default function DashboardLoading() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full animate-in fade-in duration-300">
       {/* Header Skeleton */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <Skeleton className="h-7 w-48" />
           <Skeleton className="h-4 w-64" />
@@ -16,7 +16,7 @@ export default function DashboardLoading() {
       </div>
 
       {/* 4 Stats Cards Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, idx) => (
           <div
             key={`stat-skel-${idx}`}
@@ -36,7 +36,7 @@ export default function DashboardLoading() {
       </div>
 
       {/* Action Bar Skeleton */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {Array.from({ length: 4 }).map((_, idx) => (
           <div
             key={`action-skel-${idx}`}

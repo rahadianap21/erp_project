@@ -82,6 +82,7 @@ export default function RoleForm({
     resetForm();
     if (editingRole) {
       onCancelEdit();
+      setIsExpanded(false);
     } else {
       setIsExpanded(false);
     }
@@ -165,7 +166,7 @@ export default function RoleForm({
 
       {/* Konten Form */}
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[850px] p-6 border-t border-gray-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-gray-100" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -201,7 +202,7 @@ export default function RoleForm({
             ) : (
               <div className="border border-slate-200/60 rounded-xl bg-slate-50/30 p-4 space-y-4 max-h-[45vh] overflow-y-auto shadow-inner">
                 {prefixes.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
                     {prefixes.map((prefix) => {
                       const currentGroupPerms = groupedPermissions[prefix];
                       // 🌟 Logika memeriksa apakah semua permission di modul ini sudah dipilih

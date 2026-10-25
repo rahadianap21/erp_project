@@ -36,7 +36,7 @@ export function ForbiddenView({
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+        <div className="flex flex-col md:flex-row gap-3 justify-center pt-4">
           {reset ? (
             <Button
               variant="outline"

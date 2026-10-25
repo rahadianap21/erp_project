@@ -45,8 +45,8 @@ export function RoleTableSkeleton() {
   return (
     <div className="space-y-4">
       {/* Filter & Search Bar Skeleton */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-card p-4 rounded-xl border shadow-sm">
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-card p-4 rounded-xl border shadow-sm">
+        <div className="flex flex-1 flex-col md:flex-row items-stretch md:items-center gap-3">
           <Skeleton className="h-9 flex-1 max-w-md rounded-md" />
         </div>
         <Skeleton className="h-5 w-36" />
@@ -91,7 +91,7 @@ export function RoleTableSkeleton() {
       </div>
 
       {/* Pagination Skeleton */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-2xs">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border shadow-2xs">
         <Skeleton className="h-5 w-48" />
         <div className="flex items-center gap-2">
           <Skeleton className="h-8 w-24 rounded-md" />
@@ -382,7 +382,7 @@ export function RoleTable({
                                 Permissions
                               </div>
                               {prefixes.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
                                   {prefixes.map((prefix) => (
                                     <div
                                       key={`group-${prefix}-${r.id}`}

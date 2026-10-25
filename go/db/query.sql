@@ -85,10 +85,13 @@ WHERE u.deleted_at IS NULL
   AND (sqlc.arg(search_query)::text = '' OR u.name ILIKE '%' || sqlc.arg(search_query)::text || '%' OR u.email ILIKE '%' || sqlc.arg(search_query)::text || '%')
   AND (sqlc.arg(role_filter)::text = 'ALL' OR r.name = sqlc.arg(role_filter)::text);
 
--- name: UpdateUser :exec
+-- name: UpdateUser :execrows
+-- role_id lama ikut menjadi syarat (compare-and-swap). Pemeriksaan wewenang
+-- usecase membaca role target sebelum UPDATE; bila admin lain mengubah role
+-- target di antara pembacaan dan penulisan, baris tidak boleh ikut ditimpa.
 UPDATE s_users
 SET name = $1, email = $2, role_id = $3, updated_at = NOW()
-WHERE id = $4 AND deleted_at IS NULL;
+WHERE id = $4 AND deleted_at IS NULL AND role_id = $5;
 
 -- name: DeleteUser :exec
 UPDATE s_users
@@ -1017,33 +1020,49 @@ WHERE id = sqlc.arg(id)::bigint
   AND qty_received + sqlc.arg(qty_to_add)::int <= qty_ordered
 RETURNING qty_received;
 
--- name: IncrementProductStock :one
--- Menambah current_stock produk dalam SATUAN JUAL sekaligus menghitung ulang
--- harga pokok rata-ratanya (Moving Average). Pemanggil wajib mengalikan
--- qty_received (satuan beli) dengan conversion_rate untuk mendapatkan delta,
--- dan meneruskan nilai DPP yang ikut diterima sebagai added_value.
+-- name: ApplyPurchaseOrderReceivedStock :one
+-- Menerapkan seluruh delta stok sebuah PO dalam SATU pernyataan UPDATE.
+--
+-- Sebelumnya repository membaca GetPOReceivedDeltas lalu memanggil
+-- IncrementProductStock per produk, sehingga satu PO dengan N produk menulis
+-- N+1 query. Dengan agregat sebagai sumber join, satu UPDATE ... FROM
+-- menambahkan stok semua produk sekaligus dan tetap menghitung harga pokok
+-- rata-rata pada baris yang sama:
 --
 --     avg_cost = (stok_lama * avg_cost_lama + nilai_diterima) / stok_baru
 --
--- Keduanya dihitung pada baris UPDATE yang sama, di dalam transaksi penutupan
--- penerimaan, supaya tidak pernah ada stok yang bertambah tanpa harga pokoknya
--- ikut terhitung. Pemisahan keduanya ke dua pernyataan UPDATE akan membuka
--- celah di mana stok sudah berubah lalu transaksi dibatalkan oleh kegagalan
--- yang terjadi di antaranya.
---
--- CASE hanya dipasang sebagai penjaga pembagian nol bila pemanggil memakai
--- delta 0; pada alur normal delta selalu positif sehingga penyebutnya positif.
-UPDATE m_products
-SET current_stock = current_stock + sqlc.arg(delta_selling)::int,
-    avg_cost = CASE
-        WHEN current_stock + sqlc.arg(delta_selling)::int = 0 THEN 0
-        ELSE (current_stock * avg_cost + sqlc.arg(added_value)::numeric)
-             / (current_stock + sqlc.arg(delta_selling)::int)
-    END,
-    updated_at = NOW(),
-    updated_by = sqlc.narg(updated_by)::bigint
-WHERE id = sqlc.arg(id)::bigint AND deleted_at IS NULL
-RETURNING current_stock;
+-- expected_count vs updated_count dipakai pemanggil untuk mendeteksi produk
+-- yang hilang/soft-delete; dulu kondisi itu tampak sebagai pgx.ErrNoRows dari
+-- IncrementProductStock sehingga penutupan penerimaan ikut batal.
+WITH deltas AS (
+    SELECT
+        gd.product_id,
+        SUM(gd.qty_received * gd.conversion_rate)::int AS delta_selling,
+        SUM(gd.qty_received * pod.unit_price * sqlc.arg(net_cost_factor)::numeric)::numeric AS net_value
+    FROM t_goods_receipt_note_details gd
+    JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+    JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
+    WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
+    GROUP BY gd.product_id
+    HAVING SUM(gd.qty_received * gd.conversion_rate) > 0
+),
+updated AS (
+    UPDATE m_products p
+    SET current_stock = p.current_stock + d.delta_selling,
+        avg_cost = CASE
+            WHEN p.current_stock + d.delta_selling = 0 THEN 0
+            ELSE (p.current_stock * p.avg_cost + d.net_value)
+                 / (p.current_stock + d.delta_selling)
+        END,
+        updated_at = NOW(),
+        updated_by = sqlc.narg(updated_by)::bigint
+    FROM deltas d
+    WHERE p.id = d.product_id AND p.deleted_at IS NULL
+    RETURNING p.id
+)
+SELECT
+    (SELECT COUNT(*) FROM deltas)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count;
 
 -- name: CreateGRN :one
 INSERT INTO t_goods_receipt_notes (
@@ -1065,20 +1084,59 @@ INSERT INTO t_goods_receipt_notes (
 )
 RETURNING id, grn_number, purchase_order_id, received_date, total_qty, created_at;
 
--- name: CreateGRNDetail :exec
+-- name: IncrementDetailQtyReceivedBatch :one
+-- Menambah qty_received semua baris PO dalam SATU UPDATE ... FROM. qty
+-- dijumlahkan per baris lebih dulu agar baris ganda tetap setara dengan
+-- penambahan berurutan. Penjaga over-receipt dan qty_to_add > 0 tetap
+-- dipertahankan; selisih expected_count/updated_count berarti ada baris yang
+-- melebihi sisa atau qty-nya tidak positif.
+WITH items AS (
+    SELECT p.purchase_order_detail_id, q.qty_to_add
+    FROM unnest(sqlc.arg(purchase_order_detail_ids)::bigint[]) WITH ORDINALITY AS p(purchase_order_detail_id, ord)
+    JOIN unnest(sqlc.arg(qtys_to_add)::int[]) WITH ORDINALITY AS q(qty_to_add, ord) USING (ord)
+),
+grouped AS (
+    SELECT purchase_order_detail_id, SUM(qty_to_add)::int AS qty_to_add
+    FROM items
+    GROUP BY purchase_order_detail_id
+),
+updated AS (
+    UPDATE t_purchase_order_details d
+    SET qty_received = d.qty_received + g.qty_to_add
+    FROM grouped g
+    WHERE d.id = g.purchase_order_detail_id
+      AND g.qty_to_add > 0
+      AND d.qty_received + g.qty_to_add <= d.qty_ordered
+    RETURNING d.id
+)
+SELECT
+    (SELECT COUNT(*) FROM grouped)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count;
+
+-- name: CreateGRNDetails :exec
+-- Menyisipkan seluruh baris GRN dalam SATU INSERT ... SELECT, bukan satu
+-- INSERT per baris. Urutan array menentukan pasangan kolom lewat ORDINALITY.
+WITH items AS (
+    SELECT p.purchase_order_detail_id, q.product_id, r.qty_received, c.conversion_rate
+    FROM unnest(sqlc.arg(purchase_order_detail_ids)::bigint[]) WITH ORDINALITY AS p(purchase_order_detail_id, ord)
+    JOIN unnest(sqlc.arg(product_ids)::bigint[]) WITH ORDINALITY AS q(product_id, ord) USING (ord)
+    JOIN unnest(sqlc.arg(qty_receiveds)::int[]) WITH ORDINALITY AS r(qty_received, ord) USING (ord)
+    JOIN unnest(sqlc.arg(conversion_rates)::int[]) WITH ORDINALITY AS c(conversion_rate, ord) USING (ord)
+)
 INSERT INTO t_goods_receipt_note_details (
     grn_id,
     purchase_order_detail_id,
     product_id,
     qty_received,
     conversion_rate
-) VALUES (
+)
+SELECT
     sqlc.arg(grn_id)::bigint,
-    sqlc.arg(purchase_order_detail_id)::bigint,
-    sqlc.arg(product_id)::bigint,
-    sqlc.arg(qty_received)::int,
-    sqlc.arg(conversion_rate)::int
-);
+    purchase_order_detail_id,
+    product_id,
+    qty_received,
+    conversion_rate
+FROM items;
 
 -- name: CountGRNsTotal :one
 SELECT COUNT(*) AS total_count
@@ -1185,35 +1243,23 @@ JOIN m_units u ON u.id = p.purchase_unit_id
 WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
 ORDER BY gd.grn_id ASC, gd.id ASC;
 
--- name: GetPOReceivedDeltas :many
--- Menjumlahkan qty diterima (satuan beli) dikali conversion_rate snapshot per
--- produk untuk sebuah PO. Dipakai saat MENUTUP penerimaan supaya stok baru
--- ditambahkan sekali di akhir, bukan setiap kali GRN dibuat.
---
--- Query ini juga menjumlahkan nilai barang yang diterima per produk karena
--- penambahan stok tidak pernah cukup dengan jumlah barang saja: harga pokok
--- rata-rata butuh nilai yang ikut masuk. Nilai DPP dihitung di sini, bukan di
--- Go, supaya baris qty dan baris nilai berasal dari baris GRN yang sama dan
--- tidak mungkin menyebar.
---
--- net_cost_factor adalah pengubah harga per dokumen: 1 untuk NON_PPN dan
--- TAX_EXCLUSIVE karena harga terima di luar PPN, dan 1/(1+PPN) untuk
--- TAX_INCLUSIVE karena harga terima sudah termasuk PPN masukan, yang bukan
--- biaya perolehan barang melainkan tagihan yang diterima kembali.
-SELECT
-    gd.product_id,
-    SUM(gd.qty_received * gd.conversion_rate)::int AS delta_selling,
-    SUM(gd.qty_received * pod.unit_price * sqlc.arg(net_cost_factor)::numeric)::numeric AS net_value
-FROM t_goods_receipt_note_details gd
-JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
-JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
-WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
-GROUP BY gd.product_id
--- Urutan produk ditentukan secara deterministik supaya penutupan dua PO yang
--- memuat produk sama selalu mengunci baris m_products dalam urutan yang sama.
--- Tanpa ORDER BY, urutan hasil GROUP BY bisa berbeda dan dua transaksi dapat
--- saling menunggu (deadlock) saat menaikkan stok.
-ORDER BY gd.product_id ASC;
+-- name: LockProductsForReceiving :many
+-- Mengunci produk yang stoknya akan ditambah saat menutup penerimaan, dalam
+-- urutan id yang deterministik. Penguncian eksplisit ini menjaga agar dua
+-- penutupan PO yang memuat produk sama selalu meminta lock dalam urutan yang
+-- sama, sehingga tidak saling menunggu (deadlock). Bulk UPDATE setelahnya boleh
+-- memakai urutan apa pun karena barisnya sudah terkunci di sini.
+SELECT p.id
+FROM m_products p
+JOIN (
+    SELECT DISTINCT gd.product_id
+    FROM t_goods_receipt_note_details gd
+    JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+    WHERE g.purchase_order_id = sqlc.arg(purchase_order_id)::bigint
+) d ON d.product_id = p.id
+WHERE p.deleted_at IS NULL
+ORDER BY p.id ASC
+FOR UPDATE OF p;
 
 -- name: CountGRNsByPOID :one
 -- Menghitung GRN yang menempel pada satu PO. Dipakai saat MENUTUP penerimaan
@@ -2145,14 +2191,41 @@ WHERE id = ANY(sqlc.arg(product_ids)::bigint[]) AND deleted_at IS NULL
 ORDER BY id
 FOR UPDATE;
 
--- name: DecrementProductStock :execrows
--- Pengurangan stok dengan penjaga current_stock >= qty. Nol baris berarti stok
--- tidak cukup (atau produk hilang), sehingga penjualan dibatalkan.
-UPDATE m_products
-SET current_stock = current_stock - sqlc.arg(qty)::int,
-    updated_at = NOW(),
-    updated_by = sqlc.narg(updated_by)::bigint
-WHERE id = sqlc.arg(id)::bigint AND current_stock >= sqlc.arg(qty)::int;
+-- name: DecrementProductStocksForSale :one
+-- Mengurangi stok semua produk pada satu nota dalam SATU UPDATE ... FROM.
+-- Sebelumnya setiap baris penjualan memanggil DecrementProductStock sendiri
+-- (N+1 query). qty dijumlahkan per produk lebih dulu karena satu nota boleh
+-- memuat produk yang sama di beberapa baris.
+--
+-- Penjaga current_stock >= qty dan g.qty > 0 tetap dipertahankan. Baris
+-- dengan qty non-positif tidak pernah mengubah stok (defense-in-depth di luar
+-- validasi domain/repository). expected_count vs updated_count memberi tahu
+-- pemanggil bahwa ada produk yang stoknya tidak cukup, tanpa perlu menebak
+-- dari nol baris satu per satu.
+WITH items AS (
+    SELECT p.product_id, q.qty
+    FROM unnest(sqlc.arg(product_ids)::bigint[]) WITH ORDINALITY AS p(product_id, ord)
+    JOIN unnest(sqlc.arg(qtys)::int[]) WITH ORDINALITY AS q(qty, ord) USING (ord)
+),
+grouped AS (
+    SELECT product_id, SUM(qty)::int AS qty
+    FROM items
+    GROUP BY product_id
+),
+updated AS (
+    UPDATE m_products p
+    SET current_stock = p.current_stock - g.qty,
+        updated_at = NOW(),
+        updated_by = sqlc.narg(updated_by)::bigint
+    FROM grouped g
+    WHERE p.id = g.product_id
+      AND g.qty > 0
+      AND p.current_stock >= g.qty
+    RETURNING p.id
+)
+SELECT
+    (SELECT COUNT(*) FROM grouped)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count;
 
 -- name: LockProductsForVoid :many
 -- Mengunci produk yang stoknya harus dikembalikan saat void, termasuk produk
@@ -2164,20 +2237,28 @@ WHERE id = ANY(sqlc.arg(product_ids)::bigint[])
 ORDER BY id
 FOR UPDATE;
 
--- name: RestoreProductStockWithValuation :exec
--- Mengembalikan stok sekaligus nilai persediaan pada harga pokok asli penjualan
--- memakai rata-rata tertimbang. RHS memakai nilai baris SEBELUM update.
-UPDATE m_products
-SET current_stock = current_stock + sqlc.arg(qty)::int,
+-- name: RestoreProductStocksWithValuation :execrows
+-- Mengembalikan stok seluruh produk pada satu nota dalam SATU UPDATE ... FROM,
+-- bukan satu UPDATE per produk. Rata-rata tertimbang memakai harga pokok asli
+-- penjualan (cost_total) dan nilai baris SEBELUM update.
+WITH items AS (
+    SELECT p.product_id, q.qty, c.cost_total
+    FROM unnest(sqlc.arg(product_ids)::bigint[]) WITH ORDINALITY AS p(product_id, ord)
+    JOIN unnest(sqlc.arg(qtys)::int[]) WITH ORDINALITY AS q(qty, ord) USING (ord)
+    JOIN unnest(sqlc.arg(cost_totals)::numeric[]) WITH ORDINALITY AS c(cost_total, ord) USING (ord)
+)
+UPDATE m_products p
+SET current_stock = p.current_stock + i.qty,
     avg_cost = CASE
-        WHEN current_stock + sqlc.arg(qty)::int > 0
-        THEN (current_stock * avg_cost + sqlc.arg(cost_total)::numeric)
-             / (current_stock + sqlc.arg(qty)::int)
-        ELSE avg_cost
+        WHEN p.current_stock + i.qty > 0
+        THEN (p.current_stock * p.avg_cost + i.cost_total)
+             / (p.current_stock + i.qty)
+        ELSE p.avg_cost
     END,
     updated_at = NOW(),
     updated_by = sqlc.narg(updated_by)::bigint
-WHERE id = sqlc.arg(id)::bigint;
+FROM items i
+WHERE p.id = i.product_id;
 
 -- --------------------------- TRANSAKSI PENJUALAN -------------------------
 

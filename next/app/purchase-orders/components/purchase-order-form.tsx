@@ -556,7 +556,7 @@ export function PurchaseOrderForm({
       </button>
 
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[1600px] p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         {isLoadingRelations ? (
           <div className="py-12 flex flex-col items-center justify-center text-xs text-slate-400 gap-2 font-medium">
@@ -741,8 +741,8 @@ export function PurchaseOrderForm({
               </div>
             </div>
             {/* Ringkasan Finansial Bawah */}
-            <div className="flex flex-col sm:flex-row justify-between items-end p-5 bg-slate-50 border border-slate-200 rounded-xl gap-4">
-              <div className="text-[11px] font-medium text-slate-400 flex items-start gap-1 self-start sm:self-center">
+            <div className="flex flex-col md:flex-row justify-between items-end p-5 bg-slate-50 border border-slate-200 rounded-xl gap-4">
+              <div className="text-[11px] font-medium text-slate-400 flex items-start gap-1 self-start md:self-center">
                 <DollarSign className="size-3.5 text-blue-500 shrink-0" />
                 <span>
                   Nilai DPP dan PPN 12% dihitung otomatis secara ketat
@@ -756,7 +756,7 @@ export function PurchaseOrderForm({
                   )}
                 </span>
               </div>
-              <div className="w-full sm:w-80 space-y-1.5 text-xs font-mono font-medium text-slate-600">
+              <div className="w-full md:w-80 space-y-1.5 text-xs font-mono font-medium text-slate-600">
                 <div className="flex justify-between border-b border-dashed pb-1">
                   <span>TOTAL DPP (NETTO):</span>
                   <span className="text-slate-900">

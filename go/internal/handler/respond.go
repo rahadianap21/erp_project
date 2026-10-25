@@ -40,15 +40,39 @@ func respondJSON(w http.ResponseWriter, status int, payload any) {
 // panjang di akuntansi, dsb.) sehingga pesan error baru yang lupa didaftarkan
 // bocor keluar sebagai 500 Internal Server Error.
 func WriteError(w http.ResponseWriter, err error) {
+	status := StatusForError(err)
+	if status >= http.StatusInternalServerError {
+		// Detail error 5xx hanya untuk pelacakan internal. Klien selalu
+		// menerima pesan generik supaya pesan database yang mungkin memuat
+		// data pelanggan tidak bocor lewat respons HTTP.
+		if err == nil {
+			err = errors.New("terjadi kesalahan pada server")
+		}
+		recordTrackedError(w, err)
+		respondJSON(w, status, map[string]string{"message": "terjadi kesalahan pada server"})
+		return
+	}
 	if err == nil {
-		respondJSON(w, http.StatusInternalServerError, map[string]string{"message": "terjadi kesalahan pada server"})
+		respondJSON(w, status, map[string]string{"message": "terjadi kesalahan pada server"})
 		return
 	}
 	msg := err.Error()
 	if msg == "" {
 		msg = "terjadi kesalahan pada server"
 	}
-	respondJSON(w, StatusForError(err), map[string]string{"message": msg})
+	respondJSON(w, status, map[string]string{"message": msg})
+}
+
+// trackedErrorRecorder diimplementasikan oleh response writer middleware
+// pelacakan error. Handler tidak perlu tahu detail pelacakan.
+type trackedErrorRecorder interface {
+	RecordError(error)
+}
+
+func recordTrackedError(w http.ResponseWriter, err error) {
+	if recorder, ok := w.(trackedErrorRecorder); ok {
+		recorder.RecordError(err)
+	}
 }
 
 // StatusForError memetakan error domain ke status HTTP. Diekspos untuk test.
@@ -108,6 +132,7 @@ func StatusForError(err error) int {
 		errors.Is(err, domain.ErrJournalAlreadyPost),
 		errors.Is(err, domain.ErrJournalAlreadyVoid),
 		errors.Is(err, domain.ErrAccountDuplicate),
+		errors.Is(err, domain.ErrUserChanged),
 		errors.Is(err, domain.ErrNomorJurnalBentrok),
 		errors.Is(err, domain.ErrNomorPOBentrok):
 		return http.StatusConflict

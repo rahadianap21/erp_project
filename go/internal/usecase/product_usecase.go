@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go_backend/internal/domain"
 	"math/rand"
@@ -48,12 +49,28 @@ func (u *productUsecase) CreateProduct(ctx context.Context, prod *domain.Product
 		prod.ConversionRate = 1
 	}
 
-	// Jika SKU tidak dikirim dari frontend, otomatis generate kode kaku internal
-	if prod.Sku == "" {
+	// Jika SKU tidak dikirim dari frontend, otomatis generate kode kaku internal.
+	// Dua pembuatan produk bersamaan bisa menghasilkan SKU acak yang sama; unique
+	// index di database tetap penentu akhir, dan SKU otomatis diulang dengan
+	// angka baru. SKU yang diketik manual tidak diulang agar pengguna melihat
+	// konfliknya.
+	autoSKU := prod.Sku == ""
+	if autoSKU {
 		prod.Sku = u.generateAutoSKU(prod.CategoryID)
 	}
 
-	return u.productRepo.Create(ctx, prod)
+	const maksPercobaanSKU = 5
+	for attempt := 1; ; attempt++ {
+		err := u.productRepo.Create(ctx, prod)
+		if err == nil {
+			return nil
+		}
+		var duplicate *domain.DuplicateError
+		if !autoSKU || !errors.As(err, &duplicate) || attempt >= maksPercobaanSKU {
+			return err
+		}
+		prod.Sku = u.generateAutoSKU(prod.CategoryID)
+	}
 }
 
 func (u *productUsecase) GetAllProducts(ctx context.Context, search string, categoryFilter int32, cursorID int64, limit int, direction string) ([]domain.Product, int64, error) {

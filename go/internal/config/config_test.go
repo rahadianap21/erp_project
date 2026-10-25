@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // secretValid adalah secret yang melewati seluruh aturan validasi.
@@ -135,5 +136,33 @@ func TestTidakAdaSecretHardcoded(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), secretValid) {
 		t.Fatal("secret tidak boleh muncul di pesan error")
+	}
+}
+
+func TestLoadConfigErrorAlertCooldown(t *testing.T) {
+	setEnv(t, "DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	setEnv(t, "JWT_SECRET", secretValid)
+	setEnv(t, "ERROR_ALERT_COOLDOWN", "6h")
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		t.Fatalf("LoadConfig error: %v", err)
+	}
+	if cfg.ErrorAlertCooldown != 6*time.Hour {
+		t.Fatalf("cooldown = %v, want 6h", cfg.ErrorAlertCooldown)
+	}
+}
+
+func TestLoadConfigMenolakCooldownTidakValid(t *testing.T) {
+	setEnv(t, "DATABASE_URL", "postgres://u:p@localhost:5432/db")
+	setEnv(t, "JWT_SECRET", secretValid)
+	setEnv(t, "ERROR_ALERT_COOLDOWN", "bukan-durasi")
+
+	_, err := LoadConfig()
+	if err == nil {
+		t.Fatal("LoadConfig harus error saat ERROR_ALERT_COOLDOWN tidak valid")
+	}
+	if !strings.Contains(err.Error(), "ERROR_ALERT_COOLDOWN") {
+		t.Fatalf("pesan error harus menyebut ERROR_ALERT_COOLDOWN, dapat: %v", err)
 	}
 }

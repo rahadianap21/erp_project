@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"time"
 
+	"go_backend/internal/alert"
 	"go_backend/internal/config"
 	"go_backend/internal/handler"
+	"go_backend/internal/middleware"
 	"go_backend/internal/middleware/limiter"
 	"go_backend/internal/repository/postgres"
 	"go_backend/internal/router"
@@ -44,6 +46,19 @@ func main() {
 		log.Fatalf("Database lokal tidak merespon: %v\n", err)
 	}
 	fmt.Println("Database Lokal Terhubung Sempurna!")
+
+	// Pelacakan error: simpan ke database, alert ke webhook hanya untuk error
+	// baru (atau yang muncul lagi setelah cooldown).
+	errorStore := postgres.NewSQLErrorStore(dbPool)
+	webhookAlerter := alert.NewWebhookAlerter(cfg.ErrorAlertWebhookURL)
+	errorTrackingUsecase := usecase.NewErrorTrackingUsecase(
+		errorStore, webhookAlerter, cfg.ErrorAlertCooldown,
+	)
+	errorTrackingHandler := handler.NewErrorTrackingHandler(
+		errorTrackingUsecase, cfg.ErrorIngestKey,
+	)
+
+	idempotencyStore := postgres.NewSQLIdempotencyRepository(dbPool)
 
 	roleRepo := postgres.NewSQLRoleRepository(dbPool)
 	roleUseCase := usecase.NewRoleUsecase(roleRepo)
@@ -130,7 +145,11 @@ func main() {
 	settingsHandler := handler.NewSettingsHandler(settingsUsecase)
 
 	mux := http.NewServeMux()
-	handler := router.RegisterRoutes(mux, cfg, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, voucherHandler, settingsHandler)
+	handler := router.RegisterRoutes(mux, cfg, idempotencyStore, userRepo, userHandler, roleHandler, regionHandler, supplierHandler, bankHandler, catHandler, productHandler, unitHandler, poHandler, lookupHandler, grnHandler, dashboardHandler, accountingHandler, saleHandler, memberHandler, paymentMethodHandler, voucherHandler, settingsHandler, errorTrackingHandler)
+
+	// Middleware terluar: menangkap panic dan seluruh respons 5xx, termasuk
+	// kegagalan di middleware JWT/rate limit.
+	handler = middleware.TrackErrors(errorTrackingUsecase, handler)
 
 	fmt.Printf("Server produksi siap melayani di http://localhost:%s\n", cfg.Port)
 	server := &http.Server{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 // MinJWTSecretLen adalah panjang minimum secret JWT.
@@ -23,6 +24,10 @@ const DefaultPort = "8090"
 // server Next.js lokal, bukan nilai rahasia.
 const DefaultCORSOrigin = "http://localhost:3000"
 
+// DefaultErrorAlertCooldown adalah jeda minimum sebelum error yang sama
+// (fingerprint sama) memicu alert lagi.
+const DefaultErrorAlertCooldown = 24 * time.Hour
+
 type Config struct {
 	Port        string
 	DatabaseURL string
@@ -31,6 +36,14 @@ type Config struct {
 	// TrustedProxies adalah daftar IP/CIDR reverse proxy yang boleh mengisi
 	// X-Forwarded-For. Bila kosong, header tersebut diabaikan sepenuhnya.
 	TrustedProxies []string
+
+	// Error tracking. Webhook kosong berarti alert dimatikan, tetapi error
+	// tetap disimpan ke database.
+	ErrorAlertWebhookURL string
+	ErrorAlertCooldown   time.Duration
+	// ErrorIngestKey melindungi POST /api/errors. Bila kosong, endpoint
+	// menerima laporan tanpa kunci (cocok untuk pengembangan lokal).
+	ErrorIngestKey string
 }
 
 // LoadConfig membaca konfigurasi dari environment dan mengembalikan error
@@ -58,6 +71,16 @@ func LoadConfig() (*Config, error) {
 		))
 	}
 
+	alertCooldown := DefaultErrorAlertCooldown
+	if raw := strings.TrimSpace(os.Getenv("ERROR_ALERT_COOLDOWN")); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed <= 0 {
+			problems = append(problems, errors.New("ERROR_ALERT_COOLDOWN harus durasi positif, mis. 24h"))
+		} else {
+			alertCooldown = parsed
+		}
+	}
+
 	if len(problems) > 0 {
 		return nil, fmt.Errorf("konfigurasi tidak valid: %w", errors.Join(problems...))
 	}
@@ -73,11 +96,14 @@ func LoadConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Port:           port,
-		DatabaseURL:    databaseURL,
-		JWTSecret:      jwtSecret,
-		CORSOrigin:     corsOrigin,
-		TrustedProxies: splitCSV(os.Getenv("TRUSTED_PROXIES")),
+		Port:                 port,
+		DatabaseURL:          databaseURL,
+		JWTSecret:            jwtSecret,
+		CORSOrigin:           corsOrigin,
+		TrustedProxies:       splitCSV(os.Getenv("TRUSTED_PROXIES")),
+		ErrorAlertWebhookURL: strings.TrimSpace(os.Getenv("ERROR_ALERT_WEBHOOK_URL")),
+		ErrorAlertCooldown:   alertCooldown,
+		ErrorIngestKey:       strings.TrimSpace(os.Getenv("ERROR_INGEST_KEY")),
 	}, nil
 }
 

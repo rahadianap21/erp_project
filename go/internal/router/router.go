@@ -38,7 +38,7 @@ func writeRateLimited(w http.ResponseWriter, message string) {
 // RegisterRoutes mengelompokkan dan mendaftarkan seluruh endpoint API sistem.
 // Fungsi mengembalikan handler lengkap (sudah dilapisi rate limit global) agar
 // cmd/api bisa memakainya langsung sebagai http.Server.Handler.
-func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.PermissionResolver, userHandler *handler.UserHandler, roleHandler *handler.RoleHandler, regionHandler *handler.RegionHandler, supplierHandler *handler.SupplierHandler, bankHandler *handler.BankHandler, catHandler *handler.ProductCategoryHandler, productHandler *handler.ProductHandler, unitHandler *handler.UnitHandler, poHandler *handler.PurchaseOrderHandler, lookupHandler *handler.LookupHandler, grnHandler *handler.GoodsReceiptNoteHandler, dashboardHandler *handler.DashboardHandler, accountingHandler *handler.AccountingHandler, saleHandler *handler.SaleHandler, memberHandler *handler.MemberHandler, paymentMethodHandler *handler.PaymentMethodHandler, voucherHandler *handler.VoucherHandler, settingsHandler *handler.SettingsHandler) http.Handler {
+func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, idempotencyStore domain.IdempotencyStore, resolver domain.PermissionResolver, userHandler *handler.UserHandler, roleHandler *handler.RoleHandler, regionHandler *handler.RegionHandler, supplierHandler *handler.SupplierHandler, bankHandler *handler.BankHandler, catHandler *handler.ProductCategoryHandler, productHandler *handler.ProductHandler, unitHandler *handler.UnitHandler, poHandler *handler.PurchaseOrderHandler, lookupHandler *handler.LookupHandler, grnHandler *handler.GoodsReceiptNoteHandler, dashboardHandler *handler.DashboardHandler, accountingHandler *handler.AccountingHandler, saleHandler *handler.SaleHandler, memberHandler *handler.MemberHandler, paymentMethodHandler *handler.PaymentMethodHandler, voucherHandler *handler.VoucherHandler, settingsHandler *handler.SettingsHandler, errorTrackingHandler *handler.ErrorTrackingHandler) http.Handler {
 	// 0. Terapkan origin CORS dari konfigurasi (default localhost:3000).
 	middleware.SetAllowedOrigin(cfg.CORSOrigin)
 
@@ -67,10 +67,16 @@ func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.Perm
 		perMinute(reportPerMinute), 5, 5*time.Minute,
 	)
 
-	// protect membungkus handler dengan JWT + resolver permission, lalu
+	// protectWith membungkus handler dengan JWT + resolver permission, lalu
 	// menerapkan bucket per user sesuai jenis request. GetRequestAuth sudah
 	// terisi karena wrapper ini berada di dalam JWTMiddlewareWithResolver.
-	protect := func(next http.HandlerFunc) http.HandlerFunc {
+	//
+	// Idempotency berada di dalam JWT (butuh auth.UserID) tetapi di luar bucket
+	// rate limit, sehingga retry yang diputar ulang tidak menghabiskan kuota
+	// tulis. required=false berarti key opsional; endpoint POS memakai
+	// required=true agar klien yang lupa mengirim key tidak bisa membuat nota
+	// ganda saat tombol terkirim dua kali.
+	protectWith := func(requireIdempotencyKey bool, next http.HandlerFunc) http.HandlerFunc {
 		limited := func(w http.ResponseWriter, r *http.Request) {
 			auth, ok := middleware.GetRequestAuth(r)
 			if !ok {
@@ -98,9 +104,20 @@ func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.Perm
 			}
 			next(w, r)
 		}
+
+		var authed http.HandlerFunc = limited
+		if idempotencyStore != nil {
+			authed = middleware.Idempotency(idempotencyStore, requireIdempotencyKey, limited)
+		}
 		return middleware.EnableCORS(
-			middleware.JWTMiddlewareWithResolver(cfg, resolver, limited),
+			middleware.JWTMiddlewareWithResolver(cfg, resolver, authed),
 		)
+	}
+	protect := func(next http.HandlerFunc) http.HandlerFunc {
+		return protectWith(false, next)
+	}
+	protectIdempotent := func(next http.HandlerFunc) http.HandlerFunc {
+		return protectWith(true, next)
 	}
 
 	handle := func(path string, h http.HandlerFunc) {
@@ -110,6 +127,13 @@ func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.Perm
 	// 1. Endpoint Otentikasi Publik
 	handle("/api/login", middleware.EnableCORS(loginLimiter.Middleware(userHandler.Login)))
 	handle("/api/logout", middleware.EnableCORS(userHandler.Logout))
+
+	// 1b. Ingest error frontend. Tanpa JWT karena pengguna yang gagal login
+	// juga perlu terlacak; dilindungi kunci ingest dan rate limit per IP.
+	errorIngestLimiter := limiter.NewIPRateLimiter(
+		perMinute(60), 20, 5*time.Minute, cfg.TrustedProxies,
+	)
+	handle("/api/errors", errorIngestLimiter.Middleware(errorTrackingHandler.HandleIngest))
 
 	// 2. Endpoint Profil Terproteksi JWT
 	handle("/api/me", protect(userHandler.GetProfile))
@@ -205,9 +229,9 @@ func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, resolver domain.Perm
 
 	handle("/api/vouchers", protect(voucherHandler.VouchersCRUDHandler))
 
-	handle("/api/sales", protect(saleHandler.HandleSales))
+	handle("/api/sales", protectIdempotent(saleHandler.HandleSales))
 
-	handle("/api/sales/void", protect(saleHandler.HandleSaleVoid))
+	handle("/api/sales/void", protectIdempotent(saleHandler.HandleSaleVoid))
 
 	handle("/api/pos/bootstrap", protect(saleHandler.HandlePOSBootstrap))
 

@@ -22,10 +22,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 	"testing"
 	"time"
 
 	"go_backend/internal/domain"
+	"go_backend/internal/repository/postgres/db"
 	"go_backend/internal/usecase"
 )
 
@@ -982,5 +984,182 @@ func TestSaleVoucherSekaliPakaiDanDilepasSaatVoid(t *testing.T) {
 	}
 	if usedAt != nil {
 		t.Fatal("voucher harus dilepas setelah nota dibatalkan")
+	}
+}
+
+// TestSaleConcurrentLastItemHanyaSatuBerhasil meniru dua kasir yang menjual
+// unit terakhir pada saat bersamaan. Penguncian baris produk dan penjaga
+// current_stock >= qty di SQL harus membuat tepat satu nota berhasil; nota
+// yang kalah ditolak ErrSaleStokTidakCukup dan seluruh tulisannya digulung.
+func TestSaleConcurrentLastItemHanyaSatuBerhasil(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+
+	var categoryID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_product_categories ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skipf("tidak ada kategori produk, test dilewati: %v", err)
+	}
+	var supplierID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_suppliers ORDER BY id LIMIT 1`).Scan(&supplierID); err != nil {
+		t.Skipf("tidak ada supplier, test dilewati: %v", err)
+	}
+	var unitID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_units ORDER BY id LIMIT 1`).Scan(&unitID); err != nil {
+		t.Skipf("tidak ada satuan, test dilewati: %v", err)
+	}
+	var actorID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM s_users ORDER BY id LIMIT 1`).Scan(&actorID); err != nil {
+		t.Skipf("tidak ada pengguna, test dilewati: %v", err)
+	}
+	var tunaiID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_payment_methods WHERE code = 'TUNAI' AND deleted_at IS NULL LIMIT 1`).Scan(&tunaiID); err != nil {
+		t.Skipf("metode TUNAI belum ada, test dilewati: %v", err)
+	}
+
+	sku := fmt.Sprintf("UJI-SALE-RACE-%d", time.Now().UnixNano())
+	var productID int64
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO m_products
+			(sku, name, category_id, supplier_id, selling_unit_id, purchase_unit_id,
+			 purchase_price, selling_price, current_stock, avg_cost, is_active)
+		VALUES ($1, 'Produk Uji Race POS', $2, $3, $4, $4, 10000, 20000, 1, 10000, TRUE)
+		RETURNING id`, sku, categoryID, supplierID, unitID).Scan(&productID); err != nil {
+		t.Fatalf("gagal membuat produk uji: %v", err)
+	}
+	t.Cleanup(func() {
+		bg := context.Background()
+		_, _ = pool.Exec(bg, `DELETE FROM t_sales WHERE id IN
+			(SELECT sale_id FROM t_sales_details WHERE product_id = $1)`, productID)
+		_, _ = pool.Exec(bg, `DELETE FROM m_products WHERE id = $1`, productID)
+	})
+
+	saleRepo := NewSQLSaleRepository(pool)
+	memberRepo := NewSQLMemberRepository(pool)
+	paymentRepo := NewSQLPaymentMethodRepository(pool)
+	saleUC := usecase.NewSaleUsecase(saleRepo, memberRepo, paymentRepo, nil, nil, nil)
+
+	const penjual = 2
+	errs := make(chan error, penjual)
+	var wg sync.WaitGroup
+	for i := 0; i < penjual; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := saleUC.CreateSale(ctx, domain.CreateSaleInput{
+				Items:     []domain.SaleLineInput{{ProductID: productID, Qty: 1}},
+				Payments:  []domain.SalePaymentInput{{PaymentMethodID: tunaiID, Amount: 20000}},
+				CreatedBy: actorID,
+			})
+			errs <- err
+		}()
+	}
+	wg.Wait()
+	close(errs)
+
+	var berhasil, stokKurang int
+	for err := range errs {
+		switch {
+		case err == nil:
+			berhasil++
+		case errors.Is(err, domain.ErrSaleStokTidakCukup):
+			stokKurang++
+		default:
+			t.Fatalf("error tak terduga dari penjualan bersamaan: %v", err)
+		}
+	}
+	if berhasil != 1 || stokKurang != 1 {
+		t.Fatalf("harus tepat 1 berhasil dan 1 ditolak stok, dapat berhasil=%d ditolak=%d", berhasil, stokKurang)
+	}
+
+	var stok int
+	if err := pool.QueryRow(ctx, `SELECT current_stock FROM m_products WHERE id = $1`, productID).Scan(&stok); err != nil {
+		t.Fatalf("gagal membaca stok: %v", err)
+	}
+	if stok != 0 {
+		t.Fatalf("stok akhir harus 0 (tidak oversell), dapat %d", stok)
+	}
+
+	var jumlahNota int
+	if err := pool.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT sale_id) FROM t_sales_details WHERE product_id = $1`,
+		productID).Scan(&jumlahNota); err != nil {
+		t.Fatalf("gagal menghitung nota: %v", err)
+	}
+	if jumlahNota != 1 {
+		t.Fatalf("nota yang tersimpan harus 1, dapat %d (nota gagal harusnya rollback)", jumlahNota)
+	}
+}
+
+// TestDecrementStockMenolakQtyTidakPositif membuktikan penjaga SQL tidak
+// mengubah stok untuk qty 0/negatif meskipun pemanggil melewati validasi
+// repository. Pemanggil mendeteksinya lewat expected_count != updated_count.
+func TestDecrementStockMenolakQtyTidakPositif(t *testing.T) {
+	pool := newTestPool(t)
+	ctx := context.Background()
+
+	var categoryID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_product_categories ORDER BY id LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skipf("tidak ada kategori produk, test dilewati: %v", err)
+	}
+	var supplierID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_suppliers ORDER BY id LIMIT 1`).Scan(&supplierID); err != nil {
+		t.Skipf("tidak ada supplier, test dilewati: %v", err)
+	}
+	var unitID int32
+	if err := pool.QueryRow(ctx, `SELECT id FROM m_units ORDER BY id LIMIT 1`).Scan(&unitID); err != nil {
+		t.Skipf("tidak ada satuan, test dilewati: %v", err)
+	}
+
+	sku := fmt.Sprintf("UJI-SALE-QTY-%d", time.Now().UnixNano())
+	var productID int64
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO m_products
+			(sku, name, category_id, supplier_id, selling_unit_id, purchase_unit_id,
+			 purchase_price, selling_price, current_stock, avg_cost, is_active)
+		VALUES ($1, 'Produk Uji Qty', $2, $3, $4, $4, 10000, 20000, 10, 10000, TRUE)
+		RETURNING id`, sku, categoryID, supplierID, unitID).Scan(&productID); err != nil {
+		t.Fatalf("gagal membuat produk uji: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM m_products WHERE id = $1`, productID)
+	})
+
+	q := db.New(pool)
+	for _, qty := range []int32{0, -1, -5} {
+		applied, err := q.DecrementProductStocksForSale(ctx, db.DecrementProductStocksForSaleParams{
+			ProductIds: []int64{productID},
+			Qtys:       []int32{qty},
+		})
+		if err != nil {
+			t.Fatalf("qty %d tidak boleh error SQL: %v", qty, err)
+		}
+		if applied.ExpectedCount != 1 || applied.UpdatedCount != 0 {
+			t.Fatalf("qty %d harus expected=1 updated=0, dapat %d/%d", qty, applied.ExpectedCount, applied.UpdatedCount)
+		}
+		var stock int
+		if err := pool.QueryRow(ctx, `SELECT current_stock FROM m_products WHERE id = $1`, productID).Scan(&stock); err != nil {
+			t.Fatalf("gagal membaca stok: %v", err)
+		}
+		if stock != 10 {
+			t.Fatalf("stok harus tetap 10 untuk qty %d, dapat %d", qty, stock)
+		}
+	}
+
+	applied, err := q.DecrementProductStocksForSale(ctx, db.DecrementProductStocksForSaleParams{
+		ProductIds: []int64{productID},
+		Qtys:       []int32{1},
+	})
+	if err != nil {
+		t.Fatalf("qty valid tidak boleh error: %v", err)
+	}
+	if applied.ExpectedCount != 1 || applied.UpdatedCount != 1 {
+		t.Fatalf("qty valid harus expected=1 updated=1, dapat %d/%d", applied.ExpectedCount, applied.UpdatedCount)
+	}
+	var stock int
+	if err := pool.QueryRow(ctx, `SELECT current_stock FROM m_products WHERE id = $1`, productID).Scan(&stock); err != nil {
+		t.Fatalf("gagal membaca stok: %v", err)
+	}
+	if stock != 9 {
+		t.Fatalf("stok harus 9 setelah decrement valid, dapat %d", stock)
 	}
 }

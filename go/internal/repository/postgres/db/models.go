@@ -308,6 +308,33 @@ type SUser struct {
 	DeletedBy pgtype.Int8
 }
 
+type TErrorEvent struct {
+	ID             int64
+	Fingerprint    string
+	Source         string
+	Level          string
+	Message        string
+	Stack          string
+	ComponentStack string
+	Route          string
+	Method         string
+	StatusCode     int32
+	RequestID      string
+	OccurredAt     pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+}
+
+type TErrorGroup struct {
+	Fingerprint   string
+	Source        string
+	Message       string
+	Route         string
+	Occurrences   int64
+	FirstSeen     pgtype.Timestamptz
+	LastSeen      pgtype.Timestamptz
+	LastAlertedAt pgtype.Timestamptz
+}
+
 type TGoodsReceiptNote struct {
 	ID              int64
 	GrnNumber       string

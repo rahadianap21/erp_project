@@ -76,6 +76,9 @@ func (r *sqlProductRepository) Create(ctx context.Context, prod *domain.Product)
 		UpdatedBy:      updatedByPg,
 	})
 	if err != nil {
+		if _, ok := uniqueViolationConstraint(err); ok {
+			return domain.NewDuplicateError("SKU produk sudah dipakai")
+		}
 		return err
 	}
 

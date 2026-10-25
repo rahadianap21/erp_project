@@ -38,7 +38,7 @@ export default function PurchaseOrdersLoading() {
       </div>
 
       {/* Filter Toolbar Control Skeleton */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
         <Skeleton className="h-9 flex-1 max-w-md rounded-lg" />
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-28 rounded-lg" />
@@ -100,7 +100,7 @@ export default function PurchaseOrdersLoading() {
       </div>
 
       {/* Pagination Controls Skeleton */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs mt-4">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs mt-4">
         <Skeleton className="h-4 w-48 rounded" />
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-16 rounded-lg" />

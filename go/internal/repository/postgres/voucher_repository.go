@@ -22,7 +22,7 @@ func NewSQLVoucherRepository(pool *pgxpool.Pool) domain.VoucherRepository {
 }
 
 func dateOnlyToPg(v *domain.DateOnly) pgtype.Date {
-	if v == nil || v.Time.IsZero() {
+	if v == nil || v.IsZero() {
 		return pgtype.Date{}
 	}
 	return pgtype.Date{Time: v.Time, Valid: true}

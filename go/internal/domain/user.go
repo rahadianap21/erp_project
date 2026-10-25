@@ -30,6 +30,9 @@ type UpdateUserParams struct {
 	Name   string `json:"name"`
 	Email  string `json:"email"`
 	RoleID int32  `json:"role_id"`
+	// ExpectedRoleID adalah role yang dibaca saat pemeriksaan wewenang. UPDATE
+	// hanya boleh berhasil bila role target belum berubah (compare-and-swap).
+	ExpectedRoleID int32 `json:"expected_role_id"`
 }
 
 // Actor adalah identitas pelaku yang sedang berinteraksi.
@@ -134,6 +137,11 @@ type OtorisasiUser struct {
 // dan tanpa membocorkan informasi yang berbeda antara "tidak ada" dan
 // "nonaktif".
 var ErrAkunTidakBerhak = errors.New("akun pelaku tidak ditemukan atau sudah dinonaktifkan")
+
+// ErrUserChanged menandai bahwa role/jenis data user berubah setelah pemeriksaan
+// wewenang tetapi sebelum penulisan. Pemanggil harus memuat ulang data supaya
+// keputusan otorisasi tidak diterapkan pada user yang sudah berbeda.
+var ErrUserChanged = errors.New("data pengguna berubah oleh permintaan lain, silakan muat ulang")
 
 // PermissionResolver menyediakan wewenang yang berlaku SAAT INI untuk satu
 // user, dibaca langsung dari database.

@@ -11,6 +11,69 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const applyPurchaseOrderReceivedStock = `-- name: ApplyPurchaseOrderReceivedStock :one
+WITH deltas AS (
+    SELECT
+        gd.product_id,
+        SUM(gd.qty_received * gd.conversion_rate)::int AS delta_selling,
+        SUM(gd.qty_received * pod.unit_price * $1::numeric)::numeric AS net_value
+    FROM t_goods_receipt_note_details gd
+    JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+    JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
+    WHERE g.purchase_order_id = $2::bigint
+    GROUP BY gd.product_id
+    HAVING SUM(gd.qty_received * gd.conversion_rate) > 0
+),
+updated AS (
+    UPDATE m_products p
+    SET current_stock = p.current_stock + d.delta_selling,
+        avg_cost = CASE
+            WHEN p.current_stock + d.delta_selling = 0 THEN 0
+            ELSE (p.current_stock * p.avg_cost + d.net_value)
+                 / (p.current_stock + d.delta_selling)
+        END,
+        updated_at = NOW(),
+        updated_by = $3::bigint
+    FROM deltas d
+    WHERE p.id = d.product_id AND p.deleted_at IS NULL
+    RETURNING p.id
+)
+SELECT
+    (SELECT COUNT(*) FROM deltas)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count
+`
+
+type ApplyPurchaseOrderReceivedStockParams struct {
+	NetCostFactor   pgtype.Numeric
+	PurchaseOrderID int64
+	UpdatedBy       pgtype.Int8
+}
+
+type ApplyPurchaseOrderReceivedStockRow struct {
+	ExpectedCount int64
+	UpdatedCount  int64
+}
+
+// Menerapkan seluruh delta stok sebuah PO dalam SATU pernyataan UPDATE.
+//
+// Sebelumnya repository membaca GetPOReceivedDeltas lalu memanggil
+// IncrementProductStock per produk, sehingga satu PO dengan N produk menulis
+// N+1 query. Dengan agregat sebagai sumber join, satu UPDATE ... FROM
+// menambahkan stok semua produk sekaligus dan tetap menghitung harga pokok
+// rata-rata pada baris yang sama:
+//
+//	avg_cost = (stok_lama * avg_cost_lama + nilai_diterima) / stok_baru
+//
+// expected_count vs updated_count dipakai pemanggil untuk mendeteksi produk
+// yang hilang/soft-delete; dulu kondisi itu tampak sebagai pgx.ErrNoRows dari
+// IncrementProductStock sehingga penutupan penerimaan ikut batal.
+func (q *Queries) ApplyPurchaseOrderReceivedStock(ctx context.Context, arg ApplyPurchaseOrderReceivedStockParams) (ApplyPurchaseOrderReceivedStockRow, error) {
+	row := q.db.QueryRow(ctx, applyPurchaseOrderReceivedStock, arg.NetCostFactor, arg.PurchaseOrderID, arg.UpdatedBy)
+	var i ApplyPurchaseOrderReceivedStockRow
+	err := row.Scan(&i.ExpectedCount, &i.UpdatedCount)
+	return i, err
+}
+
 const assignPermissionToRole = `-- name: AssignPermissionToRole :exec
 INSERT INTO role_permissions (role_id, permission_id) 
 VALUES ($1, (SELECT id FROM s_permissions WHERE name = $2 LIMIT 1))
@@ -509,37 +572,47 @@ func (q *Queries) CreateGRN(ctx context.Context, arg CreateGRNParams) (CreateGRN
 	return i, err
 }
 
-const createGRNDetail = `-- name: CreateGRNDetail :exec
+const createGRNDetails = `-- name: CreateGRNDetails :exec
+WITH items AS (
+    SELECT p.purchase_order_detail_id, q.product_id, r.qty_received, c.conversion_rate
+    FROM unnest($2::bigint[]) WITH ORDINALITY AS p(purchase_order_detail_id, ord)
+    JOIN unnest($3::bigint[]) WITH ORDINALITY AS q(product_id, ord) USING (ord)
+    JOIN unnest($4::int[]) WITH ORDINALITY AS r(qty_received, ord) USING (ord)
+    JOIN unnest($5::int[]) WITH ORDINALITY AS c(conversion_rate, ord) USING (ord)
+)
 INSERT INTO t_goods_receipt_note_details (
     grn_id,
     purchase_order_detail_id,
     product_id,
     qty_received,
     conversion_rate
-) VALUES (
-    $1::bigint,
-    $2::bigint,
-    $3::bigint,
-    $4::int,
-    $5::int
 )
+SELECT
+    $1::bigint,
+    purchase_order_detail_id,
+    product_id,
+    qty_received,
+    conversion_rate
+FROM items
 `
 
-type CreateGRNDetailParams struct {
-	GrnID                 int64
-	PurchaseOrderDetailID int64
-	ProductID             int64
-	QtyReceived           int32
-	ConversionRate        int32
+type CreateGRNDetailsParams struct {
+	GrnID                  int64
+	PurchaseOrderDetailIds []int64
+	ProductIds             []int64
+	QtyReceiveds           []int32
+	ConversionRates        []int32
 }
 
-func (q *Queries) CreateGRNDetail(ctx context.Context, arg CreateGRNDetailParams) error {
-	_, err := q.db.Exec(ctx, createGRNDetail,
+// Menyisipkan seluruh baris GRN dalam SATU INSERT ... SELECT, bukan satu
+// INSERT per baris. Urutan array menentukan pasangan kolom lewat ORDINALITY.
+func (q *Queries) CreateGRNDetails(ctx context.Context, arg CreateGRNDetailsParams) error {
+	_, err := q.db.Exec(ctx, createGRNDetails,
 		arg.GrnID,
-		arg.PurchaseOrderDetailID,
-		arg.ProductID,
-		arg.QtyReceived,
-		arg.ConversionRate,
+		arg.PurchaseOrderDetailIds,
+		arg.ProductIds,
+		arg.QtyReceiveds,
+		arg.ConversionRates,
 	)
 	return err
 }
@@ -1774,28 +1847,59 @@ func (q *Queries) CreateVoucher(ctx context.Context, arg CreateVoucherParams) (C
 	return i, err
 }
 
-const decrementProductStock = `-- name: DecrementProductStock :execrows
-UPDATE m_products
-SET current_stock = current_stock - $1::int,
-    updated_at = NOW(),
-    updated_by = $2::bigint
-WHERE id = $3::bigint AND current_stock >= $1::int
+const decrementProductStocksForSale = `-- name: DecrementProductStocksForSale :one
+WITH items AS (
+    SELECT p.product_id, q.qty
+    FROM unnest($1::bigint[]) WITH ORDINALITY AS p(product_id, ord)
+    JOIN unnest($2::int[]) WITH ORDINALITY AS q(qty, ord) USING (ord)
+),
+grouped AS (
+    SELECT product_id, SUM(qty)::int AS qty
+    FROM items
+    GROUP BY product_id
+),
+updated AS (
+    UPDATE m_products p
+    SET current_stock = p.current_stock - g.qty,
+        updated_at = NOW(),
+        updated_by = $3::bigint
+    FROM grouped g
+    WHERE p.id = g.product_id
+      AND g.qty > 0
+      AND p.current_stock >= g.qty
+    RETURNING p.id
+)
+SELECT
+    (SELECT COUNT(*) FROM grouped)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count
 `
 
-type DecrementProductStockParams struct {
-	Qty       int32
-	UpdatedBy pgtype.Int8
-	ID        int64
+type DecrementProductStocksForSaleParams struct {
+	ProductIds []int64
+	Qtys       []int32
+	UpdatedBy  pgtype.Int8
 }
 
-// Pengurangan stok dengan penjaga current_stock >= qty. Nol baris berarti stok
-// tidak cukup (atau produk hilang), sehingga penjualan dibatalkan.
-func (q *Queries) DecrementProductStock(ctx context.Context, arg DecrementProductStockParams) (int64, error) {
-	result, err := q.db.Exec(ctx, decrementProductStock, arg.Qty, arg.UpdatedBy, arg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+type DecrementProductStocksForSaleRow struct {
+	ExpectedCount int64
+	UpdatedCount  int64
+}
+
+// Mengurangi stok semua produk pada satu nota dalam SATU UPDATE ... FROM.
+// Sebelumnya setiap baris penjualan memanggil DecrementProductStock sendiri
+// (N+1 query). qty dijumlahkan per produk lebih dulu karena satu nota boleh
+// memuat produk yang sama di beberapa baris.
+//
+// Penjaga current_stock >= qty dan g.qty > 0 tetap dipertahankan. Baris
+// dengan qty non-positif tidak pernah mengubah stok (defense-in-depth di luar
+// validasi domain/repository). expected_count vs updated_count memberi tahu
+// pemanggil bahwa ada produk yang stoknya tidak cukup, tanpa perlu menebak
+// dari nol baris satu per satu.
+func (q *Queries) DecrementProductStocksForSale(ctx context.Context, arg DecrementProductStocksForSaleParams) (DecrementProductStocksForSaleRow, error) {
+	row := q.db.QueryRow(ctx, decrementProductStocksForSale, arg.ProductIds, arg.Qtys, arg.UpdatedBy)
+	var i DecrementProductStocksForSaleRow
+	err := row.Scan(&i.ExpectedCount, &i.UpdatedCount)
+	return i, err
 }
 
 const deleteAllPermissionsFromRole = `-- name: DeleteAllPermissionsFromRole :exec
@@ -3917,68 +4021,6 @@ func (q *Queries) GetMembersCursorPrev(ctx context.Context, arg GetMembersCursor
 			&i.IsActive,
 			&i.CreatedAt,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getPOReceivedDeltas = `-- name: GetPOReceivedDeltas :many
-SELECT
-    gd.product_id,
-    SUM(gd.qty_received * gd.conversion_rate)::int AS delta_selling,
-    SUM(gd.qty_received * pod.unit_price * $1::numeric)::numeric AS net_value
-FROM t_goods_receipt_note_details gd
-JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
-JOIN t_purchase_order_details pod ON pod.id = gd.purchase_order_detail_id
-WHERE g.purchase_order_id = $2::bigint
-GROUP BY gd.product_id
-ORDER BY gd.product_id ASC
-`
-
-type GetPOReceivedDeltasParams struct {
-	NetCostFactor   pgtype.Numeric
-	PurchaseOrderID int64
-}
-
-type GetPOReceivedDeltasRow struct {
-	ProductID    int64
-	DeltaSelling int32
-	NetValue     pgtype.Numeric
-}
-
-// Menjumlahkan qty diterima (satuan beli) dikali conversion_rate snapshot per
-// produk untuk sebuah PO. Dipakai saat MENUTUP penerimaan supaya stok baru
-// ditambahkan sekali di akhir, bukan setiap kali GRN dibuat.
-//
-// Query ini juga menjumlahkan nilai barang yang diterima per produk karena
-// penambahan stok tidak pernah cukup dengan jumlah barang saja: harga pokok
-// rata-rata butuh nilai yang ikut masuk. Nilai DPP dihitung di sini, bukan di
-// Go, supaya baris qty dan baris nilai berasal dari baris GRN yang sama dan
-// tidak mungkin menyebar.
-//
-// net_cost_factor adalah pengubah harga per dokumen: 1 untuk NON_PPN dan
-// TAX_EXCLUSIVE karena harga terima di luar PPN, dan 1/(1+PPN) untuk
-// TAX_INCLUSIVE karena harga terima sudah termasuk PPN masukan, yang bukan
-// biaya perolehan barang melainkan tagihan yang diterima kembali.
-// Urutan produk ditentukan secara deterministik supaya penutupan dua PO yang
-// memuat produk sama selalu mengunci baris m_products dalam urutan yang sama.
-// Tanpa ORDER BY, urutan hasil GROUP BY bisa berbeda dan dua transaksi dapat
-// saling menunggu (deadlock) saat menaikkan stok.
-func (q *Queries) GetPOReceivedDeltas(ctx context.Context, arg GetPOReceivedDeltasParams) ([]GetPOReceivedDeltasRow, error) {
-	rows, err := q.db.Query(ctx, getPOReceivedDeltas, arg.NetCostFactor, arg.PurchaseOrderID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetPOReceivedDeltasRow
-	for rows.Next() {
-		var i GetPOReceivedDeltasRow
-		if err := rows.Scan(&i.ProductID, &i.DeltaSelling, &i.NetValue); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -6610,52 +6652,51 @@ func (q *Queries) IncrementDetailQtyReceived(ctx context.Context, arg IncrementD
 	return qty_received, err
 }
 
-const incrementProductStock = `-- name: IncrementProductStock :one
-UPDATE m_products
-SET current_stock = current_stock + $1::int,
-    avg_cost = CASE
-        WHEN current_stock + $1::int = 0 THEN 0
-        ELSE (current_stock * avg_cost + $2::numeric)
-             / (current_stock + $1::int)
-    END,
-    updated_at = NOW(),
-    updated_by = $3::bigint
-WHERE id = $4::bigint AND deleted_at IS NULL
-RETURNING current_stock
+const incrementDetailQtyReceivedBatch = `-- name: IncrementDetailQtyReceivedBatch :one
+WITH items AS (
+    SELECT p.purchase_order_detail_id, q.qty_to_add
+    FROM unnest($1::bigint[]) WITH ORDINALITY AS p(purchase_order_detail_id, ord)
+    JOIN unnest($2::int[]) WITH ORDINALITY AS q(qty_to_add, ord) USING (ord)
+),
+grouped AS (
+    SELECT purchase_order_detail_id, SUM(qty_to_add)::int AS qty_to_add
+    FROM items
+    GROUP BY purchase_order_detail_id
+),
+updated AS (
+    UPDATE t_purchase_order_details d
+    SET qty_received = d.qty_received + g.qty_to_add
+    FROM grouped g
+    WHERE d.id = g.purchase_order_detail_id
+      AND g.qty_to_add > 0
+      AND d.qty_received + g.qty_to_add <= d.qty_ordered
+    RETURNING d.id
+)
+SELECT
+    (SELECT COUNT(*) FROM grouped)::bigint AS expected_count,
+    (SELECT COUNT(*) FROM updated)::bigint AS updated_count
 `
 
-type IncrementProductStockParams struct {
-	DeltaSelling int32
-	AddedValue   pgtype.Numeric
-	UpdatedBy    pgtype.Int8
-	ID           int64
+type IncrementDetailQtyReceivedBatchParams struct {
+	PurchaseOrderDetailIds []int64
+	QtysToAdd              []int32
 }
 
-// Menambah current_stock produk dalam SATUAN JUAL sekaligus menghitung ulang
-// harga pokok rata-ratanya (Moving Average). Pemanggil wajib mengalikan
-// qty_received (satuan beli) dengan conversion_rate untuk mendapatkan delta,
-// dan meneruskan nilai DPP yang ikut diterima sebagai added_value.
-//
-//	avg_cost = (stok_lama * avg_cost_lama + nilai_diterima) / stok_baru
-//
-// Keduanya dihitung pada baris UPDATE yang sama, di dalam transaksi penutupan
-// penerimaan, supaya tidak pernah ada stok yang bertambah tanpa harga pokoknya
-// ikut terhitung. Pemisahan keduanya ke dua pernyataan UPDATE akan membuka
-// celah di mana stok sudah berubah lalu transaksi dibatalkan oleh kegagalan
-// yang terjadi di antaranya.
-//
-// CASE hanya dipasang sebagai penjaga pembagian nol bila pemanggil memakai
-// delta 0; pada alur normal delta selalu positif sehingga penyebutnya positif.
-func (q *Queries) IncrementProductStock(ctx context.Context, arg IncrementProductStockParams) (int32, error) {
-	row := q.db.QueryRow(ctx, incrementProductStock,
-		arg.DeltaSelling,
-		arg.AddedValue,
-		arg.UpdatedBy,
-		arg.ID,
-	)
-	var current_stock int32
-	err := row.Scan(&current_stock)
-	return current_stock, err
+type IncrementDetailQtyReceivedBatchRow struct {
+	ExpectedCount int64
+	UpdatedCount  int64
+}
+
+// Menambah qty_received semua baris PO dalam SATU UPDATE ... FROM. qty
+// dijumlahkan per baris lebih dulu agar baris ganda tetap setara dengan
+// penambahan berurutan. Penjaga over-receipt dan qty_to_add > 0 tetap
+// dipertahankan; selisih expected_count/updated_count berarti ada baris yang
+// melebihi sisa atau qty-nya tidak positif.
+func (q *Queries) IncrementDetailQtyReceivedBatch(ctx context.Context, arg IncrementDetailQtyReceivedBatchParams) (IncrementDetailQtyReceivedBatchRow, error) {
+	row := q.db.QueryRow(ctx, incrementDetailQtyReceivedBatch, arg.PurchaseOrderDetailIds, arg.QtysToAdd)
+	var i IncrementDetailQtyReceivedBatchRow
+	err := row.Scan(&i.ExpectedCount, &i.UpdatedCount)
+	return i, err
 }
 
 const insertMemberPointEntry = `-- name: InsertMemberPointEntry :exec
@@ -6972,6 +7013,45 @@ func (q *Queries) LockMemberPoints(ctx context.Context, id int64) (LockMemberPoi
 	var i LockMemberPointsRow
 	err := row.Scan(&i.ID, &i.Points)
 	return i, err
+}
+
+const lockProductsForReceiving = `-- name: LockProductsForReceiving :many
+SELECT p.id
+FROM m_products p
+JOIN (
+    SELECT DISTINCT gd.product_id
+    FROM t_goods_receipt_note_details gd
+    JOIN t_goods_receipt_notes g ON g.id = gd.grn_id
+    WHERE g.purchase_order_id = $1::bigint
+) d ON d.product_id = p.id
+WHERE p.deleted_at IS NULL
+ORDER BY p.id ASC
+FOR UPDATE OF p
+`
+
+// Mengunci produk yang stoknya akan ditambah saat menutup penerimaan, dalam
+// urutan id yang deterministik. Penguncian eksplisit ini menjaga agar dua
+// penutupan PO yang memuat produk sama selalu meminta lock dalam urutan yang
+// sama, sehingga tidak saling menunggu (deadlock). Bulk UPDATE setelahnya boleh
+// memakai urutan apa pun karena barisnya sudah terkunci di sini.
+func (q *Queries) LockProductsForReceiving(ctx context.Context, purchaseOrderID int64) ([]int64, error) {
+	rows, err := q.db.Query(ctx, lockProductsForReceiving, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockProductsForSale = `-- name: LockProductsForSale :many
@@ -7604,37 +7684,48 @@ func (q *Queries) ReopenAccountPeriod(ctx context.Context, arg ReopenAccountPeri
 	return result.RowsAffected(), nil
 }
 
-const restoreProductStockWithValuation = `-- name: RestoreProductStockWithValuation :exec
-UPDATE m_products
-SET current_stock = current_stock + $1::int,
+const restoreProductStocksWithValuation = `-- name: RestoreProductStocksWithValuation :execrows
+WITH items AS (
+    SELECT p.product_id, q.qty, c.cost_total
+    FROM unnest($2::bigint[]) WITH ORDINALITY AS p(product_id, ord)
+    JOIN unnest($3::int[]) WITH ORDINALITY AS q(qty, ord) USING (ord)
+    JOIN unnest($4::numeric[]) WITH ORDINALITY AS c(cost_total, ord) USING (ord)
+)
+UPDATE m_products p
+SET current_stock = p.current_stock + i.qty,
     avg_cost = CASE
-        WHEN current_stock + $1::int > 0
-        THEN (current_stock * avg_cost + $2::numeric)
-             / (current_stock + $1::int)
-        ELSE avg_cost
+        WHEN p.current_stock + i.qty > 0
+        THEN (p.current_stock * p.avg_cost + i.cost_total)
+             / (p.current_stock + i.qty)
+        ELSE p.avg_cost
     END,
     updated_at = NOW(),
-    updated_by = $3::bigint
-WHERE id = $4::bigint
+    updated_by = $1::bigint
+FROM items i
+WHERE p.id = i.product_id
 `
 
-type RestoreProductStockWithValuationParams struct {
-	Qty       int32
-	CostTotal pgtype.Numeric
-	UpdatedBy pgtype.Int8
-	ID        int64
+type RestoreProductStocksWithValuationParams struct {
+	UpdatedBy  pgtype.Int8
+	ProductIds []int64
+	Qtys       []int32
+	CostTotals []pgtype.Numeric
 }
 
-// Mengembalikan stok sekaligus nilai persediaan pada harga pokok asli penjualan
-// memakai rata-rata tertimbang. RHS memakai nilai baris SEBELUM update.
-func (q *Queries) RestoreProductStockWithValuation(ctx context.Context, arg RestoreProductStockWithValuationParams) error {
-	_, err := q.db.Exec(ctx, restoreProductStockWithValuation,
-		arg.Qty,
-		arg.CostTotal,
+// Mengembalikan stok seluruh produk pada satu nota dalam SATU UPDATE ... FROM,
+// bukan satu UPDATE per produk. Rata-rata tertimbang memakai harga pokok asli
+// penjualan (cost_total) dan nilai baris SEBELUM update.
+func (q *Queries) RestoreProductStocksWithValuation(ctx context.Context, arg RestoreProductStocksWithValuationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreProductStocksWithValuation,
 		arg.UpdatedBy,
-		arg.ID,
+		arg.ProductIds,
+		arg.Qtys,
+		arg.CostTotals,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setMemberPoints = `-- name: SetMemberPoints :exec
@@ -8152,27 +8243,35 @@ func (q *Queries) UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) 
 	return err
 }
 
-const updateUser = `-- name: UpdateUser :exec
+const updateUser = `-- name: UpdateUser :execrows
 UPDATE s_users
 SET name = $1, email = $2, role_id = $3, updated_at = NOW()
-WHERE id = $4 AND deleted_at IS NULL
+WHERE id = $4 AND deleted_at IS NULL AND role_id = $5
 `
 
 type UpdateUserParams struct {
-	Name   string
-	Email  string
-	RoleID int32
-	ID     int64
+	Name     string
+	Email    string
+	RoleID   int32
+	ID       int64
+	RoleID_2 int32
 }
 
-func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
-	_, err := q.db.Exec(ctx, updateUser,
+// role_id lama ikut menjadi syarat (compare-and-swap). Pemeriksaan wewenang
+// usecase membaca role target sebelum UPDATE; bila admin lain mengubah role
+// target di antara pembacaan dan penulisan, baris tidak boleh ikut ditimpa.
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateUser,
 		arg.Name,
 		arg.Email,
 		arg.RoleID,
 		arg.ID,
+		arg.RoleID_2,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateVoucher = `-- name: UpdateVoucher :exec

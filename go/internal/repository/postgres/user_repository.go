@@ -32,7 +32,11 @@ func (r *sqlUserRepository) Create(ctx context.Context, user *domain.User) error
 		RoleID:   user.RoleID,
 	})
 	if err != nil {
-		return err
+		// Pemeriksaan GetByEmail di usecase tidak atomik. Saat dua pendaftaran
+		// dengan email sama berjalan bersamaan, unique index parsial di
+		// database-lah yang menang; terjemahkan pelanggarannya agar pemanggil
+		// menerima 409, bukan 500.
+		return mapDuplicate(err, "email sudah terdaftar")
 	}
 
 	user.ID = insertedUser.ID
@@ -277,10 +281,23 @@ func (r *sqlUserRepository) GetRoleByName(ctx context.Context, name string) (dom
 }
 
 func (r *sqlUserRepository) UpdateUser(ctx context.Context, arg domain.UpdateUserParams) error {
-	return r.q.UpdateUser(ctx, db.UpdateUserParams{
+	rows, err := r.q.UpdateUser(ctx, db.UpdateUserParams{
 		ID:     arg.ID,
 		Name:   arg.Name,
 		Email:  arg.Email,
 		RoleID: arg.RoleID,
+		// Role target dibaca usecase sebelum wewenang diperiksa. Syarat ini
+		// membuat UPDATE gagal bila role berubah di antara baca dan tulis.
+		RoleID_2: arg.ExpectedRoleID,
 	})
+	if err != nil {
+		// Dua admin bisa mengganti email ke nilai yang sama secara bersamaan.
+		// Unique index tetap menjaga integritas; di sini hanya pesannya yang
+		// diterjemahkan supaya tidak bocor sebagai 500.
+		return mapDuplicate(err, "email sudah terdaftar")
+	}
+	if rows == 0 {
+		return domain.ErrUserChanged
+	}
+	return nil
 }

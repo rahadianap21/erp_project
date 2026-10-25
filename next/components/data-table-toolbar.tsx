@@ -34,8 +34,8 @@ export function DataTableToolbar({
   children,
 }: DataTableToolbarProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border shadow-3xs relative">
-      <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-4 rounded-xl border shadow-3xs relative">
+      <div className="flex flex-1 flex-col md:flex-row items-stretch md:items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
           <Input
@@ -54,7 +54,7 @@ export function DataTableToolbar({
               type="button"
               onClick={() => setSearch("")}
               title="Hapus pencarian"
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              className="absolute right-0 top-1/2 grid size-12 -translate-y-1/2 place-items-center text-slate-400 hover:text-slate-600 cursor-pointer md:right-2.5 md:size-4"
             >
               <X className="size-3.5" />
             </button>

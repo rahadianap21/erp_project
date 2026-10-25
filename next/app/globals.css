@@ -140,6 +140,53 @@ body {
   @apply bg-background text-foreground font-sans;
 }
 
+/* Mobile (<768px) ergonomics: prevent horizontal page overflow and guarantee
+   that every interactive control meets the 48x48px touch-target minimum. */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  button,
+  [role="button"],
+  [data-slot="button"],
+  [data-slot="sidebar-menu-button"],
+  [data-slot="sidebar-menu-sub-button"],
+  [data-slot="dialog-close"],
+  [data-slot="select-trigger"],
+  [data-slot="dropdown-menu-trigger"],
+  [role="menuitem"],
+  [role="option"],
+  input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not(
+      [type="range"]
+    ):not([type="color"]),
+  select,
+  textarea {
+    min-height: 3rem;
+  }
+
+  /* Perbesar area sentuh label yang membungkus checkbox/radio tanpa
+     memperbesar kotak kontrolnya. */
+  label:has(input[type="checkbox"]),
+  label:has(input[type="radio"]) {
+    display: flex;
+    min-height: 3rem;
+    align-items: center;
+  }
+
+  button,
+  [role="button"],
+  [data-slot="button"],
+  [data-slot="sidebar-menu-button"],
+  [data-slot="sidebar-menu-sub-button"],
+  [data-slot="dialog-close"],
+  [data-slot="select-trigger"],
+  [data-slot="dropdown-menu-trigger"] {
+    min-width: 3rem;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

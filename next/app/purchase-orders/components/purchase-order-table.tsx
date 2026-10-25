@@ -442,7 +442,7 @@ export function PurchaseOrderTable({
                             <div className="py-4 pl-12 pr-6 space-y-4 bg-slate-50/40 border-t border-slate-100 shadow-inner w-full">
                               {/* Panel Pajak Rangkuman Finansial Atas Sub-Row */}
                               {/* 🌟 PERBAIKAN 2: Ubah max-w-4xl menjadi w-full agar panel pajak mengikuti lebar parent */}
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-3 rounded-xl border w-full font-mono text-[11px] font-bold">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-xl border w-full font-mono text-[11px] font-bold">
                                 <div className="flex justify-between items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
                                   <span className="text-slate-500 font-sans text-[10px] uppercase">
                                     Dasar Pajak (DPP):

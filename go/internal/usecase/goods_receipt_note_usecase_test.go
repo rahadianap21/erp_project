@@ -307,8 +307,10 @@ type fakeGRNPoster struct {
 	err   error
 }
 
-func (f *fakeGRNPoster) PostGRNJournal(ctx context.Context, grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder, actorID int64) error {
-	f.calls = append(f.calls, grn.ID)
+func (f *fakeGRNPoster) PostGRNJournals(ctx context.Context, grns []*domain.GoodsReceiptNote, po *domain.PurchaseOrder, actorID int64) error {
+	for _, grn := range grns {
+		f.calls = append(f.calls, grn.ID)
+	}
 	return f.err
 }
 

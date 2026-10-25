@@ -266,6 +266,9 @@ type JournalUsecase interface {
 	// Idempoten: GRN yang sudah punya jurnal POSTED akan dilewati tanpa error,
 	// sehingga penutupan penerimaan bisa diulang tanpa mencatat dua kali.
 	PostGRNJournal(ctx context.Context, grn *GoodsReceiptNote, po *PurchaseOrder, actorID int64) error
+	// PostGRNJournals adalah versi batch dari PostGRNJournal. Pemetaan akun,
+	// validasi akun, dan pengecekan periode dibaca sekali untuk seluruh GRN.
+	PostGRNJournals(ctx context.Context, grns []*GoodsReceiptNote, po *PurchaseOrder, actorID int64) error
 	// PostClosingEntry menerbitkan jurnal penutup satu periode: seluruh akun
 	// PENDAPATAN dan BEBAN disanatkan ke nol, selisihnya (laba/rugi) dipindahkan
 	// ke akun Laba Ditahan (pemetaan RETAINED_EARNINGS). Jurnal diberi sumber

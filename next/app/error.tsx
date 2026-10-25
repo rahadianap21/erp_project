@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { ForbiddenView } from "@/components/forbidden-view";
 import { Button } from "@/components/ui/button";
+import { reportClientError } from "@/lib/error-tracking";
 
 export default function ErrorBoundary({
   error,
@@ -12,7 +13,7 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("ErrorBoundary menangkap error:", error);
+    reportClientError(error);
   }, [error]);
 
   // JAUH LEBIH AMAN: Langsung cek status HTTP 403 atau jika teks mengandung kata kunci otorisasi

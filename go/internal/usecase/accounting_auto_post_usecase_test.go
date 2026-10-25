@@ -15,16 +15,19 @@ import (
 // --- Fakes khusus auto-posting ---
 
 type fakeSettingsRepo struct {
-	mapping map[string]int64
-	err     error
+	mapping   map[string]int64
+	err       error
+	listCalls int
 }
 
 func (f *fakeSettingsRepo) ListMapping(ctx context.Context) (map[string]int64, error) {
+	f.listCalls++
 	return f.mapping, f.err
 }
 
 type fakeAccountRepo struct {
-	accounts map[int64]domain.ChartOfAccount
+	accounts      map[int64]domain.ChartOfAccount
+	getByIDsCalls int
 }
 
 func (f *fakeAccountRepo) Create(context.Context, *domain.ChartOfAccount) error { return nil }
@@ -35,6 +38,7 @@ func (f *fakeAccountRepo) GetByID(context.Context, int64) (*domain.ChartOfAccoun
 	return nil, nil
 }
 func (f *fakeAccountRepo) GetByIDs(ctx context.Context, ids []int64) ([]domain.ChartOfAccount, error) {
+	f.getByIDsCalls++
 	res := make([]domain.ChartOfAccount, 0, len(ids))
 	for _, id := range ids {
 		if acc, ok := f.accounts[id]; ok {
@@ -314,6 +318,33 @@ func TestPostGRNJournalPeriodeTertutup(t *testing.T) {
 	}
 	if repo.createCalls != 0 {
 		t.Fatal("tidak boleh menulis jurnal saat periode tertutup")
+	}
+}
+
+// TestPostGRNJournalsBatchMembacaReferensiSekali memastikan batch beberapa GRN
+// tidak mengulang query pengaturan, akun, dan periode per GRN.
+func TestPostGRNJournalsBatchMembacaReferensiSekali(t *testing.T) {
+	repo := &fakeJournalRepo{}
+	settings := &fakeSettingsRepo{mapping: defaultMapping()}
+	accounts := &fakeAccountRepo{accounts: postableAccounts()}
+	period := &fakePeriodRepo{}
+	uc := NewJournalUsecase(repo, accounts, period, settings, &fakeReportRepo{})
+
+	grns := []*domain.GoodsReceiptNote{receivedGRN(1), receivedGRN(2), receivedGRN(3)}
+	if err := uc.PostGRNJournals(context.Background(), grns, poWithTax("NON_PPN", 1000), 99); err != nil {
+		t.Fatalf("jurnal batch harus terbit: %v", err)
+	}
+	if settings.listCalls != 1 {
+		t.Fatalf("ListMapping harus sekali, dapat %d", settings.listCalls)
+	}
+	if accounts.getByIDsCalls != 1 {
+		t.Fatalf("GetByIDs harus sekali, dapat %d", accounts.getByIDsCalls)
+	}
+	if len(period.ensured) != 1 {
+		t.Fatalf("EnsureOpen harus sekali untuk bulan yang sama, dapat %v", period.ensured)
+	}
+	if repo.createCalls != len(grns) {
+		t.Fatalf("harus menulis %d jurnal, dapat %d", len(grns), repo.createCalls)
 	}
 }
 

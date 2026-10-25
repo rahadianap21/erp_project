@@ -10,10 +10,15 @@ import (
 // productRepoPalsu merekam produk terakhir yang disimpan, cukup untuk menguji
 // normalisasi conversion_rate tanpa database.
 type productRepoPalsu struct {
-	disimpan domain.Product
+	disimpan      domain.Product
+	duplicateLeft int
 }
 
 func (r *productRepoPalsu) Create(_ context.Context, p *domain.Product) error {
+	if r.duplicateLeft > 0 {
+		r.duplicateLeft--
+		return domain.NewDuplicateError("SKU produk sudah dipakai")
+	}
 	r.disimpan = *p
 	return nil
 }
@@ -90,5 +95,37 @@ func TestUpdateProductMempertahankanRateValid(t *testing.T) {
 	}
 	if repo.disimpan.ConversionRate != 12 {
 		t.Fatalf("rate valid harus dipertahankan 12, dapat %d", repo.disimpan.ConversionRate)
+	}
+}
+
+func TestCreateProductMengulangSKUOtomatisSaatBentrok(t *testing.T) {
+	repo := &productRepoPalsu{duplicateLeft: 1}
+	uc := NewProductUsecase(repo)
+
+	p := &domain.Product{
+		Name: "Beras", CategoryID: 3, SupplierID: 1,
+		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: 10, SellingPrice: 20,
+	}
+	if err := uc.CreateProduct(context.Background(), p); err != nil {
+		t.Fatalf("create harus mengulang SKU otomatis, dapat: %v", err)
+	}
+	if repo.disimpan.Sku == "" {
+		t.Fatal("SKU otomatis harus terisi")
+	}
+}
+
+func TestCreateProductTidakMengulangSKUManualSaatBentrok(t *testing.T) {
+	repo := &productRepoPalsu{duplicateLeft: 1}
+	uc := NewProductUsecase(repo)
+
+	p := &domain.Product{
+		Sku: "SKU-MANUAL", Name: "Beras", CategoryID: 3, SupplierID: 1,
+		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: 10, SellingPrice: 20,
+	}
+	if err := uc.CreateProduct(context.Background(), p); err == nil {
+		t.Fatal("SKU manual yang bentrok harus menghasilkan error")
+	}
+	if repo.disimpan.Sku != "" {
+		t.Fatalf("produk tidak boleh tersimpan saat SKU manual bentrok, dapat %q", repo.disimpan.Sku)
 	}
 }

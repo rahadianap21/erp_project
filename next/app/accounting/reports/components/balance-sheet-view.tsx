@@ -66,7 +66,7 @@ export function BalanceSheetView({
       </div>
 
       {report && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Total Aset

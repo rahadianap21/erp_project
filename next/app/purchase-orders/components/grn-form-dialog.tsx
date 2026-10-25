@@ -201,7 +201,7 @@ export function GRNFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !submitting && onOpenChange(o)}>
-      <DialogContent className="w-full !max-w-3xl sm:!max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full !max-w-[calc(100vw-1.5rem)] max-h-[90vh] overflow-y-auto md:!max-w-3xl xl:!max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <PackageCheck className="size-5 text-emerald-600" />
@@ -313,7 +313,7 @@ export function GRNFormDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase">
                   Tanggal Terima

@@ -326,7 +326,7 @@ export function ProductForm({
       </button>
 
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[1200px] p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-slate-100" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Baris 1: Identifikasi Unik SKU, Barcode, & Dropdown Master Satuan */}
@@ -478,7 +478,7 @@ export function ProductForm({
           </div>
 
           {/* Baris 4: Metrika Finansial Harga & Batas Stok */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-blue-50/10 p-4 rounded-xl border border-blue-100/30">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50/10 p-4 rounded-xl border border-blue-100/30">
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
                 <DollarSign className="size-3" /> Harga Beli Modal (HPP)
@@ -544,7 +544,7 @@ export function ProductForm({
           </div>
 
           {/* Baris 5: Diskon Default Produk untuk Kasir POS */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-amber-50/10 p-4 rounded-xl border border-amber-100/40">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/10 p-4 rounded-xl border border-amber-100/40">
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
                 <Tag className="size-3" /> Tipe Diskon Default

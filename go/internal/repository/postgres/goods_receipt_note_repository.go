@@ -160,29 +160,38 @@ func (r *sqlGRNRepository) CreateGRN(ctx context.Context, in domain.CreateGRNInp
 		return nil, err
 	}
 
+	detailIDs := make([]int64, 0, len(in.Items))
+	productIDs := make([]int64, 0, len(in.Items))
+	receivedQtys := make([]int32, 0, len(in.Items))
+	conversionRates := make([]int32, 0, len(in.Items))
 	for _, it := range in.Items {
 		l := lines[it.PurchaseOrderDetailID]
-		rate := rates[it.PurchaseOrderDetailID]
-		if err := qtx.CreateGRNDetail(ctx, db.CreateGRNDetailParams{
-			GrnID:                 header.ID,
-			PurchaseOrderDetailID: it.PurchaseOrderDetailID,
-			ProductID:             l.ProductID,
-			QtyReceived:           it.QtyReceived,
-			ConversionRate:        rate,
-		}); err != nil {
-			return nil, err
-		}
-		// Penjaga di SQL (qty_received + qty <= qty_ordered) yang menjadi penentu
-		// terakhir; error di sini berarti bentrok dengan penerimaan lain.
-		if _, err := qtx.IncrementDetailQtyReceived(ctx, db.IncrementDetailQtyReceivedParams{
-			ID:       it.PurchaseOrderDetailID,
-			QtyToAdd: it.QtyReceived,
-		}); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, domain.ErrGRNOverReceipt
-			}
-			return nil, err
-		}
+		detailIDs = append(detailIDs, it.PurchaseOrderDetailID)
+		productIDs = append(productIDs, l.ProductID)
+		receivedQtys = append(receivedQtys, it.QtyReceived)
+		conversionRates = append(conversionRates, rates[it.PurchaseOrderDetailID])
+	}
+	if err := qtx.CreateGRNDetails(ctx, db.CreateGRNDetailsParams{
+		GrnID:                  header.ID,
+		PurchaseOrderDetailIds: detailIDs,
+		ProductIds:             productIDs,
+		QtyReceiveds:           receivedQtys,
+		ConversionRates:        conversionRates,
+	}); err != nil {
+		return nil, err
+	}
+
+	// Penjaga di SQL (qty_received + qty <= qty_ordered) yang menjadi penentu
+	// terakhir; selisih jumlah baris berarti bentrok dengan penerimaan lain.
+	applied, err := qtx.IncrementDetailQtyReceivedBatch(ctx, db.IncrementDetailQtyReceivedBatchParams{
+		PurchaseOrderDetailIds: detailIDs,
+		QtysToAdd:              receivedQtys,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if applied.ExpectedCount != applied.UpdatedCount {
+		return nil, domain.ErrGRNOverReceipt
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -254,25 +263,27 @@ func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, upda
 		return err
 	}
 
-	deltas, err := qtx.GetPOReceivedDeltas(ctx, db.GetPOReceivedDeltasParams{
-		PurchaseOrderID: poID,
+	// Kunci semua produk yang stoknya akan berubah dalam urutan id yang sama
+	// untuk setiap transaksi. Bulk UPDATE di bawah tidak menjamin urutan lock,
+	// jadi penguncian deterministik dilakukan lebih dulu agar dua penutupan PO
+	// dengan produk yang sama tidak saling menunggu (deadlock).
+	if _, err := qtx.LockProductsForReceiving(ctx, poID); err != nil {
+		return err
+	}
+
+	applied, err := qtx.ApplyPurchaseOrderReceivedStock(ctx, db.ApplyPurchaseOrderReceivedStockParams{
 		NetCostFactor:   netCostFactorPg,
+		PurchaseOrderID: poID,
+		UpdatedBy:       updatedByPg,
 	})
 	if err != nil {
 		return err
 	}
-	for _, d := range deltas {
-		if d.DeltaSelling <= 0 {
-			continue
-		}
-		if _, err := qtx.IncrementProductStock(ctx, db.IncrementProductStockParams{
-			ID:           d.ProductID,
-			DeltaSelling: d.DeltaSelling,
-			AddedValue:   d.NetValue,
-			UpdatedBy:    updatedByPg,
-		}); err != nil {
-			return err
-		}
+	// Jumlah baris agregat harus sama dengan jumlah produk yang berhasil
+	// di-update. Selisih berarti ada produk yang hilang atau sudah soft-delete;
+	// jangan lanjut karena stoknya akan hilang tanpa jejak.
+	if applied.ExpectedCount != applied.UpdatedCount {
+		return domain.NewBusinessRuleError("penerimaan ditolak: produk pada GRN tidak ditemukan atau sudah dihapus")
 	}
 
 	rows, err := qtx.TransitionPurchaseOrderStatus(ctx, db.TransitionPurchaseOrderStatusParams{

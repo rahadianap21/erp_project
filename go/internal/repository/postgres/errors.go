@@ -27,6 +27,7 @@ func uniqueViolationConstraint(err error) (string, bool) {
 	}
 	return "", false
 }
+
 // asUniqueViolation mengenali pelanggaran unique constraint (SQLSTATE 23505)
 // dan mengembalikan error pg-nya. Dipakai mapDuplicate dan repository PO yang
 // punya kebutuhan pesan khusus (ErrNomorPOBentrok untuk retry penomoran).

@@ -317,41 +317,41 @@ func grnReceivedValues(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder) (
 // manual. Idempotensi diserahkan ke unique index parsial (source_type, source_id)
 // sehingga penutupan penerimaan yang diulang tidak pernah mencatat dua kali.
 func (u *journalUsecase) PostGRNJournal(ctx context.Context, grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder, actorID int64) error {
+	return u.PostGRNJournals(ctx, []*domain.GoodsReceiptNote{grn}, po, actorID)
+}
+
+// buildGRNJournalEntry menyusun jurnal POSTED untuk satu GRN tanpa menulis apa
+// pun. mapping dibaca sekali oleh pemanggil agar batch beberapa GRN tidak
+// mengulang query pengaturan akun.
+func buildGRNJournalEntry(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder, mapping map[string]int64, actorID int64) (*domain.JournalEntry, error) {
 	if grn == nil || grn.ID <= 0 {
-		return domain.NewBusinessRuleError("jurnal penerimaan ditolak: grn tidak valid")
+		return nil, domain.NewBusinessRuleError("jurnal penerimaan ditolak: grn tidak valid")
 	}
 	if po == nil || po.ID <= 0 {
-		return domain.NewBusinessRuleError("jurnal penerimaan ditolak: po tidak valid")
+		return nil, domain.NewBusinessRuleError("jurnal penerimaan ditolak: po tidak valid")
 	}
 
 	dpp, vat, err := grnReceivedValues(grn, po)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if round2(dpp+vat) <= 0 {
 		// Tidak ada nilai ekonomis, sehingga tidak ada jurnal yang pantas terbit.
-		return nil
+		return nil, nil
 	}
 
-	var mapping map[string]int64
-	if u.settings != nil {
-		mapping, err = u.settings.ListMapping(ctx)
-		if err != nil {
-			return err
-		}
-	}
 	inventoryID, err := requireMapping(mapping, "INVENTORY")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	apID, err := requireMapping(mapping, "AP")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var vatInputID int64
 	if vat > 0 {
 		if vatInputID, err = requireMapping(mapping, "VAT_INPUT"); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -386,14 +386,7 @@ func (u *journalUsecase) PostGRNJournal(ctx context.Context, grn *domain.GoodsRe
 		Credit:      ap,
 	})
 
-	if _, err := u.validatePostableAccounts(ctx, toLineInputs(&lines)); err != nil {
-		return err
-	}
-	if _, err := u.periodRepo.EnsureOpen(ctx, entryDate.Year(), int(entryDate.Month()), actorID); err != nil {
-		return err
-	}
-
-	entry := &domain.JournalEntry{
+	return &domain.JournalEntry{
 		EntryDate:       entryDate,
 		Description:     fmt.Sprintf("Penerimaan barang %s dari PO %s", grn.GRNNumber, po.PoNumber),
 		SourceType:      domain.JournalSourceGRN,
@@ -406,9 +399,76 @@ func (u *journalUsecase) PostGRNJournal(ctx context.Context, grn *domain.GoodsRe
 		PeriodMonth:     int(entryDate.Month()),
 		CreatedBy:       &actorID,
 		Lines:           lines,
+	}, nil
+}
+
+// PostGRNJournals menerbitkan jurnal untuk banyak GRN sekaligus. Pemetaan akun,
+// validasi akun, dan pengecekan periode dilakukan sekali untuk seluruh batch,
+// bukan sekali per GRN. Sebelumnya setiap GRN mengulang ListMapping,
+// GetByIDs, dan EnsureOpen sehingga N GRN menghasilkan 3N+ query referensi.
+func (u *journalUsecase) PostGRNJournals(ctx context.Context, grns []*domain.GoodsReceiptNote, po *domain.PurchaseOrder, actorID int64) error {
+	if po == nil || po.ID <= 0 {
+		return domain.NewBusinessRuleError("jurnal penerimaan ditolak: po tidak valid")
+	}
+	if len(grns) == 0 {
+		return nil
 	}
 
-	datePrefix := entryDate.Format("20060102")
+	var mapping map[string]int64
+	var err error
+	if u.settings != nil {
+		mapping, err = u.settings.ListMapping(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	entries := make([]*domain.JournalEntry, 0, len(grns))
+	allLines := make([]domain.JournalLineInput, 0, len(grns)*3)
+	for _, grn := range grns {
+		entry, err := buildGRNJournalEntry(grn, po, mapping, actorID)
+		if err != nil {
+			return err
+		}
+		if entry == nil {
+			continue
+		}
+		entries = append(entries, entry)
+		allLines = append(allLines, toLineInputs(&entry.Lines)...)
+	}
+	if len(entries) == 0 {
+		return nil
+	}
+
+	// Satu query untuk seluruh akun yang dipakai batch ini.
+	if _, err := u.validatePostableAccounts(ctx, allLines); err != nil {
+		return err
+	}
+
+	// Satu EnsureOpen per bulan yang benar-benar dipakai, bukan per GRN.
+	periods := make(map[[2]int]struct{}, len(entries))
+	for _, entry := range entries {
+		key := [2]int{entry.PeriodYear, entry.PeriodMonth}
+		if _, ok := periods[key]; ok {
+			continue
+		}
+		if _, err := u.periodRepo.EnsureOpen(ctx, entry.PeriodYear, entry.PeriodMonth, actorID); err != nil {
+			return err
+		}
+		periods[key] = struct{}{}
+	}
+
+	for _, entry := range entries {
+		if err := u.writePostedGRNJournal(ctx, entry); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writePostedGRNJournal menerbitkan satu jurnal POSTED dengan retry nomor.
+func (u *journalUsecase) writePostedGRNJournal(ctx context.Context, entry *domain.JournalEntry) error {
+	datePrefix := entry.EntryDate.Format("20060102")
 	const maksPercobaanNomor = 5
 	for attempt := 1; attempt <= maksPercobaanNomor; attempt++ {
 		seq, err := u.repo.NextSeq(ctx, datePrefix)

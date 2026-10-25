@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { ChevronRightIcon } from "lucide-react";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 type NavSubItem = {
@@ -131,8 +131,20 @@ function NavCollapsible({
 
 export function NavMain({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed" && !isMobile;
+
+  // Tutup sheet navigasi mobile hanya setelah berpindah halaman. Jangan
+  // menutupnya saat NavMain pertama kali di-mount di dalam sheet, karena itu
+  // membuat menu langsung hilang begitu tombol hamburger ditekan.
+  const previousPathname = useRef(pathname);
+
+  useEffect(() => {
+    if (isMobile && previousPathname.current !== pathname) {
+      setOpenMobile(false);
+    }
+    previousPathname.current = pathname;
+  }, [pathname, isMobile, setOpenMobile]);
 
   return (
     <SidebarGroup>

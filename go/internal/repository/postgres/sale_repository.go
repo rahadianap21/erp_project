@@ -250,6 +250,14 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 	if len(sale.Details) == 0 {
 		return nil, domain.ErrSaleItemsRequired
 	}
+	// Validasi ini juga ada di domain. Pertahanan di repository memastikan
+	// pemanggil yang melewati CalculateSale tidak bisa menambah stok lewat qty
+	// negatif (current_stock - (-qty)).
+	for _, d := range sale.Details {
+		if d.Qty <= 0 {
+			return nil, domain.ErrSaleLineInvalid
+		}
+	}
 
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -396,19 +404,34 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 		}
 	}
 
-	// Pengurangan stok dengan penjaga. Nol baris berarti stok tidak cukup.
+	// Pengurangan stok seluruh baris dalam satu UPDATE ... FROM. Penjaga
+	// current_stock >= qty tetap berlaku di SQL; selisih jumlah baris berarti
+	// stok salah satu produk tidak cukup.
+	productIDs := make([]int64, 0, len(sale.Details))
+	qtys := make([]int32, 0, len(sale.Details))
+	need := make(map[int64]int, len(sale.Details))
 	for _, d := range sale.Details {
-		rows, err := qtx.DecrementProductStock(ctx, db.DecrementProductStockParams{
-			Qty:       int32(d.Qty),
-			UpdatedBy: actor,
-			ID:        d.ProductID,
-		})
-		if err != nil {
-			return nil, err
+		productIDs = append(productIDs, d.ProductID)
+		qtys = append(qtys, int32(d.Qty))
+		need[d.ProductID] += d.Qty
+	}
+	applied, err := qtx.DecrementProductStocksForSale(ctx, db.DecrementProductStocksForSaleParams{
+		ProductIds: productIDs,
+		Qtys:       qtys,
+		UpdatedBy:  actor,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if applied.ExpectedCount != applied.UpdatedCount {
+		// Sebut produk pertama yang stoknya kurang agar pesan tetap ramah.
+		for id, qty := range need {
+			p := locked[id]
+			if p.CurrentStock < qty {
+				return nil, fmt.Errorf("%w: %s (tersedia %d)", domain.ErrSaleStokTidakCukup, p.Name, p.CurrentStock)
+			}
 		}
-		if rows == 0 {
-			return nil, fmt.Errorf("%w: %s", domain.ErrSaleStokTidakCukup, d.ProductName)
-		}
+		return nil, fmt.Errorf("%w: stok produk berubah saat transaksi", domain.ErrSaleStokTidakCukup)
 	}
 
 	for _, d := range sale.Details {
@@ -516,16 +539,26 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 		return nil, domain.ErrSaleProductNotFound
 	}
 	actor := int8FromID(actorID)
+	restoreIDs := make([]int64, 0, len(productLocks))
+	restoreQtys := make([]int32, 0, len(productLocks))
+	restoreCosts := make([]pgtype.Numeric, 0, len(productLocks))
 	for _, p := range productLocks {
 		r := restocks[p.ID]
-		if err := qtx.RestoreProductStockWithValuation(ctx, db.RestoreProductStockWithValuationParams{
-			Qty:       r.qty,
-			CostTotal: numericFromFloat(r.costTotal),
-			UpdatedBy: actor,
-			ID:        p.ID,
-		}); err != nil {
-			return nil, err
-		}
+		restoreIDs = append(restoreIDs, p.ID)
+		restoreQtys = append(restoreQtys, r.qty)
+		restoreCosts = append(restoreCosts, numericFromFloat(r.costTotal))
+	}
+	restored, err := qtx.RestoreProductStocksWithValuation(ctx, db.RestoreProductStocksWithValuationParams{
+		ProductIds: restoreIDs,
+		Qtys:       restoreQtys,
+		CostTotals: restoreCosts,
+		UpdatedBy:  actor,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if restored != int64(len(restoreIDs)) {
+		return nil, domain.ErrSaleProductNotFound
 	}
 
 	// Batalkan poin yang terlibat pada nota ini (earn ditarik, redeem dikembalikan).

@@ -120,12 +120,15 @@ type GoodsReceiptNoteRepository interface {
 	GetByPOID(ctx context.Context, poID int64) ([]GoodsReceiptNote, error)
 }
 
-// GRNJournalPoster menerbitkan jurnal otomatis dari satu GRN (auto-posting).
-// Penerapan wajib idempoten: GRN yang sudah punya jurnal POSTED tidak boleh
-// menghasilkan jurnal kedua, supaya penutupan penerimaan yang diulang tidak pernah
-// mencatat persediaan dua kali.
+// GRNJournalPoster menerbitkan jurnal otomatis dari satu atau beberapa GRN
+// (auto-posting). Penerapan wajib idempoten: GRN yang sudah punya jurnal POSTED
+// tidak boleh menghasilkan jurnal kedua, supaya penutupan penerimaan yang
+// diulang tidak pernah mencatat persediaan dua kali.
+//
+// Batch dipakai agar pemetaan akun, validasi akun, dan pengecekan periode cukup
+// dibaca sekali untuk seluruh GRN, bukan sekali per GRN.
 type GRNJournalPoster interface {
-	PostGRNJournal(ctx context.Context, grn *GoodsReceiptNote, po *PurchaseOrder, actorID int64) error
+	PostGRNJournals(ctx context.Context, grns []*GoodsReceiptNote, po *PurchaseOrder, actorID int64) error
 }
 
 // GoodsReceiptNoteUsecase mendefinisikan aturan bisnis GRN.

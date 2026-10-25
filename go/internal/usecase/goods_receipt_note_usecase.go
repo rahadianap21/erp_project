@@ -93,6 +93,7 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 	// stok dan status PO dulu yang berubah, PO sudah tampak selesai padahal buku
 	// besar belum terisi, dan kegagalan seperti itu justru jarang diulang.
 	if u.poster != nil {
+		postable := make([]*domain.GoodsReceiptNote, 0, len(grns))
 		for i := range grns {
 			g := &grns[i]
 			// GetByPOID sudah membawa detail seluruh GRN dalam satu query. Baris
@@ -101,9 +102,12 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 			if len(g.Items) == 0 {
 				return domain.NewBusinessRuleError("penerimaan ditolak: detail grn %d tidak ditemukan saat penerbitan jurnal", g.ID)
 			}
-			if err := u.poster.PostGRNJournal(ctx, g, po, updatedBy); err != nil {
-				return err
-			}
+			postable = append(postable, g)
+		}
+		// Satu panggilan untuk seluruh GRN: pemetaan akun, validasi akun, dan
+		// pengecekan periode dibaca sekali, tidak lagi per GRN.
+		if err := u.poster.PostGRNJournals(ctx, postable, po, updatedBy); err != nil {
+			return err
 		}
 	}
 

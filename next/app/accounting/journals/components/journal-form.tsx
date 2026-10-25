@@ -160,7 +160,7 @@ export function JournalForm({
       </button>
 
       <div
-        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-[1600px] p-6 border-t border-slate-100 overflow-y-auto" : "max-h-0 opacity-0 pointer-events-none"}`}
+        className={`transition-all duration-300 ease-in-out ${isExpanded ? "max-h-none p-6 border-t border-slate-100 overflow-y-auto" : "max-h-0 opacity-0 pointer-events-none"}`}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -191,8 +191,8 @@ export function JournalForm({
             </div>
           </div>
 
-          <div className="border rounded-xl overflow-hidden">
-            <div className="bg-slate-100/80 px-4 py-2 grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="border rounded-xl overflow-x-auto">
+            <div className="min-w-[720px] bg-slate-100/80 px-4 py-2 grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               <span className="col-span-4">Akun</span>
               <span className="col-span-3">Keterangan</span>
               <span className="col-span-2 text-right">Debit (Rp)</span>
@@ -203,7 +203,7 @@ export function JournalForm({
             {lines.map((line, index) => (
               <div
                 key={index}
-                className="border-t border-slate-100 px-4 py-2 grid grid-cols-12 gap-2 items-start"
+                className="min-w-[720px] border-t border-slate-100 px-4 py-2 grid grid-cols-12 gap-2 items-start"
               >
                 <div className="col-span-4 space-y-1">
                   <ComboboxSelect

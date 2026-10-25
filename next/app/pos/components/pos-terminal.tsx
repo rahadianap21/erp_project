@@ -467,8 +467,8 @@ export function PosTerminal() {
   };
 
   return (
-    <div className="mx-auto grid h-[calc(100svh-3.5rem)] w-full max-w-[2560px] grid-cols-1 lg:grid-cols-[minmax(0,1fr)_370px] xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_420px] 3xl:grid-cols-[minmax(0,1fr)_500px] 4xl:h-[calc(100svh-4rem)] 4xl:grid-cols-[minmax(0,1fr)_600px]">
-      <section className="flex min-h-0 flex-col border-r">
+    <div className="mx-auto grid min-h-[calc(100svh-4rem)] w-full max-w-[2560px] grid-cols-1 md:h-[calc(100svh-4rem)] md:grid-cols-[minmax(0,1fr)_370px] xl:grid-cols-[minmax(0,1fr)_400px] 2xl:grid-cols-[minmax(0,1fr)_420px] 3xl:grid-cols-[minmax(0,1fr)_500px] 4xl:grid-cols-[minmax(0,1fr)_600px]">
+      <section className="flex min-h-0 flex-col border-b md:border-b-0 md:border-r">
         <div className="space-y-3 border-b p-4 3xl:p-5 4xl:p-6">
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground 4xl:size-5" />
@@ -484,7 +484,7 @@ export function PosTerminal() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto p-4 3xl:p-5 4xl:p-6">
+        <div className="min-h-[50svh] flex-1 overflow-auto p-4 md:min-h-0 3xl:p-5 4xl:p-6">
           {!showProducts ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               <ScanLineIcon className="size-10 opacity-40 4xl:size-14" />
@@ -501,7 +501,7 @@ export function PosTerminal() {
               Produk tidak ditemukan.
             </p>
           ) : (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 3xl:gap-4 4xl:gap-5">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-4 3xl:gap-4 4xl:gap-5">
               {products.map((p) => {
                 const habis = p.current_stock <= 0;
                 const stokTipis = !habis && p.current_stock <= 5;
@@ -708,7 +708,7 @@ export function PosTerminal() {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto p-4 3xl:p-5 4xl:p-6">
+        <div className="min-h-[12rem] flex-1 overflow-auto p-4 md:min-h-0 3xl:p-5 4xl:p-6">
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
               <ShoppingCartIcon className="size-10 opacity-40 4xl:size-14" />

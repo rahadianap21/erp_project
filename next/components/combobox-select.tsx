@@ -397,7 +397,7 @@ export function ComboboxSelect({
           }
         }}
       >
-        <DialogContent className="w-full !max-w-2xl sm:!max-w-2xl p-6 bg-white rounded-xl border shadow-lg z-50 !overflow-visible">
+        <DialogContent className="w-full !max-w-[calc(100vw-1.5rem)] p-6 bg-white rounded-xl border shadow-lg z-50 !overflow-visible md:!max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5 uppercase">
               <Plus className="size-4 text-blue-600" /> Registrasi{" "}
@@ -525,7 +525,7 @@ export function ComboboxSelect({
                       setFormFields({ ...formFields, parentId: val })
                     }
                     emptyText="Kategori induk tidak ditemukan..."
-                    popoverClassName="!w-[620px] !min-w-[620px] !max-w-2xl !z-50"
+                    popoverClassName="!w-[calc(100vw-2rem)] !min-w-0 !max-w-[calc(100vw-2rem)] !z-50 md:!w-[620px] md:!min-w-[620px] md:!max-w-2xl"
                   />
                 </div>
 
@@ -582,7 +582,7 @@ export function ComboboxSelect({
                     placeholder="Contoh: Hendra Wijaya"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-600 uppercase">
                       No. Telepon / Fax

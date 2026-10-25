@@ -126,6 +126,48 @@ Catatan:
 
 ---
 
+## Pelacakan Error & Alert
+
+Error backend (respons 5xx dan panic) serta error frontend/Next.js dilacak secara
+built-in, tanpa layanan pihak ketiga.
+
+- Backend menyimpan error ke tabel `t_error_groups` dan `t_error_events`
+  (migrasi `000022_error_tracking`). Jalankan `make migrateup`.
+- Frontend mengirim laporan ke route handler `/api/errors`, yang meneruskannya
+  ke backend. Error server Next.js ditangkap lewat `next/instrumentation.ts`.
+- Alert dikirim ke webhook bila error **baru** muncul, atau error yang sama
+  masih berulang setelah `ERROR_ALERT_COOLDOWN` (default `24h`). Payload webhook
+  memuat `text` (Slack) dan `content` (Discord).
+- Data yang dikirim hanya pesan, stack, route (tanpa query), metode, dan status.
+  Request body, header, cookie, query string, serta identitas pengguna tidak
+  pernah dikumpulkan. Email, telepon, password, token, NIK/nomor panjang, dan
+  nilai dari kunci sensitif (`password`, `email`, `phone`, `customer`, dst.)
+  diredaksi di frontend dan sekali lagi di backend.
+
+Environment backend (lihat `go/.env.example`):
+
+| Variabel | Wajib | Default | Keterangan |
+| --- | --- | --- | --- |
+| `ERROR_ALERT_WEBHOOK_URL` | tidak | — | Webhook Slack/Discord/generik untuk alert. Kosong = alert mati, error tetap disimpan. |
+| `ERROR_ALERT_COOLDOWN` | tidak | `24h` | Jeda minimum sebelum fingerprint yang sama memicu alert lagi. |
+| `ERROR_INGEST_KEY` | tidak | — | Kunci bersama untuk `POST /api/errors`. Disarankan di produksi. |
+
+Environment frontend (server-side, jangan pakai prefix `NEXT_PUBLIC_`):
+
+```bash
+# next/.env.local — samakan dengan backend
+ERROR_INGEST_KEY=nilai-acak-yang-sama
+```
+
+Untuk melihat error terbaru:
+
+```sql
+SELECT fingerprint, source, message, occurrences, first_seen, last_seen
+FROM t_error_groups
+ORDER BY last_seen DESC
+LIMIT 20;
+```
+
 ## CI
 
 Workflow ada di `.github/workflows/ci.yml`:

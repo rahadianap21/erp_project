@@ -24,7 +24,7 @@ export function ReportHeader({
   children,
 }: ReportHeaderProps) {
   return (
-    <div className="flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-center md:justify-between">
       <div className="flex items-center gap-2">
         <div
           className={`rounded-xl border p-2 ${ACCENTS[accent] ?? ACCENTS.emerald}`}

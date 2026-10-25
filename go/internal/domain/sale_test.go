@@ -211,6 +211,17 @@ func TestCalculateSaleMenolakDiskonNotaManual(t *testing.T) {
 	}
 }
 
+func TestCalculateSaleMenolakQtyTidakPositif(t *testing.T) {
+	for _, qty := range []int{0, -1, -5} {
+		_, err := CalculateSale(CreateSaleInput{
+			Items: []SaleLineInput{{ProductID: 1, Qty: qty}},
+		}, produkUji(), cfgInclusive())
+		if !errors.Is(err, ErrSaleLineInvalid) {
+			t.Fatalf("qty %d harus ErrSaleLineInvalid, dapat %v", qty, err)
+		}
+	}
+}
+
 func TestCalculateSaleMemakaiHargaServer(t *testing.T) {
 	sale, err := CalculateSale(CreateSaleInput{
 		Items: []SaleLineInput{
