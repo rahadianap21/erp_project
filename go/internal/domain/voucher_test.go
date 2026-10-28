@@ -22,7 +22,7 @@ func TestValidateVoucherInput(t *testing.T) {
 		Code:          "promo",
 		Name:          "Promo",
 		DiscountType:  VoucherDiscountPercent,
-		DiscountValue: 10,
+		DiscountValue: DecInt(10),
 		IsActive:      true,
 	}
 	if err := ValidateVoucherInput(valid); err != nil {
@@ -32,12 +32,12 @@ func TestValidateVoucherInput(t *testing.T) {
 		name string
 		in   VoucherInput
 	}{
-		{"kode kosong", VoucherInput{Name: "X", DiscountType: VoucherDiscountAmount, DiscountValue: 1000}},
-		{"nama kosong", VoucherInput{Code: "X", DiscountType: VoucherDiscountAmount, DiscountValue: 1000}},
+		{"kode kosong", VoucherInput{Name: "X", DiscountType: VoucherDiscountAmount, DiscountValue: DecInt(1000)}},
+		{"nama kosong", VoucherInput{Code: "X", DiscountType: VoucherDiscountAmount, DiscountValue: DecInt(1000)}},
 		{"persen nol", VoucherInput{Code: "X", Name: "X", DiscountType: VoucherDiscountPercent}},
-		{"persen lebih 100", VoucherInput{Code: "X", Name: "X", DiscountType: VoucherDiscountPercent, DiscountValue: 101}},
+		{"persen lebih 100", VoucherInput{Code: "X", Name: "X", DiscountType: VoucherDiscountPercent, DiscountValue: DecInt(101)}},
 		{"nominal nol", VoucherInput{Code: "X", Name: "X", DiscountType: VoucherDiscountAmount}},
-		{"jenis salah", VoucherInput{Code: "X", Name: "X", DiscountType: "BOGUS", DiscountValue: 1}},
+		{"jenis salah", VoucherInput{Code: "X", Name: "X", DiscountType: "BOGUS", DiscountValue: DecInt(1)}},
 	}
 	for _, c := range cases {
 		if err := ValidateVoucherInput(c.in); err == nil {
@@ -48,7 +48,7 @@ func TestValidateVoucherInput(t *testing.T) {
 
 func TestVoucherValidateUsable(t *testing.T) {
 	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
-	base := Voucher{Code: "X", Name: "X", DiscountType: VoucherDiscountAmount, DiscountValue: 1000, IsActive: true}
+	base := Voucher{Code: "X", Name: "X", DiscountType: VoucherDiscountAmount, DiscountValue: DecInt(1000), IsActive: true}
 
 	inactive := base
 	inactive.IsActive = false

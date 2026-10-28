@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	"go_backend/internal/domain"
@@ -31,7 +30,7 @@ func (u *settingsUsecase) TaxConfig(ctx context.Context) (domain.TaxConfig, erro
 		return cfg, err
 	}
 	if rate != nil {
-		if v, perr := strconv.ParseFloat(strings.TrimSpace(rate.Value), 64); perr == nil && v >= 0 {
+		if v, perr := domain.DecFromString(strings.TrimSpace(rate.Value)); perr == nil && !v.IsNegative() {
 			cfg.Rate = v
 		}
 	}
@@ -62,11 +61,10 @@ func (u *settingsUsecase) GetAll(ctx context.Context) (*domain.SettingsView, err
 func (u *settingsUsecase) Update(ctx context.Context, in domain.UpdateSettingsInput, actorID int64) (*domain.SettingsView, error) {
 	if in.PPNRate != nil {
 		rate := *in.PPNRate
-		if rate < 0 || rate > 1 {
+		if rate.IsNegative() || rate.Cmp(domain.DecInt(1)) > 0 {
 			return nil, domain.ErrSettingPPNRateInvalid
 		}
-		value := strconv.FormatFloat(rate, 'f', -1, 64)
-		if err := u.repo.Upsert(ctx, domain.SettingKeyPPNRate, value, ppnRateDescription, actorID); err != nil {
+		if err := u.repo.Upsert(ctx, domain.SettingKeyPPNRate, rate.String(), ppnRateDescription, actorID); err != nil {
 			return nil, err
 		}
 	}

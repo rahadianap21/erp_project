@@ -151,7 +151,7 @@ export default function RoleForm({
         disabled={!!editingRole}
         className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100/80 transition-colors text-left cursor-pointer"
       >
-        <span className=" text-sm font-semibold text-gray-800">
+        <span className=" text-sm font-medium text-foreground">
           {editingRole
             ? `📝 Edit Role: ${editingRole.name}`
             : "Tambah Role Baru"}
@@ -172,7 +172,7 @@ export default function RoleForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {/* Input Nama */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-wide text-slate-800">
+              <label className="text-xs font-medium text-muted-foreground">
                 Nama Role *
               </label>
               <input
@@ -187,7 +187,7 @@ export default function RoleForm({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold tracking-wide text-slate-800 flex items-center gap-1.5">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <KeyRound className="size-3.5 text-blue-500" /> Atur Hak Akses
               Granular (Permissions)
             </label>
@@ -237,7 +237,7 @@ export default function RoleForm({
                         >
                           {/* Judul Kop Modul + Tombol Select All */}
                           <div className="flex items-center justify-between border-b pb-1.5 border-slate-100">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                            <div className="text-xs font-medium text-muted-foreground tracking-wide flex items-center gap-1.5">
                               <Folder className="size-3 text-slate-400" />
                               <span>Modul {prefix}</span>
                             </div>
@@ -246,7 +246,7 @@ export default function RoleForm({
                             <button
                               type="button"
                               onClick={handleSelectAllGroup}
-                              className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer select-none"
+                              className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer select-none"
                             >
                               {isAllGroupChecked
                                 ? "Deselect All"
@@ -300,7 +300,7 @@ export default function RoleForm({
                               return (
                                 <label
                                   key={`cb-${perm}`}
-                                  className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-[10px] font-medium transition-all shadow-3xs cursor-pointer select-none active:scale-95 ${badgeColorClass} ${stateClasses}`}
+                                  className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-md border font-mono text-xs font-medium transition-all shadow-3xs cursor-pointer select-none active:scale-95 ${badgeColorClass} ${stateClasses}`}
                                 >
                                   <input
                                     type="checkbox"

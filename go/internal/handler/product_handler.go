@@ -86,21 +86,21 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 			userID := middleware.CurrentUserID(r)
 
 			var req struct {
-				Sku            string  `json:"sku"`
-				Barcode        string  `json:"barcode"`
-				Name           string  `json:"name"`
-				Description    string  `json:"description"`
-				CategoryID     int32   `json:"category_id"`
-				SupplierID     int64   `json:"supplier_id"`
-				SellingUnitID  int32   `json:"selling_unit_id"`
-				PurchaseUnitID int32   `json:"purchase_unit_id"`
-				ConversionRate int32   `json:"conversion_rate"`
-				PurchasePrice  float64 `json:"purchase_price"`
-				SellingPrice   float64 `json:"selling_price"`
-				MinStockLevel  int32   `json:"min_stock_level"`
-				DiscountType   string  `json:"discount_type"`
-				DiscountValue  float64 `json:"discount_value"`
-				IsTaxable      *bool   `json:"is_taxable"`
+				Sku            string         `json:"sku"`
+				Barcode        string         `json:"barcode"`
+				Name           string         `json:"name"`
+				Description    string         `json:"description"`
+				CategoryID     int32          `json:"category_id"`
+				SupplierID     int64          `json:"supplier_id"`
+				SellingUnitID  int32          `json:"selling_unit_id"`
+				PurchaseUnitID int32          `json:"purchase_unit_id"`
+				ConversionRate int32          `json:"conversion_rate"`
+				PurchasePrice  domain.Money   `json:"purchase_price"`
+				SellingPrice   domain.Money   `json:"selling_price"`
+				MinStockLevel  int32          `json:"min_stock_level"`
+				DiscountType   string         `json:"discount_type"`
+				DiscountValue  domain.Decimal `json:"discount_value"`
+				IsTaxable      *bool          `json:"is_taxable"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -166,22 +166,22 @@ func (h *ProductHandler) ProductsCRUDHandler(w http.ResponseWriter, r *http.Requ
 			userID := middleware.CurrentUserID(r)
 
 			var req struct {
-				Sku            string  `json:"sku"`
-				Barcode        string  `json:"barcode"`
-				Name           string  `json:"name"`
-				Description    string  `json:"description"`
-				CategoryID     int32   `json:"category_id"`
-				SupplierID     int64   `json:"supplier_id"`
-				SellingUnitID  int32   `json:"selling_unit_id"`
-				PurchaseUnitID int32   `json:"purchase_unit_id"`
-				ConversionRate int32   `json:"conversion_rate"`
-				PurchasePrice  float64 `json:"purchase_price"`
-				SellingPrice   float64 `json:"selling_price"`
-				MinStockLevel  int32   `json:"min_stock_level"`
-				DiscountType   string  `json:"discount_type"`
-				DiscountValue  float64 `json:"discount_value"`
-				IsTaxable      *bool   `json:"is_taxable"`
-				IsActive       bool    `json:"is_active"`
+				Sku            string         `json:"sku"`
+				Barcode        string         `json:"barcode"`
+				Name           string         `json:"name"`
+				Description    string         `json:"description"`
+				CategoryID     int32          `json:"category_id"`
+				SupplierID     int64          `json:"supplier_id"`
+				SellingUnitID  int32          `json:"selling_unit_id"`
+				PurchaseUnitID int32          `json:"purchase_unit_id"`
+				ConversionRate int32          `json:"conversion_rate"`
+				PurchasePrice  domain.Money   `json:"purchase_price"`
+				SellingPrice   domain.Money   `json:"selling_price"`
+				MinStockLevel  int32          `json:"min_stock_level"`
+				DiscountType   string         `json:"discount_type"`
+				DiscountValue  domain.Decimal `json:"discount_value"`
+				IsTaxable      *bool          `json:"is_taxable"`
+				IsActive       bool           `json:"is_active"`
 			}
 
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -193,7 +193,7 @@ func receivedGRN(id int64) *domain.GoodsReceiptNote {
 	}
 }
 
-func poWithTax(taxType string, unitPrice float64) *domain.PurchaseOrder {
+func poWithTax(taxType string, unitPrice domain.Money) *domain.PurchaseOrder {
 	return &domain.PurchaseOrder{
 		ID:       7,
 		PoNumber: "PO/20261013/0001",
@@ -207,22 +207,22 @@ func poWithTax(taxType string, unitPrice float64) *domain.PurchaseOrder {
 func TestGRNReceivedValuesMatrix(t *testing.T) {
 	cases := []struct {
 		taxType string
-		wantDPP float64
-		wantVAT float64
+		wantDPP domain.Money
+		wantVAT domain.Money
 	}{
-		{"NON_PPN", 10000, 0},
-		{"TAX_EXCLUSIVE", 10000, 1200},
-		{"TAX_INCLUSIVE", 8929, 1071},
+		{"NON_PPN", domain.Rupiah(10000), domain.Money{}},
+		{"TAX_EXCLUSIVE", domain.Rupiah(10000), domain.Rupiah(1200)},
+		{"TAX_INCLUSIVE", domain.NewMoney(892857), domain.NewMoney(107143)},
 	}
 	for _, c := range cases {
 		t.Run(c.taxType, func(t *testing.T) {
 			// UnitPrice 1000 x qty 10 = 10000.
-			dpp, vat, err := grnReceivedValues(receivedGRN(1), poWithTax(c.taxType, 1000))
+			dpp, vat, err := grnReceivedValues(receivedGRN(1), poWithTax(c.taxType, domain.Rupiah(1000)))
 			if err != nil {
 				t.Fatalf("tidak boleh gagal: %v", err)
 			}
-			if dpp != c.wantDPP || vat != c.wantVAT {
-				t.Fatalf("DPP/PPN salah: dapat (%.2f, %.2f), ingin (%.2f, %.2f)", dpp, vat, c.wantDPP, c.wantVAT)
+			if dpp.Cmp(c.wantDPP) != 0 || vat.Cmp(c.wantVAT) != 0 {
+				t.Fatalf("DPP/PPN salah: dapat (%s, %s), ingin (%s, %s)", dpp, vat, c.wantDPP, c.wantVAT)
 			}
 		})
 	}
@@ -235,7 +235,7 @@ func TestPostGRNJournalExclusiveSeimbang(t *testing.T) {
 	period := &fakePeriodRepo{}
 	uc := newPostingUsecase(repo, &fakeSettingsRepo{mapping: defaultMapping()}, period)
 
-	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("TAX_EXCLUSIVE", 1000), 99); err != nil {
+	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("TAX_EXCLUSIVE", domain.Rupiah(1000)), 99); err != nil {
 		t.Fatalf("jurnal harus terbit: %v", err)
 	}
 	if repo.created == nil {
@@ -252,13 +252,13 @@ func TestPostGRNJournalExclusiveSeimbang(t *testing.T) {
 		t.Fatalf("harus 3 baris, dapat %d", len(got.Lines))
 	}
 
-	var debit, credit float64
+	var debit, credit domain.Money
 	for _, l := range got.Lines {
-		debit += l.Debit
-		credit += l.Credit
+		debit = debit.Add(l.Debit)
+		credit = credit.Add(l.Credit)
 	}
-	if debit != credit || debit != 11200 {
-		t.Fatalf("jurnal tidak seimbang: debit %.2f kredit %.2f", debit, credit)
+	if debit.Cmp(credit) != 0 || debit.Cmp(domain.Rupiah(11200)) != 0 {
+		t.Fatalf("jurnal tidak seimbang: debit %s kredit %s", debit, credit)
 	}
 	if len(period.ensured) != 1 || period.ensured[0] != "2026-10" {
 		t.Fatalf("periode jurnal salah: %v", period.ensured)
@@ -271,7 +271,7 @@ func TestPostGRNJournalTanPPNGaVATInput(t *testing.T) {
 	repo := &fakeJournalRepo{}
 	uc := newPostingUsecase(repo, &fakeSettingsRepo{mapping: map[string]int64{"INVENTORY": 11, "AP": 21}}, &fakePeriodRepo{})
 
-	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", 1000), 99); err != nil {
+	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", domain.Rupiah(1000)), 99); err != nil {
 		t.Fatalf("jurnal harus terbit tanpa akun PPN: %v", err)
 	}
 	if len(repo.created.Lines) != 2 {
@@ -285,7 +285,7 @@ func TestPostGRNJournalIdempoten(t *testing.T) {
 	repo := &fakeJournalRepo{createErr: domain.ErrJournalAlreadyPost}
 	uc := newPostingUsecase(repo, &fakeSettingsRepo{mapping: defaultMapping()}, &fakePeriodRepo{})
 
-	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", 1000), 99); err != nil {
+	if err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", domain.Rupiah(1000)), 99); err != nil {
 		t.Fatalf("harus mengabaikan jurnal yang sudah ada, dapat %v", err)
 	}
 }
@@ -296,7 +296,7 @@ func TestPostGRNJournalPemetaanKurang(t *testing.T) {
 	repo := &fakeJournalRepo{}
 	uc := newPostingUsecase(repo, &fakeSettingsRepo{mapping: map[string]int64{"AP": 21}}, &fakePeriodRepo{})
 
-	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", 1000), 99)
+	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", domain.Rupiah(1000)), 99)
 	if !errors.Is(err, domain.ErrAutoPostingSettings) {
 		t.Fatalf("harus menandai pemetaan kurang, dapat %v", err)
 	}
@@ -312,7 +312,7 @@ func TestPostGRNJournalPeriodeTertutup(t *testing.T) {
 	period := &fakePeriodRepo{ensureErr: domain.ErrJournalPeriodClosed}
 	uc := newPostingUsecase(repo, &fakeSettingsRepo{mapping: defaultMapping()}, period)
 
-	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", 1000), 99)
+	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", domain.Rupiah(1000)), 99)
 	if !errors.Is(err, domain.ErrJournalPeriodClosed) {
 		t.Fatalf("harus meneruskan error periode, dapat %v", err)
 	}
@@ -331,7 +331,7 @@ func TestPostGRNJournalsBatchMembacaReferensiSekali(t *testing.T) {
 	uc := NewJournalUsecase(repo, accounts, period, settings, &fakeReportRepo{})
 
 	grns := []*domain.GoodsReceiptNote{receivedGRN(1), receivedGRN(2), receivedGRN(3)}
-	if err := uc.PostGRNJournals(context.Background(), grns, poWithTax("NON_PPN", 1000), 99); err != nil {
+	if err := uc.PostGRNJournals(context.Background(), grns, poWithTax("NON_PPN", domain.Rupiah(1000)), 99); err != nil {
 		t.Fatalf("jurnal batch harus terbit: %v", err)
 	}
 	if settings.listCalls != 1 {
@@ -358,7 +358,7 @@ func TestAkunHeaderDitolak(t *testing.T) {
 	uc := NewJournalUsecase(repo, &fakeAccountRepo{accounts: accounts}, &fakePeriodRepo{},
 		&fakeSettingsRepo{mapping: map[string]int64{"INVENTORY": 11, "AP": 21}}, &fakeReportRepo{})
 
-	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", 1000), 99)
+	err := uc.PostGRNJournal(context.Background(), receivedGRN(5), poWithTax("NON_PPN", domain.Rupiah(1000)), 99)
 	if err == nil {
 		t.Fatal("akun header tidak boleh diposting")
 	}

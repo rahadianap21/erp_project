@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"go_backend/internal/domain"
@@ -72,8 +71,8 @@ func insertPostedJournal(ctx context.Context, qtx *db.Queries, plan *domain.Sale
 		SourceType:      srcType,
 		SourceID:        nullableInt8(sourceID),
 		SourceReference: srcRef,
-		TotalDebit:      numericFromFloat(plan.TotalDebit),
-		TotalCredit:     numericFromFloat(plan.TotalCredit),
+		TotalDebit:      numericFromMoney(plan.TotalDebit),
+		TotalCredit:     numericFromMoney(plan.TotalCredit),
 		PeriodYear:      int32(plan.EntryDate.Year()),
 		PeriodMonth:     int32(plan.EntryDate.Month()),
 		ReversalOfID:    nullableInt8(plan.ReversalOfID),
@@ -101,8 +100,8 @@ func insertPostedJournal(ctx context.Context, qtx *db.Queries, plan *domain.Sale
 			LineNo:         int32(i + 1),
 			AccountID:      l.AccountID,
 			Description:    lineDesc,
-			Debit:          numericFromFloat(l.Debit),
-			Credit:         numericFromFloat(l.Credit),
+			Debit:          numericFromMoney(l.Debit),
+			Credit:         numericFromMoney(l.Credit),
 		}); err != nil {
 			return 0, err
 		}
@@ -235,11 +234,11 @@ func (r *sqlSaleRepository) GetProductsForSale(ctx context.Context, ids []int64)
 			ID:            v.ID,
 			SKU:           v.Sku,
 			Name:          v.Name,
-			SellingPrice:  numericToFloat(v.SellingPrice),
-			AvgCost:       numericToFloat(v.AvgCost),
+			SellingPrice:  moneyFromNumeric(v.SellingPrice),
+			AvgCost:       decimalFromNumeric(v.AvgCost),
 			CurrentStock:  int(v.CurrentStock),
 			DiscountType:  v.DiscountType,
-			DiscountValue: numericToFloat(v.DiscountValue),
+			DiscountValue: decimalFromNumeric(v.DiscountValue),
 			IsTaxable:     v.IsTaxable,
 		}
 	}
@@ -282,11 +281,11 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 			ID:            l.ID,
 			SKU:           l.Sku,
 			Name:          l.Name,
-			SellingPrice:  numericToFloat(l.SellingPrice),
-			AvgCost:       numericToFloat(l.AvgCost),
+			SellingPrice:  moneyFromNumeric(l.SellingPrice),
+			AvgCost:       decimalFromNumeric(l.AvgCost),
 			CurrentStock:  int(l.CurrentStock),
 			DiscountType:  l.DiscountType,
-			DiscountValue: numericToFloat(l.DiscountValue),
+			DiscountValue: decimalFromNumeric(l.DiscountValue),
 			IsTaxable:     l.IsTaxable,
 		}
 	}
@@ -368,23 +367,23 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 		SaleDate:        pgtype.Date{Time: sale.SaleDate, Valid: true},
 		MemberID:        memberID,
 		TaxType:         sale.TaxType,
-		Subtotal:        numericFromFloat(sale.Subtotal),
-		ItemDiscount:    numericFromFloat(sale.ItemDiscount),
+		Subtotal:        numericFromMoney(sale.Subtotal),
+		ItemDiscount:    numericFromMoney(sale.ItemDiscount),
 		DiscountType:    sale.DiscountType,
-		DiscountValue:   numericFromFloat(sale.DiscountValue),
-		DiscountAmount:  numericFromFloat(sale.DiscountAmount),
-		DppAmount:       numericFromFloat(sale.DppAmount),
-		TaxAmount:       numericFromFloat(sale.TaxAmount),
-		TotalAmount:     numericFromFloat(sale.TotalAmount),
-		PaidAmount:      numericFromFloat(sale.PaidAmount),
-		ChangeAmount:    numericFromFloat(sale.ChangeAmount),
-		CostTotal:       numericFromFloat(sale.CostTotal),
+		DiscountValue:   numericFromDecimal(sale.DiscountValue),
+		DiscountAmount:  numericFromMoney(sale.DiscountAmount),
+		DppAmount:       numericFromMoney(sale.DppAmount),
+		TaxAmount:       numericFromMoney(sale.TaxAmount),
+		TotalAmount:     numericFromMoney(sale.TotalAmount),
+		PaidAmount:      numericFromMoney(sale.PaidAmount),
+		ChangeAmount:    numericFromMoney(sale.ChangeAmount),
+		CostTotal:       numericFromMoney(sale.CostTotal),
 		PointsEarned:    sale.PointsEarned,
 		RedeemPoints:    sale.RedeemPoints,
-		RedeemAmount:    numericFromFloat(sale.RedeemAmount),
+		RedeemAmount:    numericFromMoney(sale.RedeemAmount),
 		VoucherID:       voucherID,
 		VoucherCode:     sale.VoucherCode,
-		VoucherDiscount: numericFromFloat(sale.VoucherDiscount),
+		VoucherDiscount: numericFromMoney(sale.VoucherDiscount),
 		PaymentStatus:   sale.PaymentStatus,
 		Status:          domain.SaleStatusPosted,
 		DueDate:         dueDate,
@@ -441,16 +440,16 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 			Sku:            d.SKU,
 			ProductName:    d.ProductName,
 			Qty:            int32(d.Qty),
-			UnitPrice:      numericFromFloat(d.UnitPrice),
+			UnitPrice:      numericFromMoney(d.UnitPrice),
 			DiscountType:   d.DiscountType,
-			DiscountValue:  numericFromFloat(d.DiscountValue),
-			DiscountAmount: numericFromFloat(d.DiscountAmount),
-			GrossAmount:    numericFromFloat(d.GrossAmount),
-			LineTotal:      numericFromFloat(d.LineTotal),
-			DppAmount:      numericFromFloat(d.DppAmount),
-			TaxAmount:      numericFromFloat(d.TaxAmount),
-			CostUnit:       numericFromFloat4(d.CostUnit),
-			CostTotal:      numericFromFloat(d.CostTotal),
+			DiscountValue:  numericFromDecimal(d.DiscountValue),
+			DiscountAmount: numericFromMoney(d.DiscountAmount),
+			GrossAmount:    numericFromMoney(d.GrossAmount),
+			LineTotal:      numericFromMoney(d.LineTotal),
+			DppAmount:      numericFromMoney(d.DppAmount),
+			TaxAmount:      numericFromMoney(d.TaxAmount),
+			CostUnit:       numericFromDecimal(d.CostUnit),
+			CostTotal:      numericFromMoney(d.CostTotal),
 		}); err != nil {
 			return nil, err
 		}
@@ -460,7 +459,7 @@ func (r *sqlSaleRepository) CreateSale(ctx context.Context, sale *domain.Sale, j
 		if err := qtx.CreateSalePayment(ctx, db.CreateSalePaymentParams{
 			SaleID:          header.ID,
 			PaymentMethodID: p.PaymentMethodID,
-			Amount:          numericFromFloat(p.Amount),
+			Amount:          numericFromMoney(p.Amount),
 			ReferenceNumber: p.ReferenceNumber,
 		}); err != nil {
 			return nil, err
@@ -518,7 +517,7 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 	// karena avg_cost produk bisa sudah berubah sejak nota dibuat.
 	type restock struct {
 		qty       int32
-		costTotal float64
+		costTotal domain.Money
 	}
 	restocks := make(map[int64]restock, len(details))
 	productIDs := make([]int64, 0, len(details))
@@ -528,7 +527,7 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 			productIDs = append(productIDs, d.ProductID)
 		}
 		r.qty += d.Qty
-		r.costTotal += numericToFloat(d.CostTotal)
+		r.costTotal = r.costTotal.Add(moneyFromNumeric(d.CostTotal))
 		restocks[d.ProductID] = r
 	}
 	productLocks, err := qtx.LockProductsForVoid(ctx, productIDs)
@@ -546,7 +545,7 @@ func (r *sqlSaleRepository) VoidSale(ctx context.Context, id, actorID int64, rea
 		r := restocks[p.ID]
 		restoreIDs = append(restoreIDs, p.ID)
 		restoreQtys = append(restoreQtys, r.qty)
-		restoreCosts = append(restoreCosts, numericFromFloat(r.costTotal))
+		restoreCosts = append(restoreCosts, numericFromMoney(r.costTotal))
 	}
 	restored, err := qtx.RestoreProductStocksWithValuation(ctx, db.RestoreProductStocksWithValuationParams{
 		ProductIds: restoreIDs,
@@ -622,9 +621,9 @@ func voucherFromLockRow(v db.LockVoucherForSaleRow) *domain.Voucher {
 		ID:            v.ID,
 		Code:          v.Code,
 		DiscountType:  v.DiscountType,
-		DiscountValue: numericToFloat(v.DiscountValue),
-		MinPurchase:   numericToFloat(v.MinPurchase),
-		MaxDiscount:   numericToFloat(v.MaxDiscount),
+		DiscountValue: decimalFromNumeric(v.DiscountValue),
+		MinPurchase:   moneyFromNumeric(v.MinPurchase),
+		MaxDiscount:   moneyFromNumeric(v.MaxDiscount),
 		ValidFrom:     dateOnlyFromPg(v.ValidFrom),
 		ValidUntil:    dateOnlyFromPg(v.ValidUntil),
 		IsActive:      v.IsActive,
@@ -635,13 +634,13 @@ func voucherFromLockRow(v db.LockVoucherForSaleRow) *domain.Voucher {
 // saleProductSnapshotChanged mendeteksi perubahan nilai yang memengaruhi total
 // nota atau HPP antara snapshot pra-transaksi dan baris produk yang terkunci.
 func saleProductSnapshotChanged(d domain.SaleDetail, p domain.SaleProductInfo) bool {
-	if math.Abs(d.UnitPrice-p.SellingPrice) > 0.005 {
+	if d.UnitPrice.Cmp(p.SellingPrice) != 0 {
 		return true
 	}
-	if d.DiscountType != p.DiscountType || math.Abs(d.DiscountValue-p.DiscountValue) > 0.005 {
+	if d.DiscountType != p.DiscountType || d.DiscountValue.Cmp(p.DiscountValue) != 0 {
 		return true
 	}
-	if math.Abs(d.CostUnit-p.AvgCost) > 0.00005 {
+	if d.CostUnit.Cmp(p.AvgCost) != 0 {
 		return true
 	}
 	return d.IsTaxable != p.IsTaxable
@@ -655,16 +654,16 @@ func mapSaleDetail(row db.GetSaleDetailsRow) domain.SaleDetail {
 		SKU:            row.Sku,
 		ProductName:    row.ProductName,
 		Qty:            int(row.Qty),
-		UnitPrice:      numericToFloat(row.UnitPrice),
+		UnitPrice:      moneyFromNumeric(row.UnitPrice),
 		DiscountType:   row.DiscountType,
-		DiscountValue:  numericToFloat(row.DiscountValue),
-		DiscountAmount: numericToFloat(row.DiscountAmount),
-		GrossAmount:    numericToFloat(row.GrossAmount),
-		LineTotal:      numericToFloat(row.LineTotal),
-		DppAmount:      numericToFloat(row.DppAmount),
-		TaxAmount:      numericToFloat(row.TaxAmount),
-		CostUnit:       numericToFloat(row.CostUnit),
-		CostTotal:      numericToFloat(row.CostTotal),
+		DiscountValue:  decimalFromNumeric(row.DiscountValue),
+		DiscountAmount: moneyFromNumeric(row.DiscountAmount),
+		GrossAmount:    moneyFromNumeric(row.GrossAmount),
+		LineTotal:      moneyFromNumeric(row.LineTotal),
+		DppAmount:      moneyFromNumeric(row.DppAmount),
+		TaxAmount:      moneyFromNumeric(row.TaxAmount),
+		CostUnit:       decimalFromNumeric(row.CostUnit),
+		CostTotal:      moneyFromNumeric(row.CostTotal),
 	}
 }
 
@@ -675,7 +674,7 @@ func mapSalePayment(row db.GetSalePaymentsRow) domain.SalePayment {
 		PaymentMethodID:   row.PaymentMethodID,
 		PaymentMethodName: row.PaymentMethodName,
 		Channel:           row.Channel,
-		Amount:            numericToFloat(row.Amount),
+		Amount:            moneyFromNumeric(row.Amount),
 		ReferenceNumber:   row.ReferenceNumber,
 		CreatedAt:         row.CreatedAt.Time,
 	}
@@ -696,22 +695,22 @@ func (r *sqlSaleRepository) GetByID(ctx context.Context, id int64) (*domain.Sale
 		SaleDate:        row.SaleDate.Time,
 		MemberName:      row.MemberName,
 		TaxType:         row.TaxType,
-		Subtotal:        numericToFloat(row.Subtotal),
-		ItemDiscount:    numericToFloat(row.ItemDiscount),
+		Subtotal:        moneyFromNumeric(row.Subtotal),
+		ItemDiscount:    moneyFromNumeric(row.ItemDiscount),
 		DiscountType:    row.DiscountType,
-		DiscountValue:   numericToFloat(row.DiscountValue),
-		DiscountAmount:  numericToFloat(row.DiscountAmount),
-		DppAmount:       numericToFloat(row.DppAmount),
-		TaxAmount:       numericToFloat(row.TaxAmount),
-		TotalAmount:     numericToFloat(row.TotalAmount),
-		PaidAmount:      numericToFloat(row.PaidAmount),
-		ChangeAmount:    numericToFloat(row.ChangeAmount),
-		CostTotal:       numericToFloat(row.CostTotal),
+		DiscountValue:   decimalFromNumeric(row.DiscountValue),
+		DiscountAmount:  moneyFromNumeric(row.DiscountAmount),
+		DppAmount:       moneyFromNumeric(row.DppAmount),
+		TaxAmount:       moneyFromNumeric(row.TaxAmount),
+		TotalAmount:     moneyFromNumeric(row.TotalAmount),
+		PaidAmount:      moneyFromNumeric(row.PaidAmount),
+		ChangeAmount:    moneyFromNumeric(row.ChangeAmount),
+		CostTotal:       moneyFromNumeric(row.CostTotal),
 		PointsEarned:    row.PointsEarned,
 		RedeemPoints:    row.RedeemPoints,
-		RedeemAmount:    numericToFloat(row.RedeemAmount),
+		RedeemAmount:    moneyFromNumeric(row.RedeemAmount),
 		VoucherCode:     row.VoucherCode,
-		VoucherDiscount: numericToFloat(row.VoucherDiscount),
+		VoucherDiscount: moneyFromNumeric(row.VoucherDiscount),
 		PaymentStatus:   row.PaymentStatus,
 		Status:          row.Status,
 		Notes:           row.Notes,
@@ -768,8 +767,8 @@ func mapSaleListRow(id int64, saleNumber string, saleDate pgtype.Date, memberID 
 		SaleNumber:    saleNumber,
 		SaleDate:      saleDate.Time,
 		MemberName:    memberName,
-		TotalAmount:   numericToFloat(total),
-		PaidAmount:    numericToFloat(paid),
+		TotalAmount:   moneyFromNumeric(total),
+		PaidAmount:    moneyFromNumeric(paid),
 		VoucherCode:   voucherCode,
 		PaymentStatus: paymentStatus,
 		Status:        status,
@@ -854,12 +853,12 @@ func (r *sqlSaleRepository) LookupProductsForPOS(ctx context.Context, search str
 			SKU:           v.Sku,
 			Barcode:       v.Barcode.String,
 			Name:          v.Name,
-			SellingPrice:  numericToFloat(v.SellingPrice),
+			SellingPrice:  moneyFromNumeric(v.SellingPrice),
 			CurrentStock:  int(v.CurrentStock),
 			CategoryName:  v.CategoryName,
 			SellingUnit:   v.SellingUnit,
 			DiscountType:  v.DiscountType,
-			DiscountValue: numericToFloat(v.DiscountValue),
+			DiscountValue: decimalFromNumeric(v.DiscountValue),
 			IsTaxable:     v.IsTaxable,
 		})
 	}

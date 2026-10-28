@@ -257,7 +257,7 @@ export function GRNFormDialog({
                         <div className="font-medium text-slate-800">
                           {r.line.product_name}
                         </div>
-                        <div className="font-mono text-[10px] text-slate-500">
+                        <div className="font-mono text-xs text-slate-500">
                           {r.line.product_sku}
                         </div>
                       </td>
@@ -278,7 +278,7 @@ export function GRNFormDialog({
                               : ""
                           }`}
                         />
-                        {/* <div className="text-[9px] text-center text-slate-400 mt-0.5">
+                        {/* <div className="text-xs text-center text-slate-400 mt-0.5">
                                                     {r.line.unit_kode}
                                                 </div> */}
                       </td>
@@ -291,7 +291,7 @@ export function GRNFormDialog({
                           <span className="text-slate-300">—</span>
                         )}
                         {r.effectiveRate > 1 && (
-                          <div className="text-[9px] text-slate-400">
+                          <div className="text-xs text-slate-400">
                             1 {r.line.unit_kode} = {r.effectiveRate}{" "}
                             {r.sellingUnit}
                           </div>
@@ -315,7 +315,7 @@ export function GRNFormDialog({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase">
+                <label className="text-xs font-medium text-muted-foreground">
                   Tanggal Terima
                 </label>
                 <Input
@@ -326,7 +326,7 @@ export function GRNFormDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase">
+                <label className="text-xs font-medium text-muted-foreground">
                   Catatan
                 </label>
                 <Input

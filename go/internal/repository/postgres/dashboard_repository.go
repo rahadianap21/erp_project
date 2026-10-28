@@ -23,7 +23,7 @@ func (r *sqlDashboardRepository) GetStats(ctx context.Context) (domain.Dashboard
 		return domain.DashboardStats{}, err
 	}
 	return domain.DashboardStats{
-		TotalPOValue:   row.TotalPoValue,
+		TotalPOValue:   moneyFromNumeric(row.TotalPoValue),
 		TotalPO:        row.TotalPo,
 		POPending:      row.PoPending,
 		POApproved:     row.PoApproved,
@@ -67,7 +67,7 @@ func (r *sqlDashboardRepository) GetRecentPOs(ctx context.Context, limit int) ([
 			ID:           row.ID,
 			PONumber:     row.PoNumber,
 			SupplierName: row.SupplierName,
-			TotalAmount:  row.TotalAmount,
+			TotalAmount:  moneyFromNumeric(row.TotalAmount),
 			Status:       row.Status,
 			PODate:       formatPgDate(row.PoDate),
 		})

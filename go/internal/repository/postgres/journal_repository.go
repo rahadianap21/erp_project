@@ -35,8 +35,8 @@ func mapJournalRow(v db.GetJournalEntriesCursorNextRow) domain.JournalEntry {
 		SourceID:        convertPgInt64(v.SourceID),
 		SourceReference: v.SourceReference.String,
 		Status:          v.Status,
-		TotalDebit:      numericToFloat(v.TotalDebit),
-		TotalCredit:     numericToFloat(v.TotalCredit),
+		TotalDebit:      moneyFromNumeric(v.TotalDebit),
+		TotalCredit:     moneyFromNumeric(v.TotalCredit),
 		PeriodYear:      int(v.PeriodYear),
 		PeriodMonth:     int(v.PeriodMonth),
 		PostedAt:        convertPgTime(v.PostedAt),
@@ -57,8 +57,8 @@ func mapJournalLine(v db.GetJournalEntryLinesRow) domain.JournalLine {
 		AccountCode: v.AccountCode,
 		AccountName: v.AccountName,
 		Description: v.Description.String,
-		Debit:       numericToFloat(v.Debit),
-		Credit:      numericToFloat(v.Credit),
+		Debit:       moneyFromNumeric(v.Debit),
+		Credit:      moneyFromNumeric(v.Credit),
 	}
 }
 
@@ -81,8 +81,8 @@ func (r *sqlJournalRepository) CreateDraft(ctx context.Context, entry *domain.Jo
 		SourceID:        nullableInt8(entry.SourceID),
 		SourceReference: pgtype.Text{String: entry.SourceReference, Valid: entry.SourceReference != ""},
 		Status:          entry.Status,
-		TotalDebit:      numericFromFloat(entry.TotalDebit),
-		TotalCredit:     numericFromFloat(entry.TotalCredit),
+		TotalDebit:      numericFromMoney(entry.TotalDebit),
+		TotalCredit:     numericFromMoney(entry.TotalCredit),
 		PeriodYear:      int32(entry.PeriodYear),
 		PeriodMonth:     int32(entry.PeriodMonth),
 		ReversalOfID:    nullableInt8(entry.ReversalOfID),
@@ -107,8 +107,8 @@ func (r *sqlJournalRepository) CreateDraft(ctx context.Context, entry *domain.Jo
 			LineNo:         int32(line.LineNo),
 			AccountID:      line.AccountID,
 			Description:    pgtype.Text{String: line.Description, Valid: line.Description != ""},
-			Debit:          numericFromFloat(line.Debit),
-			Credit:         numericFromFloat(line.Credit),
+			Debit:          numericFromMoney(line.Debit),
+			Credit:         numericFromMoney(line.Credit),
 		}); err != nil {
 			return err
 		}
@@ -313,8 +313,8 @@ func reverseJournal(ctx context.Context, q *db.Queries, originalID int64, entryD
 		Description: description,
 		SourceType:  domain.JournalSourceManual,
 		Status:      domain.JournalStatusDraft,
-		TotalDebit:  numericToFloat(origRow.TotalCredit),
-		TotalCredit: numericToFloat(origRow.TotalDebit),
+		TotalDebit:  moneyFromNumeric(origRow.TotalCredit),
+		TotalCredit: moneyFromNumeric(origRow.TotalDebit),
 		PeriodYear:  int(origRow.PeriodYear),
 		PeriodMonth: int(origRow.PeriodMonth),
 	}
@@ -325,8 +325,8 @@ func reverseJournal(ctx context.Context, q *db.Queries, originalID int64, entryD
 		Description:  pgtype.Text{String: description, Valid: description != ""},
 		SourceType:   pgtype.Text{String: domain.JournalSourceManual, Valid: true},
 		Status:       domain.JournalStatusDraft,
-		TotalDebit:   numericFromFloat(rev.TotalDebit),
-		TotalCredit:  numericFromFloat(rev.TotalCredit),
+		TotalDebit:   numericFromMoney(rev.TotalDebit),
+		TotalCredit:  numericFromMoney(rev.TotalCredit),
 		PeriodYear:   origRow.PeriodYear,
 		PeriodMonth:  origRow.PeriodMonth,
 		ReversalOfID: pgtype.Int8{Int64: originalID, Valid: true},
@@ -386,8 +386,8 @@ func reverseJournal(ctx context.Context, q *db.Queries, originalID int64, entryD
 			LineNo:      int(l.LineNo),
 			AccountID:   l.AccountID,
 			Description: l.Description.String,
-			Debit:       numericToFloat(l.Credit),
-			Credit:      numericToFloat(l.Debit),
+			Debit:       moneyFromNumeric(l.Credit),
+			Credit:      moneyFromNumeric(l.Debit),
 		})
 	}
 	return rev, nil
@@ -444,8 +444,8 @@ func createPosted(ctx context.Context, q *db.Queries, entry *domain.JournalEntry
 		SourceType:      pgtype.Text{String: entry.SourceType, Valid: entry.SourceType != ""},
 		SourceID:        nullableInt8(entry.SourceID),
 		SourceReference: pgtype.Text{String: entry.SourceReference, Valid: entry.SourceReference != ""},
-		TotalDebit:      numericFromFloat(entry.TotalDebit),
-		TotalCredit:     numericFromFloat(entry.TotalCredit),
+		TotalDebit:      numericFromMoney(entry.TotalDebit),
+		TotalCredit:     numericFromMoney(entry.TotalCredit),
 		PeriodYear:      int32(entry.PeriodYear),
 		PeriodMonth:     int32(entry.PeriodMonth),
 		ReversalOfID:    nullableInt8(entry.ReversalOfID),
@@ -477,8 +477,8 @@ func createPosted(ctx context.Context, q *db.Queries, entry *domain.JournalEntry
 			LineNo:         int32(line.LineNo),
 			AccountID:      line.AccountID,
 			Description:    pgtype.Text{String: line.Description, Valid: line.Description != ""},
-			Debit:          numericFromFloat(line.Debit),
-			Credit:         numericFromFloat(line.Credit),
+			Debit:          numericFromMoney(line.Debit),
+			Credit:         numericFromMoney(line.Credit),
 		}); err != nil {
 			return err
 		}

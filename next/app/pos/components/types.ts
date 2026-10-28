@@ -121,13 +121,6 @@ export interface Sale {
   payments?: SalePayment[];
 }
 
-export const formatRupiah = (value: number): string => {
-  const rounded = Math.round(Number.isFinite(value) ? value : 0);
-  const sign = rounded < 0 ? "-" : "";
-  const digits = Math.abs(rounded)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `Rp ${sign}${digits}`;
-};
-
-export const round2 = (value: number): number => Math.round(value * 100) / 100;
+// Formatter dan pembulatan uang dipusatkan di @/lib/money. Alias lama tetap
+// diekspor agar modul POS yang sudah ada tidak perlu diubah sekaligus.
+export { formatIDR as formatRupiah, roundMoney as round2 } from "@/lib/money";

@@ -13,10 +13,10 @@ const (
 )
 
 // Nilai bawaan bila pengaturan belum ada di database.
-const (
-	DefaultPPNRate      = 0.12
-	DefaultPPNPriceMode = TaxModeInclusive
-)
+const DefaultPPNPriceMode = TaxModeInclusive
+
+// DefaultPPNRate adalah tarif PPN bawaan (12%).
+var DefaultPPNRate = MustDec("0.12")
 
 var (
 	ErrSettingPPNRateInvalid = errors.New("tarif PPN harus antara 0 dan 1 (mis. 0.12 untuk 12%)")
@@ -34,14 +34,14 @@ type AppSetting struct {
 
 // SettingsView adalah tampilan pengaturan yang dipakai frontend.
 type SettingsView struct {
-	PPNRate      float64 `json:"ppn_rate"`
+	PPNRate      Decimal `json:"ppn_rate"`
 	PPNPriceMode string  `json:"ppn_price_mode"`
 }
 
 // UpdateSettingsInput memakai pointer supaya field yang tidak dikirim tidak
 // ikut diubah.
 type UpdateSettingsInput struct {
-	PPNRate      *float64 `json:"ppn_rate"`
+	PPNRate      *Decimal `json:"ppn_rate"`
 	PPNPriceMode *string  `json:"ppn_price_mode"`
 }
 

@@ -131,7 +131,7 @@ export function ProductCategoryForm({
         disabled={!!editingCategory}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
           <FolderTree className="size-4 text-blue-600" />
           {editingCategory
             ? `Edit Kategori: ${editingCategory.name}`
@@ -151,7 +151,7 @@ export function ProductCategoryForm({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FolderTree className="size-3" /> Nama Kategori
               </label>
               <input
@@ -164,7 +164,7 @@ export function ProductCategoryForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Link2 className="size-3" /> Slug Kustom (Opsional)
               </label>
               <input
@@ -176,7 +176,7 @@ export function ProductCategoryForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FolderTree className="size-3" /> Induk Kategori (Hierarki)
               </label>
               <select
@@ -197,7 +197,7 @@ export function ProductCategoryForm({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <FileText className="size-3" /> Deskripsi Kategori
             </label>
             <textarea

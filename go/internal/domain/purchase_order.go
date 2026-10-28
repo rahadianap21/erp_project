@@ -24,9 +24,9 @@ type PurchaseOrder struct {
 	SupplierEmail string                `json:"supplier_email,omitempty"`
 	PoDate        time.Time             `json:"po_date"`
 	TaxType       string                `json:"tax_type"`   // 'NON_PPN', 'TAX_EXCLUSIVE', 'TAX_INCLUSIVE'
-	DppAmount     float64               `json:"dpp_amount"` // Nilai Dasar Pengenaan Pajak
-	TaxAmount     float64               `json:"tax_amount"`
-	TotalAmount   float64               `json:"total_amount"`
+	DppAmount     Money                 `json:"dpp_amount"` // Nilai Dasar Pengenaan Pajak
+	TaxAmount     Money                 `json:"tax_amount"`
+	TotalAmount   Money                 `json:"total_amount"`
 	Status        string                `json:"status"` // PENDING, APPROVED, RECEIVED, REJECTED
 	Notes         string                `json:"notes,omitempty"`
 	CreatedAt     time.Time             `json:"created_at"`
@@ -54,11 +54,11 @@ type PurchaseOrderDetail struct {
 	UnitKode        string `json:"unit_kode,omitempty"`
 	// ConversionRate memengaruhi berapa satuan jual yang bertambah saat barang
 	// diterima, jadi UI perlu menyodorkannya sebelum GRN dibuat.
-	ConversionRate  int32   `json:"conversion_rate"`
-	SellingUnitID   int32   `json:"selling_unit_id"`
-	SellingUnitKode string  `json:"selling_unit_kode,omitempty"`
-	UnitPrice       float64 `json:"unit_price"`
-	SubTotal        float64 `json:"sub_total"`
+	ConversionRate  int32  `json:"conversion_rate"`
+	SellingUnitID   int32  `json:"selling_unit_id"`
+	SellingUnitKode string `json:"selling_unit_kode,omitempty"`
+	UnitPrice       Money  `json:"unit_price"`
+	SubTotal        Money  `json:"sub_total"`
 }
 
 // PurchaseOrderParam penampung filter kueri cursor pagination dari Next.js frontend

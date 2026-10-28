@@ -3,7 +3,6 @@ package domain
 import (
 	"context"
 	"errors"
-	"math"
 	"strings"
 	"time"
 )
@@ -41,9 +40,9 @@ type Voucher struct {
 	Name          string     `json:"name"`
 	Description   string     `json:"description"`
 	DiscountType  string     `json:"discount_type"`
-	DiscountValue float64    `json:"discount_value"`
-	MinPurchase   float64    `json:"min_purchase"`
-	MaxDiscount   float64    `json:"max_discount"`
+	DiscountValue Decimal    `json:"discount_value"`
+	MinPurchase   Money      `json:"min_purchase"`
+	MaxDiscount   Money      `json:"max_discount"`
 	ValidFrom     *DateOnly  `json:"valid_from,omitempty"`
 	ValidUntil    *DateOnly  `json:"valid_until,omitempty"`
 	IsActive      bool       `json:"is_active"`
@@ -56,9 +55,9 @@ type VoucherInput struct {
 	Name          string    `json:"name"`
 	Description   string    `json:"description"`
 	DiscountType  string    `json:"discount_type"`
-	DiscountValue float64   `json:"discount_value"`
-	MinPurchase   float64   `json:"min_purchase"`
-	MaxDiscount   float64   `json:"max_discount"`
+	DiscountValue Decimal   `json:"discount_value"`
+	MinPurchase   Money     `json:"min_purchase"`
+	MaxDiscount   Money     `json:"max_discount"`
 	ValidFrom     *DateOnly `json:"valid_from"`
 	ValidUntil    *DateOnly `json:"valid_until"`
 	IsActive      bool      `json:"is_active"`
@@ -119,11 +118,11 @@ func (v *Voucher) ValidateUsable(now time.Time) error {
 
 // ValidateSubtotal memastikan minimal belanja terpenuhi. Basisnya adalah
 // subtotal sebelum diskon item agar syarat mudah dipahami kasir.
-func (v *Voucher) ValidateSubtotal(subtotal float64) error {
+func (v *Voucher) ValidateSubtotal(subtotal Money) error {
 	if v == nil {
 		return ErrVoucherNotFound
 	}
-	if subtotal+1e-9 < v.MinPurchase {
+	if subtotal.Cmp(v.MinPurchase) < 0 {
 		return ErrVoucherMinPurchase
 	}
 	return nil
@@ -132,37 +131,37 @@ func (v *Voucher) ValidateSubtotal(subtotal float64) error {
 // DiscountAmount menghitung potongan voucher dari nilai setelah diskon item.
 // Diskon persen dibatasi max_discount (bila > 0); diskon nominal tidak pernah
 // melebihi nilai belanja.
-func (v *Voucher) DiscountAmount(base float64) (float64, error) {
+func (v *Voucher) DiscountAmount(base Money) (Money, error) {
 	if v == nil {
-		return 0, nil
+		return Money{}, nil
 	}
-	if base < 0 {
-		base = 0
+	if base.IsNegative() {
+		base = Money{}
 	}
 	switch v.DiscountType {
 	case VoucherDiscountPercent:
-		if v.DiscountValue < 0 || v.DiscountValue > 100 {
-			return 0, ErrVoucherDiscountInvalid
+		if v.DiscountValue.IsNegative() || v.DiscountValue.Cmp(DecInt(100)) > 0 {
+			return Money{}, ErrVoucherDiscountInvalid
 		}
-		amount := roundMoney(base * v.DiscountValue / 100)
-		if v.MaxDiscount > 0 && amount > v.MaxDiscount {
-			amount = roundMoney(v.MaxDiscount)
+		amount := base.MulDecimal(v.DiscountValue.DivInt(100).Raw())
+		if v.MaxDiscount.IsPositive() && amount.Cmp(v.MaxDiscount) > 0 {
+			amount = v.MaxDiscount
 		}
-		if amount > base {
-			amount = roundMoney(base)
+		if amount.Cmp(base) > 0 {
+			amount = base
 		}
 		return amount, nil
 	case VoucherDiscountAmount:
-		if v.DiscountValue < 0 {
-			return 0, ErrVoucherDiscountInvalid
+		if v.DiscountValue.IsNegative() {
+			return Money{}, ErrVoucherDiscountInvalid
 		}
-		amount := roundMoney(v.DiscountValue)
-		if amount > base {
-			amount = roundMoney(base)
+		amount := MoneyFromDecimal(v.DiscountValue.Raw())
+		if amount.Cmp(base) > 0 {
+			amount = base
 		}
 		return amount, nil
 	default:
-		return 0, ErrVoucherDiscountInvalid
+		return Money{}, ErrVoucherDiscountInvalid
 	}
 }
 
@@ -177,20 +176,20 @@ func ValidateVoucherInput(in VoucherInput) error {
 	}
 	switch in.DiscountType {
 	case VoucherDiscountPercent:
-		if in.DiscountValue <= 0 || in.DiscountValue > 100 {
+		if !in.DiscountValue.IsPositive() || in.DiscountValue.Cmp(DecInt(100)) > 0 {
 			return NewBusinessRuleError("diskon persen harus lebih dari 0 dan maksimal 100")
 		}
 	case VoucherDiscountAmount:
-		if in.DiscountValue <= 0 {
+		if !in.DiscountValue.IsPositive() {
 			return NewBusinessRuleError("diskon nominal harus lebih dari 0")
 		}
 	default:
 		return NewBusinessRuleError("jenis diskon voucher tidak dikenal")
 	}
-	if in.MinPurchase < 0 {
+	if in.MinPurchase.IsNegative() {
 		return NewBusinessRuleError("minimal belanja tidak boleh negatif")
 	}
-	if in.MaxDiscount < 0 {
+	if in.MaxDiscount.IsNegative() {
 		return NewBusinessRuleError("maksimal diskon tidak boleh negatif")
 	}
 	if in.ValidFrom != nil && in.ValidUntil != nil {
@@ -199,9 +198,6 @@ func ValidateVoucherInput(in VoucherInput) error {
 		if until.Before(from) {
 			return NewBusinessRuleError("tanggal berakhir tidak boleh sebelum tanggal mulai")
 		}
-	}
-	if math.IsNaN(in.DiscountValue) || math.IsInf(in.DiscountValue, 0) {
-		return NewBusinessRuleError("nilai diskon tidak valid")
 	}
 	return nil
 }

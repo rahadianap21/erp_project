@@ -1,5 +1,6 @@
 import { Geist } from "next/font/google";
 import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { ErrorTracker } from "@/components/error-tracker";
 import { Toaster } from "@/components/ui/sonner";
@@ -34,12 +35,19 @@ export default function RootLayout({
         className={`${geist.variable} antialiased`}
         suppressHydrationWarning
       >
-        <TooltipProvider>
-          <ErrorTracker />
-          {children}
-          <Toaster richColors position="top-center" />
-          <SessionExtender />
-        </TooltipProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <TooltipProvider>
+            <ErrorTracker />
+            {children}
+            <Toaster richColors position="top-center" />
+            <SessionExtender />
+          </TooltipProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

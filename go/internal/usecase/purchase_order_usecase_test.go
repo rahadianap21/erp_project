@@ -204,9 +204,9 @@ func newUsecase(poStatus string, received int64) (*purchaseOrderUsecase, *fakePO
 		transitionRows: 1,
 	}
 	prodRepo := &fakeProductRepo{products: map[int64]*domain.Product{
-		4: {ID: 4, Name: "KURSI KERJA", SupplierID: supplierID, PurchasePrice: 450000, PurchaseUnitID: 7},
-		5: {ID: 5, Name: "KERTAS HVS", SupplierID: supplierID, PurchasePrice: 55000, PurchaseUnitID: 8},
-		9: {ID: 9, Name: "BARANG VENDOR LAIN", SupplierID: 2, PurchasePrice: 100, PurchaseUnitID: 9},
+		4: {ID: 4, Name: "KURSI KERJA", SupplierID: supplierID, PurchasePrice: domain.Rupiah(450000), PurchaseUnitID: 7},
+		5: {ID: 5, Name: "KERTAS HVS", SupplierID: supplierID, PurchasePrice: domain.Rupiah(55000), PurchaseUnitID: 8},
+		9: {ID: 9, Name: "BARANG VENDOR LAIN", SupplierID: 2, PurchasePrice: domain.Rupiah(100), PurchaseUnitID: 9},
 	}}
 	return &purchaseOrderUsecase{poRepo: poRepo, productRepo: prodRepo}, poRepo, prodRepo
 }
@@ -240,17 +240,17 @@ func TestUpdatePO_HappyPath_HargaSelaluDariMaster(t *testing.T) {
 	}
 
 	// Harga harus berasal dari master (450000 dan 55000), bukan dari klien.
-	if got.Items[0].UnitPrice != 450000 {
-		t.Errorf("harga baris 1 harus 450000 dari master, dapat %v", got.Items[0].UnitPrice)
+	if got.Items[0].UnitPrice.Cmp(domain.Rupiah(450000)) != 0 {
+		t.Errorf("harga baris 1 harus 450000 dari master, dapat %s", got.Items[0].UnitPrice)
 	}
-	if got.Items[0].SubTotal != 10*450000 {
-		t.Errorf("subtotal baris 1 harus %v, dapat %v", 10*450000, got.Items[0].SubTotal)
+	if got.Items[0].SubTotal.Cmp(domain.Rupiah(10*450000)) != 0 {
+		t.Errorf("subtotal baris 1 harus %s, dapat %s", domain.Rupiah(10*450000), got.Items[0].SubTotal)
 	}
-	if got.Items[1].UnitPrice != 55000 {
-		t.Errorf("harga baris 2 harus 55000 dari master, dapat %v", got.Items[1].UnitPrice)
+	if got.Items[1].UnitPrice.Cmp(domain.Rupiah(55000)) != 0 {
+		t.Errorf("harga baris 2 harus 55000 dari master, dapat %s", got.Items[1].UnitPrice)
 	}
-	if got.Items[1].SubTotal != 2*55000 {
-		t.Errorf("subtotal baris 2 harus %v, dapat %v", 2*55000, got.Items[1].SubTotal)
+	if got.Items[1].SubTotal.Cmp(domain.Rupiah(2*55000)) != 0 {
+		t.Errorf("subtotal baris 2 harus %s, dapat %s", domain.Rupiah(2*55000), got.Items[1].SubTotal)
 	}
 
 	// Satuan beli juga wajib dari master.
@@ -260,16 +260,16 @@ func TestUpdatePO_HappyPath_HargaSelaluDariMaster(t *testing.T) {
 	}
 
 	// Kalk pajak TAX_EXCLUSIVE: gross 10*450000 + 2*55000 = 4.610.000; PPN 12%
-	const gross = 10*450000 + 2*55000
-	wantTax := 553200.0 // 4610000 * 0.12
-	if got.DppAmount != gross {
-		t.Errorf("DPP harus %v, dapat %v", gross, got.DppAmount)
+	gross := domain.Rupiah(10*450000 + 2*55000)
+	wantTax := domain.Rupiah(553200) // 4610000 * 0.12
+	if got.DppAmount.Cmp(gross) != 0 {
+		t.Errorf("DPP harus %s, dapat %s", gross, got.DppAmount)
 	}
-	if got.TaxAmount != wantTax {
-		t.Errorf("PPN harus %v, dapat %v", wantTax, got.TaxAmount)
+	if got.TaxAmount.Cmp(wantTax) != 0 {
+		t.Errorf("PPN harus %s, dapat %s", wantTax, got.TaxAmount)
 	}
-	if got.TotalAmount != gross+wantTax {
-		t.Errorf("total harus %v, dapat %v", gross+wantTax, got.TotalAmount)
+	if got.TotalAmount.Cmp(gross.Add(wantTax)) != 0 {
+		t.Errorf("total harus %s, dapat %s", gross.Add(wantTax), got.TotalAmount)
 	}
 
 	if got.Notes != "Kirim box tertutup" {
@@ -304,16 +304,16 @@ func TestUpdatePO_RekananTerkunci(t *testing.T) {
 func TestUpdatePO_MatriksPajak(t *testing.T) {
 	tests := []struct {
 		taxType  string
-		gross    float64
-		wantDPP  float64
-		wantTax  float64
-		wantTot  float64
+		gross    domain.Money
+		wantDPP  domain.Money
+		wantTax  domain.Money
+		wantTot  domain.Money
 		wantNote string
 	}{
-		{"NON_PPN", 4610000, 4610000, 0, 4610000, ""},
-		{"TAX_EXCLUSIVE", 4610000, 4610000, 553200, 5163200, ""},
-		{"TAX_INCLUSIVE", 4610000, 4116071, 493929, 4610000, ""},
-		{"NGARANG", 4610000, 4610000, 0, 4610000, "tipe tak dikenal -> NON_PPN"},
+		{"NON_PPN", domain.Rupiah(4610000), domain.Rupiah(4610000), domain.Money{}, domain.Rupiah(4610000), ""},
+		{"TAX_EXCLUSIVE", domain.Rupiah(4610000), domain.Rupiah(4610000), domain.Rupiah(553200), domain.Rupiah(5163200), ""},
+		{"TAX_INCLUSIVE", domain.Rupiah(4610000), domain.NewMoney(411607143), domain.NewMoney(49392857), domain.Rupiah(4610000), ""},
+		{"NGARANG", domain.Rupiah(4610000), domain.Rupiah(4610000), domain.Money{}, domain.Rupiah(4610000), "tipe tak dikenal -> NON_PPN"},
 	}
 	for _, tc := range tests {
 		u, poRepo, _ := newUsecase("PENDING", 0)
@@ -325,14 +325,14 @@ func TestUpdatePO_MatriksPajak(t *testing.T) {
 			t.Fatalf("[%s] harus berhasil, dapat error: %v", tc.taxType, err)
 		}
 		g := poRepo.updatedPO
-		if g.DppAmount != tc.wantDPP {
-			t.Errorf("[%s] DPP harus %v, dapat %v", tc.taxType, tc.wantDPP, g.DppAmount)
+		if g.DppAmount.Cmp(tc.wantDPP) != 0 {
+			t.Errorf("[%s] DPP harus %s, dapat %s", tc.taxType, tc.wantDPP, g.DppAmount)
 		}
-		if g.TaxAmount != tc.wantTax {
-			t.Errorf("[%s] PPN harus %v, dapat %v", tc.taxType, tc.wantTax, g.TaxAmount)
+		if g.TaxAmount.Cmp(tc.wantTax) != 0 {
+			t.Errorf("[%s] PPN harus %s, dapat %s", tc.taxType, tc.wantTax, g.TaxAmount)
 		}
-		if g.TotalAmount != tc.wantTot {
-			t.Errorf("[%s] total harus %v, dapat %v", tc.taxType, tc.wantTot, g.TotalAmount)
+		if g.TotalAmount.Cmp(tc.wantTot) != 0 {
+			t.Errorf("[%s] total harus %s, dapat %s", tc.taxType, tc.wantTot, g.TotalAmount)
 		}
 	}
 }
@@ -522,9 +522,9 @@ func TestUpdatePO_ErrorRepoDiteruskan(t *testing.T) {
 // tidak melenceng antara alur terbit dan alur koreksi.
 func TestCreatePO_Dan_UpdatePO_GunakanMatriksPajakYangSama(t *testing.T) {
 	po := &domain.PurchaseOrder{TaxType: "TAX_INCLUSIVE"}
-	applyTaxMatrix(po, 4610000)
-	if po.DppAmount != 4116071 || po.TaxAmount != 493929 || po.TotalAmount != 4610000 {
-		t.Errorf("matriks pajak tidak konsisten: dpp=%v tax=%v total=%v",
+	applyTaxMatrix(po, domain.Rupiah(4610000))
+	if po.DppAmount.Cmp(domain.NewMoney(411607143)) != 0 || po.TaxAmount.Cmp(domain.NewMoney(49392857)) != 0 || po.TotalAmount.Cmp(domain.Rupiah(4610000)) != 0 {
+		t.Errorf("matriks pajak tidak konsisten: dpp=%s tax=%s total=%s",
 			po.DppAmount, po.TaxAmount, po.TotalAmount)
 	}
 }
@@ -938,21 +938,21 @@ func TestCreatePO_HargaSelaluDariMaster(t *testing.T) {
 		TaxType:    "NON_PPN",
 		// Qty 2, tapi harga dan satuan sengaja diisi ngawur: harus diabaikan.
 		Items: []domain.PurchaseOrderDetail{
-			{ProductID: 4, QtyOrdered: 2, UnitPrice: 1, PurchaseUnitID: 999},
+			{ProductID: 4, QtyOrdered: 2, UnitPrice: domain.Rupiah(1), PurchaseUnitID: 999},
 		},
 	}
 	if err := u.CreatePO(context.Background(), po); err != nil {
 		t.Fatalf("harus berhasil, dapat error: %v", err)
 	}
 
-	if po.Items[0].UnitPrice != 450000 {
-		t.Errorf("harga harus dari master (450000), dapat %v", po.Items[0].UnitPrice)
+	if po.Items[0].UnitPrice.Cmp(domain.Rupiah(450000)) != 0 {
+		t.Errorf("harga harus dari master (450000), dapat %s", po.Items[0].UnitPrice)
 	}
 	if po.Items[0].PurchaseUnitID != 7 {
 		t.Errorf("satuan harus dari master (7), dapat %d", po.Items[0].PurchaseUnitID)
 	}
-	if po.Items[0].SubTotal != 900000 {
-		t.Errorf("subtotal harus 2x450000, dapat %v", po.Items[0].SubTotal)
+	if po.Items[0].SubTotal.Cmp(domain.Rupiah(900000)) != 0 {
+		t.Errorf("subtotal harus 2x450000, dapat %s", po.Items[0].SubTotal)
 	}
 }
 

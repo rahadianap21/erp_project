@@ -175,9 +175,9 @@ export function MembersView() {
       <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Users2Icon className="size-5 text-blue-600" /> Master Member
+            <Users2Icon className="size-5 text-primary" /> Master Member
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Data member, saldo poin, dan tempo pembayaran bawaan.
           </p>
         </div>
@@ -197,9 +197,97 @@ export function MembersView() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
+      {/* Mobile: card list */}
+      <div className="space-y-3 md:hidden">
+        {loading && members.length === 0 ? (
+          <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+            Memuat...
+          </div>
+        ) : members.length === 0 ? (
+          <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+            Belum ada member.
+          </div>
+        ) : (
+          members.map((m) => (
+            <article
+              key={m.id}
+              className="rounded-lg border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-medium">{m.name}</h3>
+                  <p className="mt-0.5 font-mono text-sm text-muted-foreground">
+                    {m.code}
+                  </p>
+                </div>
+                {m.is_active ? (
+                  <Badge variant="success" className="shrink-0">
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" className="shrink-0">
+                    Nonaktif
+                  </Badge>
+                )}
+              </div>
+
+              <dl className="mt-3 grid grid-cols-3 gap-2 rounded-md bg-muted/40 p-2.5 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Telepon</dt>
+                  <dd className="mt-0.5 truncate font-medium">
+                    {m.phone || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Saldo Poin</dt>
+                  <dd className="mt-0.5 font-semibold text-amber-700">
+                    {m.points}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Tempo</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {m.default_term_days} hari
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex justify-end gap-1 border-t pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm"
+                  onClick={() => openHistory(m)}
+                  title="Riwayat poin"
+                >
+                  <HistoryIcon /> Riwayat
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm"
+                  onClick={() => openEdit(m)}
+                >
+                  <PencilIcon /> Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm text-destructive"
+                  onClick={() => remove(m)}
+                >
+                  <Trash2Icon /> Hapus
+                </Button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-lg border md:block">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+          <thead className="bg-muted/50 text-left text-sm font-medium tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-2">Kode</th>
               <th className="px-3 py-2">Nama</th>
@@ -232,20 +320,20 @@ export function MembersView() {
             ) : (
               members.map((m) => (
                 <tr key={m.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{m.code}</td>
+                  <td className="px-3 py-2 font-mono font-medium">{m.code}</td>
                   <td className="px-3 py-2">{m.name}</td>
                   <td className="px-3 py-2">{m.phone || "-"}</td>
-                  <td className="px-3 py-2 text-right font-medium text-amber-700">
+                  <td className="px-3 py-2 text-right font-mono font-medium text-amber-700">
                     {m.points}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right font-mono">
                     {m.default_term_days}
                   </td>
                   <td className="px-3 py-2">
                     {m.is_active ? (
-                      <Badge variant="secondary">Aktif</Badge>
+                      <Badge variant="success">Active</Badge>
                     ) : (
-                      <Badge variant="outline">Nonaktif</Badge>
+                      <Badge variant="neutral">Nonaktif</Badge>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -351,7 +439,7 @@ export function MembersView() {
                     setForm({ ...form, is_active: e.target.checked })
                   }
                 />
-                Aktif
+                Active
               </label>
             </div>
           </div>
@@ -401,7 +489,7 @@ export function MembersView() {
                     <p className="font-medium">
                       {POINT_TYPE_LABEL[e.entry_type] ?? e.entry_type}
                     </p>
-                    <p className="truncate text-xs text-muted-foreground">
+                    <p className="truncate text-sm text-muted-foreground">
                       {new Date(e.created_at).toLocaleString("id-ID")}
                       {e.sale_number ? ` · ${e.sale_number}` : ""}
                       {e.note ? ` · ${e.note}` : ""}
@@ -415,7 +503,7 @@ export function MembersView() {
                     >
                       {e.points >= 0 ? `+${e.points}` : e.points}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       saldo {e.balance_after}
                     </p>
                   </div>

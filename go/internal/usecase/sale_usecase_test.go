@@ -17,9 +17,9 @@ type saleRepoRetryPalsu struct {
 
 func (r *saleRepoRetryPalsu) GetProductsForSale(_ context.Context, ids []int64) (map[int64]domain.SaleProductInfo, error) {
 	r.getCalls++
-	price := 20000.0
+	price := domain.Rupiah(20000)
 	if r.getCalls > 1 {
-		price = 25000
+		price = domain.Rupiah(25000)
 	}
 	out := make(map[int64]domain.SaleProductInfo, len(ids))
 	for _, id := range ids {
@@ -28,7 +28,7 @@ func (r *saleRepoRetryPalsu) GetProductsForSale(_ context.Context, ids []int64) 
 			SKU:          "SKU-UJI",
 			Name:         "Produk Uji",
 			SellingPrice: price,
-			AvgCost:      10000,
+			AvgCost:      domain.DecInt(10000),
 			CurrentStock: 10,
 			DiscountType: domain.SaleDiscountNone,
 			IsTaxable:    false,
@@ -81,7 +81,7 @@ func TestCreateSaleMenghitungUlangSaatSnapshotBerubah(t *testing.T) {
 	sale, err := uc.CreateSale(context.Background(), domain.CreateSaleInput{
 		Items: []domain.SaleLineInput{{ProductID: 1, Qty: 1}},
 		Payments: []domain.SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 25000},
+			{PaymentMethodID: 1, Amount: domain.Rupiah(25000)},
 		},
 		CreatedBy: 7,
 	})
@@ -91,7 +91,7 @@ func TestCreateSaleMenghitungUlangSaatSnapshotBerubah(t *testing.T) {
 	if repo.getCalls != 2 || repo.createCalls != 2 {
 		t.Fatalf("harus menghitung ulang sekali, dapat get=%d create=%d", repo.getCalls, repo.createCalls)
 	}
-	if sale.Details[0].UnitPrice != 25000 || sale.TotalAmount != 25000 {
-		t.Fatalf("harus memakai harga snapshot terbaru 25000, dapat harga %.2f total %.2f", sale.Details[0].UnitPrice, sale.TotalAmount)
+	if sale.Details[0].UnitPrice.Cmp(domain.Rupiah(25000)) != 0 || sale.TotalAmount.Cmp(domain.Rupiah(25000)) != 0 {
+		t.Fatalf("harus memakai harga snapshot terbaru 25000, dapat harga %s total %s", sale.Details[0].UnitPrice, sale.TotalAmount)
 	}
 }

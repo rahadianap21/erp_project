@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
@@ -47,17 +48,36 @@ export function UserTableSkeleton() {
         <Skeleton className="h-5 w-36" />
       </div>
 
+      {/* Mobile Card Skeleton */}
+      <div className="space-y-3 md:hidden">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={`user-card-skel-${idx}`}
+            className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-8 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
       {/* Table Skeleton */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card">
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card md:block">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 Nama Karyawan
               </TableHead>
-              <TableHead className="font-semibold text-xs">Email</TableHead>
-              <TableHead className="font-semibold text-xs">Role</TableHead>
-              <TableHead className="text-right font-semibold text-xs w-32">
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead className="text-right w-32">
                 Aksi
               </TableHead>
             </TableRow>
@@ -175,7 +195,7 @@ export function UserTable({
             disabled={loading && users.length === 0}
             onChange={(e) => updateFilter("role", e.target.value)}
             suppressHydrationWarning
-            className="h-9 w-full rounded-lg border border-input bg-background pl-8 pr-8 text-xs outline-none cursor-pointer appearance-none disabled:opacity-50"
+            className="h-9 w-full rounded-lg border border-input bg-background pl-8 pr-8 text-sm outline-none cursor-pointer appearance-none disabled:opacity-50"
           >
             <option value="ALL">Semua Role</option>
             {roleOptions &&
@@ -188,8 +208,103 @@ export function UserTable({
         </div>
       </DataTableToolbar>
 
-      {/* Table Area */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card relative">
+      {/* Mobile: card list */}
+      <div className="space-y-3 md:hidden">
+        {loading && users.length === 0 ? (
+          Array.from({ length: 4 }).map((_, idx) => (
+            <div
+              key={`user-card-skeleton-${idx}`}
+              className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-8 w-full rounded-lg" />
+            </div>
+          ))
+        ) : users.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Search className="size-5 text-muted-foreground/50" />
+              <p className="text-sm font-medium">
+                {isFiltered
+                  ? "Data tidak ditemukan. Coba sesuaikan kata kunci atau filter pencarian Anda."
+                  : "Tidak ada data pengguna yang terindeks di sistem."}
+              </p>
+              {isFiltered && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="mt-1 h-7 cursor-pointer text-sm"
+                >
+                  Bersihkan Filter
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          users.map((u) => (
+            <article
+              key={u.id}
+              className={`rounded-xl border bg-card p-4 shadow-sm transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""
+                }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-medium">{u.name}</h3>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    {u.email}
+                  </p>
+                </div>
+                <Badge
+                  variant={
+                    u.role_name?.toLowerCase().includes("admin")
+                      ? "warning"
+                      : "info"
+                  }
+                  className="shrink-0"
+                >
+                  {u.role_name || "staff"}
+                </Badge>
+              </div>
+
+              {showActionColumn && (
+                <div className="mt-3 flex justify-end gap-2 border-t pt-3">
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      onClick={() => onEditClick(u)}
+                      aria-label={`Edit ${u.name}`}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted cursor-pointer"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteClick(u)}
+                      aria-label={`Hapus ${u.name}`}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Hapus
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card relative md:block">
         {/* Indikator Loading Tipis Saat Memperbarui Data yang Sudah Ada */}
         {loading && users.length > 0 && (
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10">
@@ -200,13 +315,13 @@ export function UserTable({
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 Nama Karyawan
               </TableHead>
-              <TableHead className="font-semibold text-xs">Email</TableHead>
-              <TableHead className="font-semibold text-xs">Role</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
               {showActionColumn && (
-                <TableHead className="text-right font-semibold text-xs w-32">
+                <TableHead className="text-right w-32">
                   Aksi
                 </TableHead>
               )}
@@ -245,7 +360,7 @@ export function UserTable({
               <TableRow>
                 <TableCell
                   colSpan={showActionColumn ? 4 : 3}
-                  className="h-32 text-center text-muted-foreground font-medium text-xs"
+                  className="h-32 text-center text-muted-foreground font-medium text-sm"
                 >
                   <div className="flex flex-col items-center justify-center gap-2 py-4">
                     <Search className="size-5 text-muted-foreground/50" />
@@ -260,7 +375,7 @@ export function UserTable({
                         variant="outline"
                         size="sm"
                         onClick={handleReset}
-                        className="mt-1 h-7 text-[11px] cursor-pointer"
+                        className="mt-1 h-7 text-sm cursor-pointer"
                       >
                         Bersihkan Filter
                       </Button>
@@ -275,22 +390,22 @@ export function UserTable({
                   key={u.id}
                   className={`hover:bg-muted/30 transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : ""}`}
                 >
-                  <TableCell className="font-medium text-xs py-3">
+                  <TableCell className="font-medium text-sm py-3">
                     {u.name}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground py-3">
+                  <TableCell className="text-sm text-muted-foreground py-3">
                     {u.email}
                   </TableCell>
                   <TableCell className="py-3">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                    <Badge
+                      variant={
                         u.role_name?.toLowerCase().includes("admin")
-                          ? "bg-red-500/10 text-red-500 border-red-500/20"
-                          : "bg-blue-500/10 text-blue-500 border-blue-500/20"
-                      }`}
+                          ? "warning"
+                          : "info"
+                      }
                     >
                       {u.role_name || "staff"}
-                    </span>
+                    </Badge>
                   </TableCell>
                   {showActionColumn && (
                     <TableCell className="text-right py-3">

@@ -12,10 +12,12 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatIDR } from "@/lib/money";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -55,20 +57,13 @@ const emptyForm = {
   is_active: true,
 };
 
-const formatRupiah = (value: number): string =>
-  new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
-
 const toDateInput = (value?: string | null): string =>
   value ? value.slice(0, 10) : "";
 
 const discountLabel = (v: Voucher): string =>
   v.discount_type === "PERCENT"
-    ? `${v.discount_value}%${v.max_discount > 0 ? ` (maks ${formatRupiah(v.max_discount)})` : ""}`
-    : formatRupiah(v.discount_value);
+    ? `${v.discount_value}%${v.max_discount > 0 ? ` (maks ${formatIDR(v.max_discount)})` : ""}`
+    : formatIDR(v.discount_value);
 
 export function VouchersView() {
   const [vouchers, setVouchers] = React.useState<Voucher[]>([]);
@@ -212,9 +207,9 @@ export function VouchersView() {
       <div className="flex flex-col gap-3 border-b pb-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
           <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <TicketPercentIcon className="size-5 text-blue-600" /> Master Voucher
+            <TicketPercentIcon className="size-5 text-primary" /> Master Voucher
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Kupon sekali pakai dengan barcode Code128 untuk diskon di POS.
           </p>
         </div>
@@ -234,9 +229,103 @@ export function VouchersView() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
+      {/* Mobile: card list */}
+      <div className="space-y-3 md:hidden">
+        {loading && vouchers.length === 0 ? (
+          <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+            Memuat...
+          </div>
+        ) : vouchers.length === 0 ? (
+          <div className="rounded-lg border p-6 text-center text-sm text-muted-foreground">
+            Belum ada voucher.
+          </div>
+        ) : (
+          vouchers.map((v) => (
+            <article
+              key={v.id}
+              className="rounded-lg border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate font-mono text-sm font-medium">
+                    {v.code}
+                  </h3>
+                  <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                    {v.name}
+                  </p>
+                </div>
+                {v.used_at ? (
+                  <Badge variant="neutral" className="shrink-0">
+                    Terpakai
+                  </Badge>
+                ) : v.is_active ? (
+                  <Badge variant="success" className="shrink-0">
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" className="shrink-0">
+                    Nonaktif
+                  </Badge>
+                )}
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2.5 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Diskon</dt>
+                  <dd className="mt-0.5 font-semibold">{discountLabel(v)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Min. Belanja</dt>
+                  <dd className="mt-0.5 font-medium">
+                    {formatIDR(v.min_purchase)}
+                  </dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-muted-foreground">Masa Berlaku</dt>
+                  <dd className="mt-0.5 text-muted-foreground">
+                    {v.valid_from || v.valid_until
+                      ? `${toDateInput(v.valid_from) || "..."} s.d. ${toDateInput(v.valid_until) || "..."
+                      }`
+                      : "Tanpa batas"}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 flex justify-end gap-1 border-t pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm"
+                  onClick={() => setPrintTarget(v)}
+                >
+                  <PrinterIcon /> Cetak
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm"
+                  onClick={() => openEdit(v)}
+                >
+                  <PencilIcon /> Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="cursor-pointer text-sm text-destructive"
+                  onClick={() => remove(v)}
+                >
+                  <Trash2Icon /> Hapus
+                </Button>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden overflow-hidden rounded-lg border md:block">
         <table className="w-full text-sm">
-          <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+          <thead className="bg-muted/50 text-left text-sm font-medium tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-2">Kode</th>
               <th className="px-3 py-2">Nama</th>
@@ -272,23 +361,22 @@ export function VouchersView() {
                   <td className="px-3 py-2 font-mono font-medium">{v.code}</td>
                   <td className="px-3 py-2">{v.name}</td>
                   <td className="px-3 py-2">{discountLabel(v)}</td>
-                  <td className="px-3 py-2 text-right">
-                    {formatRupiah(v.min_purchase)}
+                  <td className="px-3 py-2 text-right font-mono font-medium">
+                    {formatIDR(v.min_purchase)}
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
                     {v.valid_from || v.valid_until
-                      ? `${toDateInput(v.valid_from) || "..."} s.d. ${
-                          toDateInput(v.valid_until) || "..."
-                        }`
+                      ? `${toDateInput(v.valid_from) || "..."} s.d. ${toDateInput(v.valid_until) || "..."
+                      }`
                       : "Tanpa batas"}
                   </td>
                   <td className="px-3 py-2">
                     {v.used_at ? (
-                      <Badge variant="outline">Terpakai</Badge>
+                      <Badge variant="neutral">Terpakai</Badge>
                     ) : v.is_active ? (
-                      <Badge variant="secondary">Aktif</Badge>
+                      <Badge variant="success">Active</Badge>
                     ) : (
-                      <Badge variant="outline">Nonaktif</Badge>
+                      <Badge variant="neutral">Nonaktif</Badge>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -373,37 +461,45 @@ export function VouchersView() {
                 Nilai Diskon{" "}
                 {form.discount_type === "PERCENT" ? "(%)" : "(Rp)"}
               </Label>
-              <Input
-                type="number"
-                min={0}
-                max={form.discount_type === "PERCENT" ? 100 : undefined}
-                value={form.discount_value}
-                onChange={(e) =>
-                  setForm({ ...form, discount_value: Number(e.target.value) })
-                }
-              />
+              {form.discount_type === "AMOUNT" ? (
+                <MoneyInput
+                  value={form.discount_value}
+                  onValueChange={(value) =>
+                    setForm({ ...form, discount_value: value })
+                  }
+                  className="h-9"
+                />
+              ) : (
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={form.discount_value}
+                  onChange={(e) =>
+                    setForm({ ...form, discount_value: Number(e.target.value) })
+                  }
+                />
+              )}
             </div>
             <div className="grid gap-1">
               <Label>Minimal Belanja</Label>
-              <Input
-                type="number"
-                min={0}
+              <MoneyInput
                 value={form.min_purchase}
-                onChange={(e) =>
-                  setForm({ ...form, min_purchase: Number(e.target.value) })
+                onValueChange={(value) =>
+                  setForm({ ...form, min_purchase: value })
                 }
+                className="h-9"
               />
             </div>
             <div className="grid gap-1">
               <Label>Maksimal Diskon</Label>
-              <Input
-                type="number"
-                min={0}
+              <MoneyInput
                 value={form.max_discount}
-                disabled={form.discount_type !== "PERCENT"}
-                onChange={(e) =>
-                  setForm({ ...form, max_discount: Number(e.target.value) })
+                onValueChange={(value) =>
+                  setForm({ ...form, max_discount: value })
                 }
+                disabled={form.discount_type !== "PERCENT"}
+                className="h-9"
                 placeholder="0 = tanpa batas"
               />
             </div>
@@ -446,7 +542,7 @@ export function VouchersView() {
                     setForm({ ...form, is_active: e.target.checked })
                   }
                 />
-                Aktif
+                Active
               </label>
             </div>
           </div>

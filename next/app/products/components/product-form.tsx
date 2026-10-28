@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComboboxSelect } from "@/components/combobox-select";
+import { MoneyInput } from "@/components/ui/money-input";
 
 interface Category {
   id: number;
@@ -311,7 +312,7 @@ export function ProductForm({
         disabled={!!editingProduct}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Package className="size-4 text-blue-600" />
           {editingProduct
             ? `Edit Spesifikasi Produk: ${editingProduct.name}`
@@ -332,7 +333,7 @@ export function ProductForm({
           {/* Baris 1: Identifikasi Unik SKU, Barcode, & Dropdown Master Satuan */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Tag className="size-3" /> Kode SKU Internal
               </label>
               <input
@@ -344,7 +345,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Tag className="size-3" /> Kode Barcode / EAN-13
               </label>
               <input
@@ -356,7 +357,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Layers className="size-3" /> Satuan Beli (UoM)
               </label>
               <ComboboxSelect
@@ -371,7 +372,7 @@ export function ProductForm({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Layers className="size-3" /> Satuan Jual (UoM)
               </label>
               <ComboboxSelect
@@ -385,7 +386,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Layers className="size-3" /> Konversi (1 Satuan Beli = ? Satuan
                 Jual)
               </label>
@@ -400,7 +401,7 @@ export function ProductForm({
                 className="w-full text-xs px-3 py-2 bg-slate-50/50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-900"
                 placeholder="1"
               />
-              <p className="text-[10px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Stok dihitung dalam satuan jual. Kosongkan/biarkan 1 jika satuan
                 beli sama dengan satuan jual.
               </p>
@@ -410,7 +411,7 @@ export function ProductForm({
           {/* Baris 2: Nama & Deskripsi */}
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Package className="size-3" /> Nama Lengkap Barang
               </label>
               <input
@@ -423,7 +424,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 Deskripsi Item
               </label>
               <textarea
@@ -439,7 +440,7 @@ export function ProductForm({
           {/* Baris 3: Relasi Dropdown Dinamik */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-xl border border-slate-100">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Layers className="size-3" /> Klasifikasi Rumpun Kategori
               </label>
               {/* <select required value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none cursor-pointer">
@@ -459,7 +460,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Building2 className="size-3" /> Rekanan Vendor / Supplier Utama
               </label>
               {/* <select required value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none cursor-pointer">
@@ -480,35 +481,33 @@ export function ProductForm({
           {/* Baris 4: Metrika Finansial Harga & Batas Stok */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50/10 p-4 rounded-xl border border-blue-100/30">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <DollarSign className="size-3" /> Harga Beli Modal (HPP)
               </label>
-              <input
-                type="number"
+              <MoneyInput
                 required
-                min={0}
                 value={purchasePrice}
-                onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none font-mono"
-                placeholder="0.00"
+                onValueChange={setPurchasePrice}
+                className="h-auto border-slate-200 bg-white px-3 py-2"
+                inputClassName="text-xs"
+                placeholder="0"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <DollarSign className="size-3" /> Harga Jual Standar
               </label>
-              <input
-                type="number"
+              <MoneyInput
                 required
-                min={0}
                 value={sellingPrice}
-                onChange={(e) => setSellingPrice(Number(e.target.value))}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none font-mono"
-                placeholder="0.00"
+                onValueChange={setSellingPrice}
+                className="h-auto border-slate-200 bg-white px-3 py-2"
+                inputClassName="text-xs"
+                placeholder="0"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <AlertCircle className="size-3" /> Batas Minimum Stok (Safety)
               </label>
               <input
@@ -522,7 +521,7 @@ export function ProductForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Package className="size-3" /> Saldo Stok Awal (Qty)
               </label>
               <input
@@ -546,7 +545,7 @@ export function ProductForm({
           {/* Baris 5: Diskon Default Produk untuk Kasir POS */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/10 p-4 rounded-xl border border-amber-100/40">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Tag className="size-3" /> Tipe Diskon Default
               </label>
               <select
@@ -562,28 +561,38 @@ export function ProductForm({
                 <option value="PERCENT">Persen (%)</option>
                 <option value="AMOUNT">Nominal (Rp)</option>
               </select>
-              <p className="text-[10px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Diskon ini otomatis terpasang saat kasir memilih produk di POS.
               </p>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <DollarSign className="size-3" /> Nilai Diskon
               </label>
-              <input
-                type="number"
-                min={0}
-                max={discountType === "PERCENT" ? 100 : undefined}
-                step={discountType === "PERCENT" ? 1 : 100}
-                disabled={discountType === "NONE"}
-                value={discountValue}
-                onChange={(e) => setDiscountValue(Number(e.target.value))}
-                className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none font-mono text-slate-900 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
-                placeholder={discountType === "PERCENT" ? "0 - 100" : "0"}
-              />
+              {discountType === "AMOUNT" ? (
+                <MoneyInput
+                  value={discountValue}
+                  onValueChange={setDiscountValue}
+                  className="h-auto border-slate-200 bg-white px-3 py-2"
+                  inputClassName="text-xs"
+                  placeholder="0"
+                />
+              ) : (
+                <input
+                  type="number"
+                  min={0}
+                  max={discountType === "PERCENT" ? 100 : undefined}
+                  step={discountType === "PERCENT" ? 1 : 100}
+                  disabled={discountType === "NONE"}
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(Number(e.target.value))}
+                  className="w-full text-xs px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none font-mono text-slate-900 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  placeholder={discountType === "PERCENT" ? "0 - 100" : "0"}
+                />
+              )}
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <DollarSign className="size-3" /> Kena PPN
               </label>
               <label className="flex items-center gap-2 h-[34px] px-3 bg-white border border-slate-200 rounded-lg cursor-pointer select-none">
@@ -597,7 +606,7 @@ export function ProductForm({
                   {isTaxable ? "Dikenai PPN" : "Bebas PPN"}
                 </span>
               </label>
-              <p className="text-[10px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 Produk ber-flag PPN memisahkan DPP &amp; PPN Keluaran pada nota
                 POS.
               </p>

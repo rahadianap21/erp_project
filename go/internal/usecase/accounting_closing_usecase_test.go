@@ -97,20 +97,20 @@ func TestPostClosingEntryLabaMemindahkanKeLabaDitahan(t *testing.T) {
 	}
 
 	rev, ok := akunDari(entry, 4)
-	if !ok || rev.Debit != 300 || rev.Credit != 0 {
+	if !ok || rev.Debit.Cmp(domain.Rupiah(300)) != 0 || !rev.Credit.IsZero() {
 		t.Errorf("pendapatan harus didebit 300, dapat %+v", rev)
 	}
 	exp, ok := akunDari(entry, 5)
-	if !ok || exp.Credit != 100 || exp.Debit != 0 {
+	if !ok || exp.Credit.Cmp(domain.Rupiah(100)) != 0 || !exp.Debit.IsZero() {
 		t.Errorf("beban harus dikredit 100, dapat %+v", exp)
 	}
 	re, ok := akunDari(entry, 31)
-	if !ok || re.Credit != 200 || re.Debit != 0 {
+	if !ok || re.Credit.Cmp(domain.Rupiah(200)) != 0 || !re.Debit.IsZero() {
 		t.Errorf("laba ditahan harus dikredit 200, dapat %+v", re)
 	}
 
-	if entry.TotalDebit != 300 || entry.TotalCredit != 300 {
-		t.Fatalf("jurnal harus seimbang 300/300, dapat %.2f/%.2f", entry.TotalDebit, entry.TotalCredit)
+	if entry.TotalDebit.Cmp(domain.Rupiah(300)) != 0 || entry.TotalCredit.Cmp(domain.Rupiah(300)) != 0 {
+		t.Fatalf("jurnal harus seimbang 300/300, dapat %s/%s", entry.TotalDebit, entry.TotalCredit)
 	}
 }
 
@@ -119,19 +119,19 @@ func TestPostClosingEntryLabaMemindahkanKeLabaDitahan(t *testing.T) {
 func TestPostClosingEntryRugiMendebitLabaDitahan(t *testing.T) {
 	repo := &fakeJournalRepo{}
 	uc := newClosingUsecase(repo, []domain.AccountBalance{
-		{AccountID: 4, Code: "4-1100", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 100},
-		{AccountID: 5, Code: "5-2100", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 300},
+		{AccountID: 4, Code: "4-1100", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(100)},
+		{AccountID: 5, Code: "5-2100", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(300)},
 	}, closingMapping())
 
 	if err := uc.PostClosingEntry(context.Background(), period2026(3, domain.PeriodStatusOpen), 99); err != nil {
 		t.Fatalf("jurnal penutup harus terbit: %v", err)
 	}
 	re, ok := akunDari(repo.created, 31)
-	if !ok || re.Debit != 200 || re.Credit != 0 {
+	if !ok || re.Debit.Cmp(domain.Rupiah(200)) != 0 || !re.Credit.IsZero() {
 		t.Errorf("rugi 200 harus didebit ke laba ditahan, dapat %+v", re)
 	}
-	if repo.created.TotalDebit != 300 || repo.created.TotalCredit != 300 {
-		t.Fatalf("jurnal harus tetap seimbang, dapat %.2f/%.2f", repo.created.TotalDebit, repo.created.TotalCredit)
+	if repo.created.TotalDebit.Cmp(domain.Rupiah(300)) != 0 || repo.created.TotalCredit.Cmp(domain.Rupiah(300)) != 0 {
+		t.Fatalf("jurnal harus tetap seimbang, dapat %s/%s", repo.created.TotalDebit, repo.created.TotalCredit)
 	}
 }
 
@@ -140,8 +140,8 @@ func TestPostClosingEntryRugiMendebitLabaDitahan(t *testing.T) {
 func TestPostClosingEntryTanpaSaldoTemporer(t *testing.T) {
 	repo := &fakeJournalRepo{}
 	uc := newClosingUsecase(repo, []domain.AccountBalance{
-		{AccountID: 1, Code: "1-1101", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 500},
-		{AccountID: 2, Code: "2-1100", AccountType: domain.AccountTypeLiability, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 500},
+		{AccountID: 1, Code: "1-1101", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(500)},
+		{AccountID: 2, Code: "2-1100", AccountType: domain.AccountTypeLiability, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(500)},
 	}, closingMapping())
 
 	if err := uc.PostClosingEntry(context.Background(), period2026(3, domain.PeriodStatusOpen), 99); err != nil {

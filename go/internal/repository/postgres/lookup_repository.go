@@ -4,7 +4,6 @@ import (
 	"context"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
-	"math/big"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -49,30 +48,11 @@ func (r *sqlLookupRepository) GetProductsForPO(ctx context.Context, supplierID i
 			Sku:              row.Sku,
 			Name:             row.Name,
 			SupplierID:       row.SupplierID,
-			PurchasePrice:    r.numericToFloat64(row.PurchasePrice),
+			PurchasePrice:    moneyFromNumeric(row.PurchasePrice),
 			PurchaseUnitKode: r.interfaceToString(row.PurchaseUnitKode),
 		})
 	}
 	return res, nil
-}
-
-func (r *sqlLookupRepository) numericToFloat64(num pgtype.Numeric) float64 {
-	if !num.Valid {
-		return 0.0
-	}
-	if num.Exp == 0 {
-		return float64(num.Int.Int64())
-	}
-	bigF := new(big.Float).SetInt(num.Int)
-	if num.Exp < 0 {
-		divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-num.Exp)), nil)
-		bigF.Quo(bigF, new(big.Float).SetInt(divisor))
-	} else {
-		multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(num.Exp)), nil)
-		bigF.Mul(bigF, new(big.Float).SetInt(multiplier))
-	}
-	f, _ := bigF.Float64()
-	return f
 }
 
 func (r *sqlLookupRepository) interfaceToString(val any) string {

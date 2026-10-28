@@ -133,9 +133,9 @@ func (u *grnUsecase) FinishReceiving(ctx context.Context, poID int64, allowParti
 // dari negara — sehingga tidak boleh menambah nilai persediaan. Pada NON_PPN
 // dan TAX_EXCLUSIVE harga terima sudah di luar PPN (faktor 1), sedangkan pada
 // TAX_INCLUSIVE harga terima memuat PPN sehingga harus dibagi (1+PPN).
-func netCostFactorFor(taxType string) float64 {
+func netCostFactorFor(taxType string) domain.Decimal {
 	if taxType == "TAX_INCLUSIVE" {
-		return 1.0 / (1.0 + taxRatePPN)
+		return domain.DecInt(1).Div(domain.DecInt(1).Add(taxRatePPN))
 	}
-	return 1.0
+	return domain.DecInt(1)
 }

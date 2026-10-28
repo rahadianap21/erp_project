@@ -14,8 +14,6 @@ const (
 	MemberPointValueRupiah = 100
 	// MemberPointEarnPerRupiah: 1 poin diperoleh tiap Rp 10.000 total nota akhir.
 	MemberPointEarnPerRupiah = 10000
-	// MemberRedeemMaxRatio: tukar poin maksimum 50% dari total nota.
-	MemberRedeemMaxRatio = 0.5
 
 	MemberPointEarn           = "EARN"
 	MemberPointRedeem         = "REDEEM"
@@ -23,6 +21,9 @@ const (
 	MemberPointRedeemReversal = "REDEEM_REVERSAL"
 	MemberPointAdjust         = "ADJUST"
 )
+
+// MemberRedeemMaxRatio: tukar poin maksimum 50% dari total nota.
+var MemberRedeemMaxRatio = MustDec("0.5")
 
 // =========================================================================
 // MASTER MEMBER

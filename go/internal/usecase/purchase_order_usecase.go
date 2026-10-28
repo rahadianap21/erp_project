@@ -5,8 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"go_backend/internal/domain"
-	"math"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type purchaseOrderUsecase struct {
@@ -19,29 +20,29 @@ func NewPurchaseOrderUsecase(po domain.PurchaseOrderRepository, prod domain.Prod
 }
 
 // taxRatePPN adalah regulasi PPN aktif yang berlaku untuk dokumen PO.
-const taxRatePPN float64 = 0.12
+var taxRatePPN = domain.MustDec("0.12")
 
 // applyTaxMatrix mengisi DppAmount / TaxAmount / TotalAmount sesuai tipe pajak
 // dokumen. Dipakai bersama oleh alur terbit (CreatePO) dan alur koreksi
 // (UpdatePO) supaya keduanya tidak pernah menghasilkan perhitungan berbeda.
-func applyTaxMatrix(po *domain.PurchaseOrder, totalGrossItems float64) {
+func applyTaxMatrix(po *domain.PurchaseOrder, totalGrossItems domain.Money) {
 	switch po.TaxType {
 	case "TAX_EXCLUSIVE":
 		// Skenario: Harga belum termasuk PPN (PPN ditambahkan di akhir)
 		po.DppAmount = totalGrossItems
-		po.TaxAmount = math.Round(po.DppAmount * taxRatePPN)
-		po.TotalAmount = po.DppAmount + po.TaxAmount
+		po.TaxAmount = po.DppAmount.MulDecimal(taxRatePPN.Raw())
+		po.TotalAmount = po.DppAmount.Add(po.TaxAmount)
 
 	case "TAX_INCLUSIVE":
 		// Skenario: Harga sudah termasuk PPN (PPN diurai ke dalam)
 		po.TotalAmount = totalGrossItems
-		po.DppAmount = math.Round(po.TotalAmount / (1.0 + taxRatePPN))
-		po.TaxAmount = po.TotalAmount - po.DppAmount
+		po.DppAmount = po.TotalAmount.DivDecimal(decimal.NewFromInt(1).Add(taxRatePPN.Raw()))
+		po.TaxAmount = po.TotalAmount.Sub(po.DppAmount)
 
 	default:
 		// Skenario: NON_PPN (Tanpa pajak pertambahan nilai)
 		po.DppAmount = totalGrossItems
-		po.TaxAmount = 0
+		po.TaxAmount = domain.Money{}
 		po.TotalAmount = totalGrossItems
 	}
 }
@@ -96,7 +97,7 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 		productsByID[product.ID] = product
 	}
 
-	var totalGrossItems float64 = 0
+	var totalGrossItems domain.Money
 	for i, item := range po.Items {
 		productObj, ok := productsByID[item.ProductID]
 		if !ok {
@@ -112,8 +113,8 @@ func (u *purchaseOrderUsecase) CreatePO(ctx context.Context, po *domain.Purchase
 
 		po.Items[i].UnitPrice = productObj.PurchasePrice
 		po.Items[i].PurchaseUnitID = productObj.PurchaseUnitID
-		po.Items[i].SubTotal = float64(item.QtyOrdered) * productObj.PurchasePrice
-		totalGrossItems += po.Items[i].SubTotal
+		po.Items[i].SubTotal = productObj.PurchasePrice.MulInt(int64(item.QtyOrdered))
+		totalGrossItems = totalGrossItems.Add(po.Items[i].SubTotal)
 	}
 
 	// 🌟 ALGORITMA CORE: Matriks Perhitungan DPP & PPN 12% Standar ERP
@@ -331,7 +332,7 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 	}
 
 	details := make([]domain.PurchaseOrderDetail, 0, len(req.Items))
-	var totalGrossItems float64
+	var totalGrossItems domain.Money
 	for i, it := range req.Items {
 		productObj, ok := productsByID[it.ProductID]
 		if !ok {
@@ -350,9 +351,9 @@ func (u *purchaseOrderUsecase) UpdatePO(ctx context.Context, id int64, userID in
 			QtyOrdered:     it.QtyOrdered,
 			PurchaseUnitID: productObj.PurchaseUnitID,
 			UnitPrice:      unitPrice,
-			SubTotal:       float64(it.QtyOrdered) * unitPrice,
+			SubTotal:       unitPrice.MulInt(int64(it.QtyOrdered)),
 		})
-		totalGrossItems += float64(it.QtyOrdered) * unitPrice
+		totalGrossItems = totalGrossItems.Add(unitPrice.MulInt(int64(it.QtyOrdered)))
 	}
 
 	po := &domain.PurchaseOrder{

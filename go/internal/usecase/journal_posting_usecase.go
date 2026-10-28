@@ -39,13 +39,13 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 		return nil, err
 	}
 	var vatOutputID int64
-	if sale.TaxAmount > 0 {
+	if sale.TaxAmount.IsPositive() {
 		if vatOutputID, err = requireMapping(mapping, "VAT_OUTPUT"); err != nil {
 			return nil, err
 		}
 	}
 	var inventoryID, cogsID int64
-	if sale.CostTotal > 0 {
+	if sale.CostTotal.IsPositive() {
 		if inventoryID, err = requireMapping(mapping, "INVENTORY"); err != nil {
 			return nil, err
 		}
@@ -55,7 +55,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 	}
 	var arID int64
 	unpaid := sale.UnpaidAmount()
-	if unpaid > 0 {
+	if unpaid.IsPositive() {
 		if arID, err = requireMapping(mapping, "AR"); err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 	// jadi dikurangi dari nominal pembayaran (kasir menyerahkan kembalian).
 	changeLeft := sale.ChangeAmount
 	for _, p := range sale.Payments {
-		if p.Amount <= 0 {
+		if !p.Amount.IsPositive() {
 			continue
 		}
 		acc, ok := paymentAccounts[p.PaymentMethodID]
@@ -79,15 +79,15 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 			return nil, fmt.Errorf("%w: metode pembayaran id %d belum memiliki akun", domain.ErrAutoPostingSettings, p.PaymentMethodID)
 		}
 		debit := p.Amount
-		if changeLeft > 0 {
+		if changeLeft.IsPositive() {
 			applied := changeLeft
-			if applied > debit {
+			if applied.Cmp(debit) > 0 {
 				applied = debit
 			}
-			debit = round2(debit - applied)
-			changeLeft = round2(changeLeft - applied)
+			debit = debit.Sub(applied)
+			changeLeft = changeLeft.Sub(applied)
 		}
-		if debit <= 0 {
+		if !debit.IsPositive() {
 			continue
 		}
 		lines = append(lines, domain.JournalLine{
@@ -97,7 +97,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 			Debit:       debit,
 		})
 	}
-	if unpaid > 0 {
+	if unpaid.IsPositive() {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   arID,
@@ -105,7 +105,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 			Debit:       unpaid,
 		})
 	}
-	if sale.CostTotal > 0 {
+	if sale.CostTotal.IsPositive() {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   cogsID,
@@ -119,7 +119,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 		Description: "Pendapatan penjualan",
 		Credit:      sale.DppAmount,
 	})
-	if sale.TaxAmount > 0 {
+	if sale.TaxAmount.IsPositive() {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   vatOutputID,
@@ -127,7 +127,7 @@ func (u *journalUsecase) PlanSaleJournal(ctx context.Context, sale *domain.Sale,
 			Credit:      sale.TaxAmount,
 		})
 	}
-	if sale.CostTotal > 0 {
+	if sale.CostTotal.IsPositive() {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   inventoryID,
@@ -178,19 +178,17 @@ func (u *journalUsecase) PlanSaleReversal(ctx context.Context, sale *domain.Sale
 // finalizeSaleJournalPlan memvalidasi akun, memastikan periode terbuka, dan
 // menjumlahkan total debit/kredit rencana jurnal.
 func (u *journalUsecase) finalizeSaleJournalPlan(ctx context.Context, sale *domain.Sale, entryDate time.Time, lines []domain.JournalLine, reversalOf *int64, actorID int64) (*domain.SaleJournalPlan, error) {
-	var totalDebit, totalCredit float64
+	var totalDebit, totalCredit domain.Money
 	for i := range lines {
 		lines[i].LineNo = i + 1
-		totalDebit += lines[i].Debit
-		totalCredit += lines[i].Credit
+		totalDebit = totalDebit.Add(lines[i].Debit)
+		totalCredit = totalCredit.Add(lines[i].Credit)
 	}
-	totalDebit = round2(totalDebit)
-	totalCredit = round2(totalCredit)
-	if totalDebit <= 0 && totalCredit <= 0 {
+	if !totalDebit.IsPositive() && !totalCredit.IsPositive() {
 		return nil, nil
 	}
-	if totalDebit != totalCredit {
-		return nil, fmt.Errorf("%w: penjualan %s (debit %.2f != kredit %.2f)", domain.ErrJournalUnbalanced, sale.SaleNumber, totalDebit, totalCredit)
+	if totalDebit.Cmp(totalCredit) != 0 {
+		return nil, fmt.Errorf("%w: penjualan %s (debit %s != kredit %s)", domain.ErrJournalUnbalanced, sale.SaleNumber, totalDebit, totalCredit)
 	}
 
 	if _, err := u.validatePostableAccounts(ctx, toLineInputs(&lines)); err != nil {

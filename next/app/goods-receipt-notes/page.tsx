@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { PackageCheck } from "lucide-react";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
 
 const GoodsReceiptNoteTable = dynamic(
   () =>
@@ -60,20 +61,11 @@ export default function GoodsReceiptNotesPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      <div className="flex items-center gap-2 border-b pb-4">
-        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-          <PackageCheck className="size-5" />
-        </div>
-        <div>
-          <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
-            Riwayat Penerimaan Barang (GRN)
-          </h1>
-          <p className="text-xs text-slate-500">
-            Dokumen batch penerimaan barang dari PO yang sudah disetujui.
-            Dokumen ini tidak bisa diubah atau dihapus.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={PackageCheck}
+        title="Riwayat Penerimaan Barang (GRN)"
+        description="Dokumen batch penerimaan barang dari PO yang sudah disetujui. Dokumen ini tidak bisa diubah atau dihapus."
+      />
 
       <GoodsReceiptNoteTable
         refreshTrigger={refreshTrigger}

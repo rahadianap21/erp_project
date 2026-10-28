@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,15 +98,11 @@ export function SettingsPageView() {
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div>
-        <h1 className="text-lg font-bold text-slate-900">
-          Pengaturan Pajak (PPN)
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Atur tarif PPN global dan perlakuan harga jual terhadap pajak untuk
-          transaksi POS.
-        </p>
-      </div>
+      <PageHeader
+        icon={PercentIcon}
+        title="Pengaturan Pajak (PPN)"
+        description="Atur tarif PPN global dan perlakuan harga jual terhadap pajak untuk transaksi POS."
+      />
 
       {loading ? (
         <div className="max-w-2xl space-y-4 rounded-xl border bg-white p-6 shadow-xs">

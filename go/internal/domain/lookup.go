@@ -12,12 +12,12 @@ type SupplierLookup struct {
 
 // ProductLookup adalah proyeksi ringan master barang untuk form Purchase Order.
 type ProductLookup struct {
-	ID               int64   `json:"id"`
-	Sku              string  `json:"sku"`
-	Name             string  `json:"name"`
-	SupplierID       int64   `json:"supplier_id"`
-	PurchasePrice    float64 `json:"purchase_price"`
-	PurchaseUnitKode string  `json:"purchase_unit_kode,omitempty"`
+	ID               int64  `json:"id"`
+	Sku              string `json:"sku"`
+	Name             string `json:"name"`
+	SupplierID       int64  `json:"supplier_id"`
+	PurchasePrice    Money  `json:"purchase_price"`
+	PurchaseUnitKode string `json:"purchase_unit_kode,omitempty"`
 }
 
 // LookupRepository menyediakan data referensi read-only yang tidak terikat

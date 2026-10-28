@@ -20,6 +20,7 @@ import {
 } from "./components/purchase-order-table";
 import { GRNFormDialog } from "./components/grn-form-dialog";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -285,20 +286,11 @@ export default function PurchaseOrdersPage() {
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Header Judul Section Menawan */}
-      <div className="flex items-center gap-2 border-b pb-4">
-        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
-          <ShoppingBag className="size-5" />
-        </div>
-        <div>
-          <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
-            Manajemen Dokumen Purchase Order (PO)
-          </h1>
-          <p className="text-xs text-slate-500">
-            Menerbitkan dokumen pesanan pengadaan logistik barang resmi ke
-            vendor / supplier rekanan.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={ShoppingBag}
+        title="Manajemen Dokumen Purchase Order (PO)"
+        description="Menerbitkan dokumen pesanan pengadaan logistik barang resmi ke vendor / supplier rekanan."
+      />
 
       {/* Form Hanya Dirender Jika Pengguna Punya Akses 'create' */}
       {permissions.create && (
@@ -345,7 +337,7 @@ export default function PurchaseOrdersPage() {
             <p className="font-bold text-blue-600 uppercase">
               {poToApprove?.po_number}
             </p>
-            <p className="text-slate-500 text-[11px] font-sans mt-0.5 font-semibold">
+            <p className="text-slate-500 text-xs font-sans mt-0.5 font-semibold">
               Vendor: {poToApprove?.supplier_name}
             </p>
           </div>
@@ -390,7 +382,7 @@ export default function PurchaseOrdersPage() {
             <p className="font-bold text-rose-600 uppercase">
               {poToCancel?.po_number}
             </p>
-            <p className="text-slate-500 text-[11px] font-sans mt-0.5 font-semibold">
+            <p className="text-slate-500 text-xs font-sans mt-0.5 font-semibold">
               Vendor: {poToCancel?.supplier_name}
             </p>
           </div>
@@ -434,7 +426,7 @@ export default function PurchaseOrdersPage() {
 
           <div className="my-2 p-3 bg-rose-50 text-rose-700 rounded-md border border-rose-100 text-xs font-mono">
             <p className="font-bold uppercase">{poToDelete?.po_number}</p>
-            <p className="text-[11px] mt-0.5">
+            <p className="text-xs mt-0.5">
               Supplier: {poToDelete?.supplier_name}
             </p>
           </div>
@@ -493,7 +485,7 @@ export default function PurchaseOrdersPage() {
             <p className="font-bold text-teal-700 uppercase">
               {poToFinish?.po_number}
             </p>
-            <p className="text-slate-500 text-[11px] font-sans mt-0.5 font-semibold">
+            <p className="text-slate-500 text-xs font-sans mt-0.5 font-semibold">
               Vendor: {poToFinish?.supplier_name}
             </p>
           </div>
@@ -522,7 +514,7 @@ export default function PurchaseOrdersPage() {
                     </li>
                   ))}
               </ul>
-              <p className="mt-2 text-[10px]">
+              <p className="mt-2 text-xs">
                 PO akan ditutup dengan sisa. GRN yang terlanjur tercatat tetap
                 tersimpan.
               </p>

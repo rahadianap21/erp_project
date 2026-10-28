@@ -37,7 +37,6 @@ export default function ReportsPage() {
     <main className="flex w-full flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <ReportHeader
         icon={BarChart3}
-        accent="emerald"
         title="Laporan Keuangan (Financial Reports)"
         subtitle="Neraca, laba rugi, neraca saldo, dan buku besar yang dihitung dari jurnal terposting."
       />

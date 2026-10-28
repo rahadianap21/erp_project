@@ -225,7 +225,7 @@ func (r *sqlGRNRepository) CreateGRN(ctx context.Context, in domain.CreateGRNInp
 // netCostFactor mengubah nilai terima bruto menjadi harga pokok perolehan per
 // produk. Faktor ini diteruskan sebagai NUMERIC 6 desimal supaya pembagian
 // TAX_INCLUSIVE (1/1.12) tidak kehilangan presisi sebelum sampai ke query.
-func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error {
+func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor domain.Decimal, expectedGRNCount int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -258,10 +258,7 @@ func (r *sqlGRNRepository) FinishReceiving(ctx context.Context, poID int64, upda
 		updatedByPg = pgtype.Int8{Int64: updatedBy, Valid: true}
 	}
 
-	var netCostFactorPg pgtype.Numeric
-	if err := netCostFactorPg.Scan(fmt.Sprintf("%.6f", netCostFactor)); err != nil {
-		return err
-	}
+	netCostFactorPg := numericFromDecimalScale(netCostFactor, -6)
 
 	// Kunci semua produk yang stoknya akan berubah dalam urutan id yang sama
 	// untuk setiap transaksi. Bulk UPDATE di bawah tidak menjamin urutan lock,

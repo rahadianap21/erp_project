@@ -3,6 +3,7 @@
 import { apiGet, apiPost, apiPut, messageFromError } from "@/lib/api-client";
 import { useEffect, useState } from "react";
 import { CalendarRange, Lock, LockOpen, RefreshCw, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ComboboxSelect } from "@/components/combobox-select";
 import {
@@ -115,8 +116,8 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
   return (
     <div className="bg-white rounded-xl shadow-2xs border border-slate-200 p-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700">
-          <CalendarRange className="size-4 text-indigo-600" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+          <CalendarRange className="size-4 text-emerald-600" />
           Periode Fiskal
           {loading && (
             <RefreshCw className="size-3 animate-spin text-slate-400" />
@@ -156,7 +157,7 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
             />
             <Button
               size="sm"
-              className="h-8 text-[11px] cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="h-8 text-xs cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={openPeriod}
               disabled={processing === "open"}
             >
@@ -173,7 +174,7 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
 
       <div className="mt-3 flex flex-wrap gap-2">
         {periods.length === 0 && !loading && (
-          <span className="text-[11px] text-slate-400">
+          <span className="text-xs text-slate-400">
             Belum ada periode fiskal tercatat.
           </span>
         )}
@@ -183,11 +184,10 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
           return (
             <div
               key={period.id}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold ${
-                isOpen
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : "bg-slate-50 border-slate-200 text-slate-500"
-              }`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold ${isOpen
+                ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                : "bg-slate-50 border-slate-200 text-slate-500"
+                }`}
             >
               {isOpen ? (
                 <LockOpen className="size-3.5" />
@@ -195,16 +195,14 @@ export function PeriodBanner({ revision, canManagePeriod }: PeriodBannerProps) {
                 <Lock className="size-3.5" />
               )}
               <span>{label}</span>
-              <span
-                className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${isOpen ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}
-              >
+              <Badge variant={isOpen ? "success" : "neutral"}>
                 {isOpen ? "OPEN" : "CLOSED"}
-              </span>
+              </Badge>
               {canManagePeriod && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={`h-6 text-[10px] px-2 cursor-pointer ${isOpen ? "text-rose-600 hover:bg-rose-50" : "text-slate-600 hover:bg-slate-100"}`}
+                  className={`h-6 text-xs px-2 cursor-pointer ${isOpen ? "text-rose-600 hover:bg-rose-50" : "text-slate-600 hover:bg-slate-100"}`}
                   onClick={() => setTarget(period)}
                   disabled={processing === `toggle-${period.id}`}
                 >

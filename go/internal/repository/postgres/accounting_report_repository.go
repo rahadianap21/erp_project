@@ -41,8 +41,8 @@ func (r *sqlAccountingReportRepository) AccountBalances(ctx context.Context, fro
 			Name:          row.Name,
 			AccountType:   row.AccountType,
 			NormalBalance: row.NormalBalance,
-			TotalDebit:    numericToFloat(row.TotalDebit),
-			TotalCredit:   numericToFloat(row.TotalCredit),
+			TotalDebit:    moneyFromNumeric(row.TotalDebit),
+			TotalCredit:   moneyFromNumeric(row.TotalCredit),
 		})
 	}
 	return balances, nil
@@ -64,20 +64,20 @@ func (r *sqlAccountingReportRepository) AccountLedgerLines(ctx context.Context, 
 			EntryNumber: row.EntryNumber,
 			EntryDate:   row.EntryDate.Time,
 			Description: row.Description,
-			Debit:       numericToFloat(row.Debit),
-			Credit:      numericToFloat(row.Credit),
+			Debit:       moneyFromNumeric(row.Debit),
+			Credit:      moneyFromNumeric(row.Credit),
 		})
 	}
 	return lines, nil
 }
 
-func (r *sqlAccountingReportRepository) AccountOpeningBalance(ctx context.Context, accountID int64, before time.Time) (float64, float64, error) {
+func (r *sqlAccountingReportRepository) AccountOpeningBalance(ctx context.Context, accountID int64, before time.Time) (domain.Money, domain.Money, error) {
 	row, err := r.q.GetAccountOpeningBalance(ctx, db.GetAccountOpeningBalanceParams{
 		AccountID:  accountID,
 		BeforeDate: pgtype.Date{Time: before, Valid: true},
 	})
 	if err != nil {
-		return 0, 0, err
+		return domain.Money{}, domain.Money{}, err
 	}
-	return numericToFloat(row.TotalDebit), numericToFloat(row.TotalCredit), nil
+	return moneyFromNumeric(row.TotalDebit), moneyFromNumeric(row.TotalCredit), nil
 }

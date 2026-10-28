@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
+	"math/big"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // =========================================================================
@@ -118,10 +120,10 @@ type SaleProductInfo struct {
 	ID            int64
 	SKU           string
 	Name          string
-	SellingPrice  float64
-	AvgCost       float64
+	SellingPrice  Money
+	AvgCost       Decimal
 	DiscountType  string
-	DiscountValue float64
+	DiscountValue Decimal
 	CurrentStock  int
 	IsTaxable     bool
 }
@@ -131,12 +133,12 @@ type POSProduct struct {
 	SKU           string  `json:"sku"`
 	Barcode       string  `json:"barcode"`
 	Name          string  `json:"name"`
-	SellingPrice  float64 `json:"selling_price"`
+	SellingPrice  Money   `json:"selling_price"`
 	CurrentStock  int     `json:"current_stock"`
 	CategoryName  string  `json:"category_name"`
 	SellingUnit   string  `json:"selling_unit"`
 	DiscountType  string  `json:"discount_type"`
-	DiscountValue float64 `json:"discount_value"`
+	DiscountValue Decimal `json:"discount_value"`
 	IsTaxable     bool    `json:"is_taxable"`
 }
 
@@ -156,17 +158,19 @@ type SaleDetail struct {
 	SKU            string  `json:"sku"`
 	ProductName    string  `json:"product_name"`
 	Qty            int     `json:"qty"`
-	UnitPrice      float64 `json:"unit_price"`
+	UnitPrice      Money   `json:"unit_price"`
 	DiscountType   string  `json:"discount_type"`
-	DiscountValue  float64 `json:"discount_value"`
-	DiscountAmount float64 `json:"discount_amount"`
-	GrossAmount    float64 `json:"gross_amount"`
-	LineTotal      float64 `json:"line_total"`
-	DppAmount      float64 `json:"dpp_amount"`
-	TaxAmount      float64 `json:"tax_amount"`
-	CostUnit       float64 `json:"cost_unit"`
-	CostTotal      float64 `json:"cost_total"`
-	IsTaxable      bool    `json:"-"`
+	DiscountValue  Decimal `json:"discount_value"`
+	DiscountAmount Money   `json:"discount_amount"`
+	GrossAmount    Money   `json:"gross_amount"`
+	LineTotal      Money   `json:"line_total"`
+	DppAmount      Money   `json:"dpp_amount"`
+	TaxAmount      Money   `json:"tax_amount"`
+	// CostUnit memakai Decimal karena kolom cost_unit NUMERIC(15,4): harga
+	// pokok per satuan bisa punya pecahan di bawah sen.
+	CostUnit  Decimal `json:"cost_unit"`
+	CostTotal Money   `json:"cost_total"`
+	IsTaxable bool    `json:"-"`
 }
 
 type SalePayment struct {
@@ -175,7 +179,7 @@ type SalePayment struct {
 	PaymentMethodID   int64     `json:"payment_method_id"`
 	PaymentMethodName string    `json:"payment_method_name"`
 	Channel           string    `json:"channel"`
-	Amount            float64   `json:"amount"`
+	Amount            Money     `json:"amount"`
 	ReferenceNumber   string    `json:"reference_number"`
 	CreatedAt         time.Time `json:"created_at"`
 }
@@ -187,23 +191,23 @@ type Sale struct {
 	MemberID        int64         `json:"member_id"`
 	MemberName      string        `json:"member_name"`
 	TaxType         string        `json:"tax_type"`
-	Subtotal        float64       `json:"subtotal"`
-	ItemDiscount    float64       `json:"item_discount"`
+	Subtotal        Money         `json:"subtotal"`
+	ItemDiscount    Money         `json:"item_discount"`
 	DiscountType    string        `json:"discount_type"`
-	DiscountValue   float64       `json:"discount_value"`
-	DiscountAmount  float64       `json:"discount_amount"`
-	DppAmount       float64       `json:"dpp_amount"`
-	TaxAmount       float64       `json:"tax_amount"`
-	TotalAmount     float64       `json:"total_amount"`
-	PaidAmount      float64       `json:"paid_amount"`
-	ChangeAmount    float64       `json:"change_amount"`
-	CostTotal       float64       `json:"cost_total"`
+	DiscountValue   Decimal       `json:"discount_value"`
+	DiscountAmount  Money         `json:"discount_amount"`
+	DppAmount       Money         `json:"dpp_amount"`
+	TaxAmount       Money         `json:"tax_amount"`
+	TotalAmount     Money         `json:"total_amount"`
+	PaidAmount      Money         `json:"paid_amount"`
+	ChangeAmount    Money         `json:"change_amount"`
+	CostTotal       Money         `json:"cost_total"`
 	PointsEarned    int64         `json:"points_earned"`
 	RedeemPoints    int64         `json:"redeem_points"`
-	RedeemAmount    float64       `json:"redeem_amount"`
+	RedeemAmount    Money         `json:"redeem_amount"`
 	VoucherID       int64         `json:"voucher_id,omitempty"`
 	VoucherCode     string        `json:"voucher_code,omitempty"`
-	VoucherDiscount float64       `json:"voucher_discount"`
+	VoucherDiscount Money         `json:"voucher_discount"`
 	PaymentStatus   string        `json:"payment_status"`
 	Status          string        `json:"status"`
 	DueDate         *time.Time    `json:"due_date,omitempty"`
@@ -225,9 +229,9 @@ type SaleLineInput struct {
 }
 
 type SalePaymentInput struct {
-	PaymentMethodID int64   `json:"payment_method_id"`
-	Amount          float64 `json:"amount"`
-	ReferenceNumber string  `json:"reference_number"`
+	PaymentMethodID int64  `json:"payment_method_id"`
+	Amount          Money  `json:"amount"`
+	ReferenceNumber string `json:"reference_number"`
 }
 
 type CreateSaleInput struct {
@@ -236,7 +240,7 @@ type CreateSaleInput struct {
 	// DiscountType/DiscountValue dipertahankan hanya agar diskon nota manual
 	// yang masih dikirim klien lama bisa ditolak secara eksplisit.
 	DiscountType  string             `json:"discount_type"`
-	DiscountValue float64            `json:"discount_value"`
+	DiscountValue Decimal            `json:"discount_value"`
 	RedeemPoints  int64              `json:"redeem_points"`
 	VoucherCode   string             `json:"voucher_code"`
 	DueDate       *time.Time         `json:"due_date"`
@@ -265,8 +269,8 @@ type SaleJournalPlan struct {
 	SourceReference string
 	ReversalOfID    *int64
 	Lines           []JournalLine
-	TotalDebit      float64
-	TotalCredit     float64
+	TotalDebit      Money
+	TotalCredit     Money
 	CreatedBy       *int64
 }
 
@@ -309,14 +313,14 @@ type POSUsecase interface {
 type POSBootstrap struct {
 	PaymentMethods []PaymentMethod `json:"payment_methods"`
 	Categories     []POSCategory   `json:"categories"`
-	TaxRate        float64         `json:"tax_rate"`
+	TaxRate        Decimal         `json:"tax_rate"`
 	TaxMode        string          `json:"tax_mode"`
 }
 
 // TaxConfig adalah konfigurasi pajak penjualan global: tarif PPN dan mode
 // harga (INCLUSIVE/EXCLUSIVE). Dibaca dari pengaturan aplikasi.
 type TaxConfig struct {
-	Rate float64
+	Rate Decimal
 	Mode string
 }
 
@@ -324,31 +328,27 @@ type TaxConfig struct {
 // PERHITUNGAN PENJUALAN (PURE)
 // =========================================================================
 
-func roundMoney(v float64) float64 {
-	return math.Round(v*100) / 100
-}
-
 // discountAmount menghitung nominal diskon dari tipe + nilai terhadap basis.
-func discountAmount(dtype string, value, base float64) (float64, error) {
+func discountAmount(dtype string, value Decimal, base Money) (Money, error) {
 	switch dtype {
 	case "", SaleDiscountNone:
-		return 0, nil
+		return Money{}, nil
 	case SaleDiscountPercent:
-		if value < 0 || value > 100 {
-			return 0, ErrSaleDiscountInvalid
+		if value.IsNegative() || value.Cmp(DecInt(100)) > 0 {
+			return Money{}, ErrSaleDiscountInvalid
 		}
-		return roundMoney(base * value / 100), nil
+		return base.MulDecimal(value.DivInt(100).Raw()), nil
 	case SaleDiscountAmount:
-		if value < 0 {
-			return 0, ErrSaleDiscountInvalid
+		if value.IsNegative() {
+			return Money{}, ErrSaleDiscountInvalid
 		}
-		d := roundMoney(value)
-		if d > base {
+		d := MoneyFromDecimal(value.Raw())
+		if d.Cmp(base) > 0 {
 			d = base
 		}
 		return d, nil
 	default:
-		return 0, ErrSaleDiscountInvalid
+		return Money{}, ErrSaleDiscountInvalid
 	}
 }
 
@@ -375,7 +375,7 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	if len(in.Items) == 0 {
 		return nil, ErrSaleItemsRequired
 	}
-	if (in.DiscountType != "" && in.DiscountType != SaleDiscountNone) || in.DiscountValue != 0 {
+	if (in.DiscountType != "" && in.DiscountType != SaleDiscountNone) || !in.DiscountValue.IsZero() {
 		return nil, fmt.Errorf("%w: diskon nota manual tidak diizinkan", ErrSaleDiscountInvalid)
 	}
 	if in.MemberID <= 0 && in.RedeemPoints > 0 {
@@ -392,9 +392,9 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	}
 
 	// 1. Hitung tiap baris dan kumpulkan basis untuk alokasi diskon/pajak.
-	lineNet := make([]float64, 0, len(in.Items))
+	lineNet := make([]Money, 0, len(in.Items))
 	lineTaxable := make([]bool, 0, len(in.Items))
-	var subtotal, itemDiscount, costTotal float64
+	var subtotal, itemDiscount, costTotal Money
 	for _, it := range in.Items {
 		if it.ProductID <= 0 || it.Qty <= 0 {
 			return nil, ErrSaleLineInvalid
@@ -404,25 +404,25 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 			return nil, fmt.Errorf("%w: id %d", ErrSaleProductNotFound, it.ProductID)
 		}
 		unitPrice := p.SellingPrice
-		if unitPrice < 0 {
+		if unitPrice.IsNegative() {
 			return nil, ErrSaleLineInvalid
 		}
-		gross := roundMoney(float64(it.Qty) * unitPrice)
+		gross := unitPrice.MulInt(int64(it.Qty))
 		discountType := normalizeDiscountType(p.DiscountType)
 		disc, err := discountAmount(discountType, p.DiscountValue, gross)
 		if err != nil {
 			return nil, err
 		}
-		net := roundMoney(gross - disc)
+		net := gross.Sub(disc)
 		costUnit := p.AvgCost
-		cost := roundMoney(float64(it.Qty) * costUnit)
+		cost := MoneyFromDecimal(costUnit.MulInt(int64(it.Qty)).Raw())
 
 		sale.Details = append(sale.Details, SaleDetail{
 			ProductID:      p.ID,
 			SKU:            p.SKU,
 			ProductName:    p.Name,
 			Qty:            it.Qty,
-			UnitPrice:      roundMoney(unitPrice),
+			UnitPrice:      unitPrice,
 			DiscountType:   discountType,
 			DiscountValue:  p.DiscountValue,
 			DiscountAmount: disc,
@@ -434,13 +434,10 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 		})
 		lineNet = append(lineNet, net)
 		lineTaxable = append(lineTaxable, p.IsTaxable)
-		subtotal += gross
-		itemDiscount += disc
-		costTotal += cost
+		subtotal = subtotal.Add(gross)
+		itemDiscount = itemDiscount.Add(disc)
+		costTotal = costTotal.Add(cost)
 	}
-	subtotal = roundMoney(subtotal)
-	itemDiscount = roundMoney(itemDiscount)
-	costTotal = roundMoney(costTotal)
 
 	// 2. Diskon voucher dihitung dari nilai setelah diskon item, lalu
 	// dialokasikan proporsional ke tiap baris agar DPP/PPN tiap baris tetap
@@ -450,13 +447,13 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 		if err := voucher.ValidateSubtotal(subtotal); err != nil {
 			return nil, err
 		}
-		voucherAmount, err := voucher.DiscountAmount(roundMoney(subtotal - itemDiscount))
+		voucherAmount, err := voucher.DiscountAmount(subtotal.Sub(itemDiscount))
 		if err != nil {
 			return nil, err
 		}
 		voucherAlloc := allocateProportional(voucherAmount, lineNet)
 		for i := range lineNet {
-			lineNet[i] = roundMoney(lineNet[i] - voucherAlloc[i])
+			lineNet[i] = lineNet[i].Sub(voucherAlloc[i])
 		}
 		sale.VoucherID = voucher.ID
 		sale.VoucherCode = voucher.Code
@@ -467,39 +464,38 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	postInvNet := lineNet
 
 	// lineTax menghitung DPP dan PPN dari sebuah nilai neto satu baris.
-	lineTax := func(net float64, taxable bool) (dpp, tax float64) {
+	lineTax := func(net Money, taxable bool) (dpp, tax Money) {
 		if !taxable {
-			return roundMoney(net), 0
+			return net, Money{}
 		}
 		switch cfg.Mode {
 		case TaxModeExclusive:
-			dpp = roundMoney(net)
-			tax = roundMoney(dpp * cfg.Rate)
+			dpp = net
+			tax = dpp.MulDecimal(cfg.Rate.Raw())
 		case TaxModeInclusive:
-			dpp = roundMoney(net / (1 + cfg.Rate))
-			tax = roundMoney(net - dpp)
+			dpp = net.DivDecimal(decimal.NewFromInt(1).Add(cfg.Rate.Raw()))
+			tax = net.Sub(dpp)
 		default:
-			dpp = roundMoney(net)
-			tax = 0
+			dpp = net
+			tax = Money{}
 		}
 		return dpp, tax
 	}
 
 	// 3. Total sebelum tukar poin dipakai menghitung batas redeem 50%.
-	preRedeemTotal := 0.0
+	var preRedeemTotal Money
 	for i := range postInvNet {
 		dpp, tax := lineTax(postInvNet[i], lineTaxable[i])
-		preRedeemTotal += dpp + tax
+		preRedeemTotal = preRedeemTotal.Add(dpp).Add(tax)
 	}
-	preRedeemTotal = roundMoney(preRedeemTotal)
 
 	// 4. Tukar poin diperlakukan seperti diskon uang: mengurangi neto tiap baris
 	// (dan pajaknya), dialokasikan proporsional. Batas 50% total sebelum redeem.
 	usedPoints := int64(0)
-	redeemAmount := 0.0
+	var redeemAmount Money
 	if in.MemberID > 0 && in.RedeemPoints > 0 {
-		maxAmount := roundMoney(preRedeemTotal * MemberRedeemMaxRatio)
-		maxPoints := int64(maxAmount / MemberPointValueRupiah)
+		maxAmount := preRedeemTotal.MulDecimal(MemberRedeemMaxRatio.Raw())
+		maxPoints := maxAmount.Cents() / (MemberPointValueRupiah * 100)
 		usedPoints = in.RedeemPoints
 		if usedPoints > maxPoints {
 			usedPoints = maxPoints
@@ -507,27 +503,25 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 		if usedPoints < 0 {
 			usedPoints = 0
 		}
-		redeemAmount = roundMoney(float64(usedPoints) * MemberPointValueRupiah)
+		redeemAmount = Rupiah(usedPoints * MemberPointValueRupiah)
 	}
 	redeemAlloc := allocateProportional(redeemAmount, postInvNet)
 
 	// 5. Pajak final tiap baris + agregasi header.
-	var dppTotal, taxTotal float64
+	var dppTotal, taxTotal Money
 	anyTaxable := false
 	for i := range postInvNet {
-		finalNet := roundMoney(postInvNet[i] - redeemAlloc[i])
+		finalNet := postInvNet[i].Sub(redeemAlloc[i])
 		dpp, tax := lineTax(finalNet, lineTaxable[i])
 		sale.Details[i].DppAmount = dpp
 		sale.Details[i].TaxAmount = tax
 		if lineTaxable[i] {
 			anyTaxable = true
 		}
-		dppTotal += dpp
-		taxTotal += tax
+		dppTotal = dppTotal.Add(dpp)
+		taxTotal = taxTotal.Add(tax)
 	}
-	dppTotal = roundMoney(dppTotal)
-	taxTotal = roundMoney(taxTotal)
-	total := roundMoney(dppTotal + taxTotal)
+	total := dppTotal.Add(taxTotal)
 
 	// TaxType diturunkan dari mode + ada/tidaknya baris kena PPN; pemilih pajak
 	// per-nota sudah dihapus dari POS.
@@ -548,31 +542,30 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	if len(in.Payments) > 1 {
 		return nil, ErrSaleMetodeGanda
 	}
-	var paid float64
+	var paid Money
 	for _, pay := range in.Payments {
-		if pay.PaymentMethodID <= 0 || pay.Amount <= 0 {
+		if pay.PaymentMethodID <= 0 || !pay.Amount.IsPositive() {
 			return nil, ErrSalePaymentInvalid
 		}
-		paid += pay.Amount
+		paid = paid.Add(pay.Amount)
 		sale.Payments = append(sale.Payments, SalePayment{
 			PaymentMethodID: pay.PaymentMethodID,
 			Amount:          pay.Amount,
 			ReferenceNumber: pay.ReferenceNumber,
 		})
 	}
-	paid = roundMoney(paid)
-	if paid < total && total-paid > 0.01 {
+	if paid.Cmp(total) < 0 && total.Sub(paid).Cents() > 1 {
 		return nil, ErrSalePaymentKurang
 	}
-	if paid < total {
+	if paid.Cmp(total) < 0 {
 		paid = total
 	}
-	sale.ChangeAmount = roundMoney(paid - total)
+	sale.ChangeAmount = paid.Sub(total)
 
 	switch {
-	case paid <= 0:
+	case !paid.IsPositive():
 		sale.PaymentStatus = SalePaymentUnpaid
-	case paid < total:
+	case paid.Cmp(total) < 0:
 		sale.PaymentStatus = SalePaymentPartial
 	default:
 		sale.PaymentStatus = SalePaymentPaid
@@ -580,7 +573,7 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 
 	sale.Subtotal = subtotal
 	sale.ItemDiscount = itemDiscount
-	sale.DiscountAmount = 0
+	sale.DiscountAmount = Money{}
 	sale.DppAmount = dppTotal
 	sale.TaxAmount = taxTotal
 	sale.TotalAmount = total
@@ -590,7 +583,7 @@ func calculateSale(in CreateSaleInput, products map[int64]SaleProductInfo, cfg T
 	sale.RedeemAmount = redeemAmount
 	// Poin diperoleh hanya bila nota memakai member; 1 poin per Rp 10.000 total akhir.
 	if sale.MemberID > 0 {
-		sale.PointsEarned = int64(total / MemberPointEarnPerRupiah)
+		sale.PointsEarned = total.Cents() / (MemberPointEarnPerRupiah * 100)
 	}
 	return sale, nil
 }
@@ -605,20 +598,16 @@ func normalizeDiscountType(t string) string {
 // allocateProportional membagi total ke tiap baris sebanding bobotnya, lalu
 // mengoreksi sisa pembulatan ke baris dengan pecahan terbesar (metode largest
 // remainder) supaya jumlah hasil tepat sama dengan total. Bobot nol menerima
-// nol. Nilai rupiah dibulatkan ke sen.
-func allocateProportional(total float64, weights []float64) []float64 {
-	out := make([]float64, len(weights))
-	if len(weights) == 0 {
+// nol. Seluruh perhitungan dilakukan dalam satuan sen sehingga eksak.
+func allocateProportional(total Money, weights []Money) []Money {
+	out := make([]Money, len(weights))
+	if len(weights) == 0 || total.IsZero() {
 		return out
 	}
-	total = roundMoney(total)
-	if total == 0 {
-		return out
-	}
-	var sumW float64
+	var sumW int64
 	for _, w := range weights {
-		if w > 0 {
-			sumW += w
+		if w.Cents() > 0 {
+			sumW += w.Cents()
 		}
 	}
 	if sumW <= 0 {
@@ -627,39 +616,42 @@ func allocateProportional(total float64, weights []float64) []float64 {
 
 	type fractional struct {
 		idx int
-		rem float64
+		rem *big.Int
 	}
 	fracs := make([]fractional, 0, len(weights))
-	var allocated float64
+	var allocated int64
+	totalCents := big.NewInt(total.Cents())
+	divisor := big.NewInt(sumW)
 	for i, w := range weights {
-		if w <= 0 {
+		if w.Cents() <= 0 {
 			continue
 		}
-		exact := total * w / sumW
-		floorCents := math.Floor(exact*100+1e-9) / 100
-		out[i] = floorCents
-		allocated = roundMoney(allocated + floorCents)
-		fracs = append(fracs, fractional{idx: i, rem: exact - floorCents})
+		num := new(big.Int).Mul(totalCents, big.NewInt(w.Cents()))
+		quotient, remainder := new(big.Int).QuoRem(num, divisor, new(big.Int))
+		cents := quotient.Int64()
+		out[i] = NewMoney(cents)
+		allocated += cents
+		fracs = append(fracs, fractional{idx: i, rem: remainder})
 	}
 
-	remaining := int(math.Round((total - allocated) * 100))
-	if remaining > len(fracs) {
-		remaining = len(fracs)
+	remaining := total.Cents() - allocated
+	if remaining > int64(len(fracs)) {
+		remaining = int64(len(fracs))
 	}
-	for k := 0; k < remaining && len(fracs) > 0; k++ {
+	for k := int64(0); k < remaining && len(fracs) > 0; k++ {
 		best := 0
 		for j := 1; j < len(fracs); j++ {
-			if fracs[j].rem > fracs[best].rem {
+			if fracs[j].rem.Cmp(fracs[best].rem) > 0 {
 				best = j
 			}
 		}
-		out[fracs[best].idx] = roundMoney(out[fracs[best].idx] + 0.01)
-		fracs[best].rem -= 0.01
+		out[fracs[best].idx] = NewMoney(out[fracs[best].idx].Cents() + 1)
+		fracs[best].rem = new(big.Int)
 	}
 	return out
 }
 
 // UnpaidAmount adalah sisa tagihan yang menjadi piutang (AR).
-func (s *Sale) UnpaidAmount() float64 {
-	return roundMoney(s.TotalAmount - s.PaidAmount)
+func (s *Sale) UnpaidAmount() Money {
+	return s.TotalAmount.Sub(s.PaidAmount)
 }

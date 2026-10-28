@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import { ProductCategoryForm } from "./components/product-category-form";
 import { toast } from "sonner";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
+import { FolderTreeIcon } from "lucide-react";
 
 // 🌟 INTEGRASI PORTAL: Ekstrak secara kaku Named Export dari komponen anak
 const ProductCategoryTable = dynamic(
@@ -124,6 +126,11 @@ export default function ProductCategoriesCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <PageHeader
+        icon={FolderTreeIcon}
+        title="Kategori Produk"
+        description="Kelola klasifikasi dan hierarki kategori barang."
+      />
       {(permissions.create || editingCategory) && (
         <ProductCategoryForm
           token={authToken}

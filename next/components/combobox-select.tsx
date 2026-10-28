@@ -365,7 +365,7 @@ export function ComboboxSelect({
                 }
                 setIsModalOpen(true);
               }}
-              className="w-full text-left px-2.5 py-2 mt-1 border-t border-slate-100 text-[11px] font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 bg-white sticky bottom-0"
+              className="w-full text-left px-2.5 py-2 mt-1 border-t border-slate-100 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 bg-white sticky bottom-0"
             >
               <Plus className="size-3" />
               <span>
@@ -415,7 +415,7 @@ export function ComboboxSelect({
             {permissionCode?.startsWith("units") && (
               <div className="grid grid-cols-1 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Kode Satuan
                   </label>
                   <input
@@ -430,7 +430,7 @@ export function ComboboxSelect({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Nama Lengkap Satuan
                   </label>
                   <input
@@ -445,7 +445,7 @@ export function ComboboxSelect({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Deskripsi Satuan
                   </label>
                   <textarea
@@ -470,7 +470,7 @@ export function ComboboxSelect({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <FolderTree className="size-3 text-blue-600" /> Nama
                       Kategori
                     </label>
@@ -486,7 +486,7 @@ export function ComboboxSelect({
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                    <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       <Link2 className="size-3 text-slate-400" /> Slug Kustom
                       (Opsional)
                     </label>
@@ -503,7 +503,7 @@ export function ComboboxSelect({
                 </div>
 
                 <div className="space-y-1.5 relative">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <FolderTree className="size-3 text-blue-600" /> Induk
                     Kategori (Hierarki)
                   </label>
@@ -530,7 +530,7 @@ export function ComboboxSelect({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <FileText className="size-3" /> Deskripsi Kategori
                   </label>
                   <textarea
@@ -553,7 +553,7 @@ export function ComboboxSelect({
             {permissionCode?.startsWith("suppliers") && (
               <div className="grid grid-cols-1 gap-3 max-h-80 overflow-y-auto pr-1">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Nama Resmi Perusahaan Vendor
                   </label>
                   <input
@@ -568,7 +568,7 @@ export function ComboboxSelect({
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Nama Lengkap PIC Narahubung
                   </label>
                   <input
@@ -584,7 +584,7 @@ export function ComboboxSelect({
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    <label className="text-xs font-bold text-slate-600 uppercase">
                       No. Telepon / Fax
                     </label>
                     <input
@@ -599,7 +599,7 @@ export function ComboboxSelect({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-600 uppercase">
+                    <label className="text-xs font-bold text-slate-600 uppercase">
                       Email Korespondensi
                     </label>
                     <input
@@ -615,7 +615,7 @@ export function ComboboxSelect({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
+                  <label className="text-xs font-bold text-slate-600 uppercase">
                     Alamat Operasional Pabrik / Kantor Utama
                   </label>
                   <textarea

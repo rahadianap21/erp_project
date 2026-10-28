@@ -46,25 +46,45 @@ export default function PurchaseOrdersLoading() {
         </div>
       </div>
 
+      {/* Mobile Card Skeleton */}
+      <div className="space-y-3 md:hidden">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={`po-card-skel-${idx}`}
+            className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-2xs"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36 rounded" />
+                <Skeleton className="h-3 w-28 rounded" />
+              </div>
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-40 rounded" />
+            <Skeleton className="h-8 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
       {/* Table Area Grid Skeleton */}
-      <div className="border border-slate-200 rounded-xl bg-white shadow-2xs overflow-hidden">
+      <div className="hidden border border-slate-200 rounded-xl bg-white shadow-2xs overflow-hidden md:block">
         <Table>
           <TableHeader className="bg-slate-50/70 border-b">
             <TableRow>
               <TableHead className="w-10"></TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/4">
+              <TableHead className="w-1/4">
                 Dokumen Pemesanan / Vendor
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/5">
+              <TableHead className="w-1/5">
                 Tanggal PO
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/5 text-center">
+              <TableHead className="w-1/5 text-center">
                 Status
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 text-right w-32">
+              <TableHead className="text-right w-32">
                 Total Nilai PO
               </TableHead>
-              <TableHead className="text-right font-bold text-xs text-slate-700 w-32">
+              <TableHead className="text-right w-32">
                 Aksi
               </TableHead>
             </TableRow>

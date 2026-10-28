@@ -13,10 +13,11 @@ import (
 // periode fiskal, dan jurnal umum. Satu struct dipakai karena ketiga modul
 // berbagi pola respons dan pemetaan error yang sama.
 type AccountingHandler struct {
-	CoaUsecase     domain.ChartOfAccountUsecase
-	PeriodUsecase  domain.AccountingPeriodUsecase
-	JournalUsecase domain.JournalUsecase
-	ReportUsecase  domain.AccountingReportUsecase
+	CoaUsecase      domain.ChartOfAccountUsecase
+	PeriodUsecase   domain.AccountingPeriodUsecase
+	JournalUsecase  domain.JournalUsecase
+	ReportUsecase   domain.AccountingReportUsecase
+	SettingsUsecase domain.AccountingSettingsUsecase
 }
 
 func NewAccountingHandler(
@@ -24,12 +25,14 @@ func NewAccountingHandler(
 	period domain.AccountingPeriodUsecase,
 	journal domain.JournalUsecase,
 	report domain.AccountingReportUsecase,
+	settings domain.AccountingSettingsUsecase,
 ) *AccountingHandler {
 	return &AccountingHandler{
-		CoaUsecase:     coa,
-		PeriodUsecase:  period,
-		JournalUsecase: journal,
-		ReportUsecase:  report,
+		CoaUsecase:      coa,
+		PeriodUsecase:   period,
+		JournalUsecase:  journal,
+		ReportUsecase:   report,
+		SettingsUsecase: settings,
 	}
 }
 
@@ -256,6 +259,46 @@ func (h *AccountingHandler) HandleReopenPeriod(w http.ResponseWriter, r *http.Re
 	})(w, r)
 }
 
+// --- Pengaturan Akun Otomatis ---
+
+// AccountingSettingsHandler melayani GET (daftar pemetaan + akun) dan PUT
+// (simpan perubahan pemetaan) untuk jurnal otomatis.
+func (h *AccountingHandler) AccountingSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		middleware.RequirePermission("accounting:read", func(w http.ResponseWriter, r *http.Request) {
+			list, err := h.SettingsUsecase.ListSettings(r.Context())
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			respondJSON(w, http.StatusOK, map[string]any{"status": "success", "data": list})
+		})(w, r)
+
+	case http.MethodPut:
+		middleware.RequirePermission("accounting:update", func(w http.ResponseWriter, r *http.Request) {
+			var req struct {
+				Settings []domain.AccountingSettingUpdateInput `json:"settings"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				respondJSON(w, http.StatusBadRequest, map[string]string{"message": "Format payload JSON tidak valid"})
+				return
+			}
+			list, err := h.SettingsUsecase.UpdateSettings(r.Context(), req.Settings, middleware.CurrentUserID(r))
+			if err != nil {
+				WriteError(w, err)
+				return
+			}
+			respondJSON(w, http.StatusOK, map[string]any{
+				"status": "success", "message": "Pengaturan akun otomatis disimpan", "data": list,
+			})
+		})(w, r)
+
+	default:
+		respondJSON(w, http.StatusMethodNotAllowed, map[string]string{"message": "Method tidak diizinkan"})
+	}
+}
+
 // --- Jurnal Umum ---
 
 // JournalsCRUDHandler melayani GET (list/detail) dan POST (jurnal manual).
@@ -297,10 +340,10 @@ func (h *AccountingHandler) JournalsCRUDHandler(w http.ResponseWriter, r *http.R
 				EntryDate   string `json:"entry_date"`
 				Description string `json:"description"`
 				Lines       []struct {
-					AccountID   int64   `json:"account_id"`
-					Description string  `json:"description"`
-					Debit       float64 `json:"debit"`
-					Credit      float64 `json:"credit"`
+					AccountID   int64        `json:"account_id"`
+					Description string       `json:"description"`
+					Debit       domain.Money `json:"debit"`
+					Credit      domain.Money `json:"credit"`
 				} `json:"lines"`
 			}
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

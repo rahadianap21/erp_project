@@ -7,6 +7,8 @@ import dynamic from "next/dynamic";
 import UserForm from "./components/user-form";
 import { UserTableSkeleton } from "./components/user-table";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
+import { UsersIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const UserTable = dynamic(
@@ -117,6 +119,11 @@ export default function UsersCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <PageHeader
+        icon={UsersIcon}
+        title="Manajemen Pengguna"
+        description="Kelola akun pengguna, email, dan role yang diberikan."
+      />
       {/* 🔄 LANGKAH PERBAIKAN 2: Form harus dirender jika user punya hak 'create' ATAU sedang meng-edit data */}
       {(permissions.create || editingUser) && (
         <UserForm

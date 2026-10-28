@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { PaymentDraft, PaymentMethod, formatRupiah, round2 } from "./types";
 
@@ -49,7 +50,7 @@ export function PaymentDialog({
   React.useEffect(() => {
     if (open) {
       setSelectedMethod(null);
-      setAmount(String(Math.round(total)));
+      setAmount(String(round2(total)));
       setReference("");
       setNotes("");
     }
@@ -131,7 +132,7 @@ export function PaymentDialog({
                   className="h-14 cursor-pointer justify-start gap-2 4xl:h-20 4xl:gap-3 4xl:text-lg"
                   onClick={() => {
                     setSelectedMethod(m.id);
-                    setAmount(String(Math.round(total)));
+                    setAmount(String(round2(total)));
                   }}
                 >
                   {CHANNEL_ICON[m.channel] ?? <WalletIcon className="size-5" />}
@@ -147,15 +148,13 @@ export function PaymentDialog({
                 <Label htmlFor="payment-amount" className="4xl:text-base">
                   Uang diterima
                 </Label>
-                <Input
+                <MoneyInput
                   id="payment-amount"
-                  inputMode="numeric"
-                  value={amount}
-                  onChange={(e) =>
-                    setAmount(e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  value={Number(amount) || 0}
+                  onValueChange={(value) => setAmount(String(value))}
                   placeholder="0"
-                  className="h-12 text-base 4xl:h-16 4xl:text-xl"
+                  className="h-12 px-3 text-base 4xl:h-16 4xl:text-xl"
+                  inputClassName="text-base 4xl:text-xl"
                 />
               </div>
               <div className="flex flex-wrap gap-2">
@@ -163,7 +162,7 @@ export function PaymentDialog({
                   type="button"
                   variant="outline"
                   className="cursor-pointer 4xl:h-12 4xl:px-5 4xl:text-base"
-                  onClick={() => setAmount(String(Math.round(total)))}
+                  onClick={() => setAmount(String(round2(total)))}
                 >
                   Uang Pas
                 </Button>

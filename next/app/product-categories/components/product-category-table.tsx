@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
@@ -31,6 +32,13 @@ interface ProductCategory {
   parent_id: number | null;
   parent_name: string;
   is_active: boolean;
+}
+
+interface CategoryNode {
+  cat: ProductCategory;
+  depth: number;
+  expandable: boolean;
+  isExpanded: boolean;
 }
 
 interface ProductCategoryTableProps {
@@ -158,114 +166,28 @@ export function ProductCategoryTable({
   const showActionColumn = canUpdate || canDelete;
   const columnCount = showActionColumn ? 5 : 4;
 
-  const renderRows = (
-    nodes: ProductCategory[],
-    depth: number
-  ): React.ReactNode[] => {
-    return nodes.flatMap((c) => {
-      if (!visibleIds.has(c.id)) return [];
+  // Ratakan hierarki sesuai state expand/search agar satu sumber data dipakai
+  // oleh tabel desktop maupun card list mobile.
+  const flatNodes = useMemo(() => {
+    const walk = (nodes: ProductCategory[], depth: number): CategoryNode[] =>
+      nodes.flatMap((cat) => {
+        if (!visibleIds.has(cat.id)) return [];
 
-      const kids = (childrenMap.get(c.id) ?? []).filter((k) =>
-        visibleIds.has(k.id)
-      );
-      const expandable = kids.length > 0;
-      const isExpanded = query ? true : expanded.has(c.id);
+        const kids = (childrenMap.get(cat.id) ?? []).filter((k) =>
+          visibleIds.has(k.id)
+        );
+        const expandable = kids.length > 0;
+        const isExpanded = query ? true : expanded.has(cat.id);
 
-      const row = (
-        <TableRow
-          key={c.id}
-          onClick={expandable ? () => toggleExpand(c.id) : undefined}
-          className={`transition-colors ${expandable ? "cursor-pointer hover:bg-slate-50/70" : ""} ${expandable && isExpanded ? "bg-slate-50/50" : ""} ${loading ? "opacity-50 pointer-events-none" : ""}`}
-        >
-          <TableCell className="text-xs py-3.5">
-            <div
-              className="flex items-center"
-              style={{ paddingLeft: depth * 20 }}
-            >
-              {expandable ? (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleExpand(c.id);
-                  }}
-                  title={
-                    isExpanded ? "Tutup sub-kategori" : "Buka sub-kategori"
-                  }
-                  className="mr-1.5 p-0.5 rounded hover:bg-slate-200/70 text-slate-500 cursor-pointer shrink-0"
-                >
-                  <ChevronRight
-                    className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
-                  />
-                </button>
-              ) : (
-                <span className="mr-1.5 inline-block size-4 shrink-0" />
-              )}
-              <FolderTree className="size-3.5 text-slate-400 shrink-0 mr-1.5" />
-              <span className="font-bold text-slate-900 uppercase tracking-tight">
-                {c.name}
-              </span>
-            </div>
-          </TableCell>
-          <TableCell className="text-xs py-3.5 font-mono text-slate-500 text-[11px]">
-            <span className="flex items-center gap-1">
-              <Link2 className="size-3 text-slate-300" /> {c.slug}
-            </span>
-          </TableCell>
-          <TableCell className="text-xs py-3.5 text-slate-500 italic max-w-xs truncate">
-            {c.description ? (
-              `"${c.description}"`
-            ) : (
-              <span className="text-slate-300">-</span>
-            )}
-          </TableCell>
-          <TableCell className="text-center py-3.5">
-            <span
-              className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.is_active ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-slate-50 text-slate-400 border-slate-200"}`}
-            >
-              {c.is_active ? "AKTIF" : "OFF"}
-            </span>
-          </TableCell>
-          {showActionColumn && (
-            <TableCell className="text-right py-3.5">
-              <div className="inline-flex gap-1.5 justify-end">
-                {canUpdate && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEditClick(c);
-                    }}
-                    className="p-1 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-slate-600 cursor-pointer shadow-3xs"
-                  >
-                    <Edit2 className="size-3" />
-                  </button>
-                )}
-                {canDelete && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteClick(c);
-                    }}
-                    className="p-1 border border-slate-200 rounded-md bg-white hover:bg-rose-50 text-rose-600 cursor-pointer shadow-3xs"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                )}
-              </div>
-            </TableCell>
-          )}
-        </TableRow>
-      );
+        return [
+          { cat, depth, expandable, isExpanded },
+          ...(expandable && isExpanded ? walk(kids, depth + 1) : []),
+        ];
+      });
 
-      const childRows =
-        expandable && isExpanded ? renderRows(kids, depth + 1) : [];
-      return [row, ...childRows];
-    });
-  };
+    return walk(roots, 0);
+  }, [roots, visibleIds, childrenMap, expanded, query]);
 
-  const bodyRows = renderRows(roots, 0);
   const visibleCount = visibleIds.size;
 
   return (
@@ -282,8 +204,129 @@ export function ProductCategoryTable({
         counterLabel={`Total ${visibleCount} kategori terdaftar`}
       />
 
-      {/* Table Area */}
-      <div className="border rounded-xl shadow-xs overflow-hidden bg-white relative">
+      {/* Mobile: hierarchical card list */}
+      <div className="space-y-2 md:hidden">
+        {loading && categories.length === 0 ? (
+          Array.from({ length: 5 }).map((_, idx) => (
+            <div
+              key={`cat-card-skeleton-${idx}`}
+              className="space-y-2 rounded-xl border bg-white p-4 shadow-xs"
+            >
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          ))
+        ) : flatNodes.length === 0 ? (
+          <div className="rounded-xl border bg-white p-8 text-center text-muted-foreground">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Search className="size-5 text-muted-foreground/50" />
+              <p className="text-sm font-medium">
+                {search !== ""
+                  ? "Data tidak ditemukan. Coba sesuaikan kata kunci pencarian Anda."
+                  : "Tidak ada data kategori yang terindeks di sistem."}
+              </p>
+              {search !== "" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearch("")}
+                  className="mt-1 h-7 cursor-pointer text-sm"
+                >
+                  Bersihkan Filter
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          flatNodes.map(({ cat: c, depth, expandable, isExpanded }) => (
+            <article
+              key={c.id}
+              onClick={expandable ? () => toggleExpand(c.id) : undefined}
+              style={{ marginLeft: Math.min(depth, 4) * 12 }}
+              className={`rounded-xl border bg-white p-3.5 shadow-xs transition-colors ${expandable ? "cursor-pointer" : ""
+                } ${isExpanded ? "border-slate-300 bg-slate-50/60" : ""} ${loading ? "pointer-events-none opacity-50" : ""
+                }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-1.5">
+                  {expandable ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpand(c.id);
+                      }}
+                      aria-label={
+                        isExpanded ? "Tutup sub-kategori" : "Buka sub-kategori"
+                      }
+                      className="mt-0.5 shrink-0 cursor-pointer rounded p-0.5 text-slate-500 hover:bg-slate-200/70"
+                    >
+                      <ChevronRight
+                        className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""
+                          }`}
+                      />
+                    </button>
+                  ) : (
+                    <span className="mt-0.5 inline-block size-4 shrink-0" />
+                  )}
+                  <FolderTree className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <h3 className="text-sm font-medium tracking-tight text-foreground">
+                    {c.name}
+                  </h3>
+                </div>
+                <Badge
+                  variant={c.is_active ? "success" : "neutral"}
+                  className="shrink-0"
+                >
+                  {c.is_active ? "Active" : "OFF"}
+                </Badge>
+              </div>
+
+              <p className="mt-1.5 flex items-center gap-1 pl-6 font-mono text-sm text-muted-foreground">
+                <Link2 className="size-3 text-slate-300" /> {c.slug}
+              </p>
+              {c.description && (
+                <p className="mt-1 line-clamp-2 pl-6 text-sm italic text-slate-500">
+                  &quot;{c.description}&quot;
+                </p>
+              )}
+
+              {showActionColumn && (
+                <div className="mt-2.5 flex justify-end gap-1.5 border-t pt-2.5">
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEditClick(c);
+                      }}
+                      className="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-slate-600 shadow-3xs hover:bg-slate-50"
+                    >
+                      <Edit2 className="size-3" /> Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteClick(c);
+                      }}
+                      className="flex cursor-pointer items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1 text-sm text-rose-600 shadow-3xs hover:bg-rose-50"
+                    >
+                      <Trash2 className="size-3" /> Hapus
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          ))
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden border rounded-xl shadow-xs overflow-hidden bg-white relative md:block">
         {loading && categories.length > 0 && (
           <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center">
             <Skeleton className="h-5 w-40" />
@@ -293,20 +336,20 @@ export function ProductCategoryTable({
         <Table>
           <TableHeader className="bg-slate-50/70">
             <TableRow>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/3">
+              <TableHead className="w-1/3">
                 Klasifikasi Kategori
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/4">
+              <TableHead className="w-1/4">
                 URL Slug
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 w-1/3">
+              <TableHead className="w-1/3">
                 Catatan / Deskripsi
               </TableHead>
-              <TableHead className="font-bold text-xs text-slate-700 text-center w-24">
+              <TableHead className="text-center w-24">
                 Status
               </TableHead>
               {showActionColumn && (
-                <TableHead className="text-right font-bold text-xs w-24">
+                <TableHead className="text-right w-24">
                   Aksi
                 </TableHead>
               )}
@@ -322,11 +365,11 @@ export function ProductCategoryTable({
                   </TableCell>
                 </TableRow>
               ))
-            ) : bodyRows.length === 0 ? (
+            ) : flatNodes.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={columnCount}
-                  className="h-32 text-center text-muted-foreground font-medium text-xs"
+                  className="h-32 text-center text-muted-foreground font-medium text-sm"
                 >
                   <div className="flex flex-col items-center justify-center gap-2 py-4">
                     <Search className="size-5 text-muted-foreground/50" />
@@ -341,7 +384,7 @@ export function ProductCategoryTable({
                         variant="outline"
                         size="sm"
                         onClick={() => setSearch("")}
-                        className="mt-1 h-7 text-[11px] cursor-pointer"
+                        className="mt-1 h-7 text-sm cursor-pointer"
                       >
                         Bersihkan Filter
                       </Button>
@@ -350,13 +393,99 @@ export function ProductCategoryTable({
                 </TableCell>
               </TableRow>
             ) : (
-              bodyRows
+              flatNodes.map(({ cat: c, depth, expandable, isExpanded }) => (
+                <TableRow
+                  key={c.id}
+                  onClick={expandable ? () => toggleExpand(c.id) : undefined}
+                  className={`transition-colors ${expandable ? "cursor-pointer hover:bg-slate-50/70" : ""} ${expandable && isExpanded ? "bg-slate-50/50" : ""} ${loading ? "opacity-50 pointer-events-none" : ""}`}
+                >
+                  <TableCell className="text-sm py-3.5">
+                    <div
+                      className="flex items-center"
+                      style={{ paddingLeft: depth * 20 }}
+                    >
+                      {expandable ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpand(c.id);
+                          }}
+                          title={
+                            isExpanded
+                              ? "Tutup sub-kategori"
+                              : "Buka sub-kategori"
+                          }
+                          className="mr-1.5 p-0.5 rounded hover:bg-slate-200/70 text-slate-500 cursor-pointer shrink-0"
+                        >
+                          <ChevronRight
+                            className={`size-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
+                          />
+                        </button>
+                      ) : (
+                        <span className="mr-1.5 inline-block size-4 shrink-0" />
+                      )}
+                      <FolderTree className="size-3.5 text-slate-400 shrink-0 mr-1.5" />
+                      <span className="font-medium text-foreground tracking-tight">
+                        {c.name}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm py-3.5 font-mono text-slate-500 text-sm">
+                    <span className="flex items-center gap-1">
+                      <Link2 className="size-3 text-slate-300" /> {c.slug}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm py-3.5 text-slate-500 italic max-w-xs truncate">
+                    {c.description ? (
+                      `"${c.description}"`
+                    ) : (
+                      <span className="text-slate-300">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center py-3.5">
+                    <Badge variant={c.is_active ? "success" : "neutral"}>
+                      {c.is_active ? "Active" : "OFF"}
+                    </Badge>
+                  </TableCell>
+                  {showActionColumn && (
+                    <TableCell className="text-right py-3.5">
+                      <div className="inline-flex gap-1.5 justify-end">
+                        {canUpdate && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditClick(c);
+                            }}
+                            className="p-1 border border-slate-200 rounded-md bg-white hover:bg-slate-50 text-slate-600 cursor-pointer shadow-3xs"
+                          >
+                            <Edit2 className="size-3" />
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteClick(c);
+                            }}
+                            className="p-1 border border-slate-200 rounded-md bg-white hover:bg-rose-50 text-rose-600 cursor-pointer shadow-3xs"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        )}
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
       </div>
 
-      <p className="text-[11px] text-slate-400 text-center">
+      <p className="text-sm text-slate-400 text-center">
         {roots.length} kategori utama · klik baris kategori untuk
         melihat/menyembunyikan sub-kategori.
       </p>

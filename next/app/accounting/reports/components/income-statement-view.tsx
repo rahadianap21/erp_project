@@ -55,7 +55,7 @@ export function IncomeStatementView({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+        <label className="text-xs font-medium text-muted-foreground">
           Dari
         </label>
         <input
@@ -64,7 +64,7 @@ export function IncomeStatementView({
           onChange={(e) => setFrom(e.target.value)}
           className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
         />
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+        <label className="text-xs font-medium text-muted-foreground">
           Sampai
         </label>
         <input
@@ -78,7 +78,7 @@ export function IncomeStatementView({
       {report && (
         <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               Total Pendapatan
             </p>
             <p className="mt-1 font-mono text-lg font-black text-slate-900">
@@ -86,7 +86,7 @@ export function IncomeStatementView({
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               Total Beban
             </p>
             <p className="mt-1 font-mono text-lg font-black text-slate-900">
@@ -96,7 +96,7 @@ export function IncomeStatementView({
           <div
             className={`rounded-xl border p-4 ${report.net_income >= 0 ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}
           >
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               {report.net_income >= 0 ? "Laba Bersih" : "Rugi Bersih"}
             </p>
             <p
@@ -104,7 +104,7 @@ export function IncomeStatementView({
             >
               {formatIDR(report.net_income)}
             </p>
-            <p className="text-[11px] text-slate-500">
+            <p className="text-xs text-slate-500">
               per {formatTanggal(report.to)}
             </p>
           </div>
@@ -122,7 +122,7 @@ export function IncomeStatementView({
           <>
             <Card>
               <CardHeader>
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   Pendapatan
                 </CardTitle>
               </CardHeader>
@@ -139,7 +139,7 @@ export function IncomeStatementView({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   Beban
                 </CardTitle>
               </CardHeader>

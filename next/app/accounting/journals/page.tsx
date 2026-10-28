@@ -10,6 +10,7 @@ import { JournalForm } from "./components/journal-form";
 import { JournalTable, JournalEntry } from "./components/journal-table";
 import { PeriodBanner } from "./components/period-banner";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -97,6 +98,20 @@ export default function JournalsPage() {
     return () => window.removeEventListener("focus", loadPermissions);
   }, []);
 
+  // Tautan dari modul lain (mis. detail penjualan) membawa ?search= & ?focus=.
+  // Dibaca dari window agar tidak perlu Suspense boundary untuk useSearchParams.
+  const [linkSearch, setLinkSearch] = useState<string>("");
+  const [linkFocus, setLinkFocus] = useState<number | null>(null);
+  const [linkAutoExpand, setLinkAutoExpand] = useState<boolean>(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const search = params.get("search")?.trim() ?? "";
+    const focus = Number(params.get("focus") ?? 0);
+    if (search) setLinkSearch(search);
+    if (Number.isFinite(focus) && focus > 0) setLinkFocus(focus);
+    setLinkAutoExpand(params.get("autoExpand") === "1");
+  }, []);
+
   if (httpStatus === 403) {
     const handleResetForbidden = () => {
       setHttpStatus(200);
@@ -108,20 +123,11 @@ export default function JournalsPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      <div className="flex items-center gap-2 border-b pb-4">
-        <div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
-          <BookOpenText className="size-5" />
-        </div>
-        <div>
-          <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
-            Jurnal Umum (General Journal)
-          </h1>
-          <p className="text-xs text-slate-500">
-            Pencatatan transaksi double-entry: debit = kredit, terkunci oleh
-            periode fiskal.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={BookOpenText}
+        title="Jurnal Umum (General Journal)"
+        description="Pencatatan transaksi double-entry: debit = kredit, terkunci oleh periode fiskal."
+      />
 
       <PeriodBanner
         revision={periodRevision}
@@ -140,6 +146,9 @@ export default function JournalsPage() {
         canPost={permissions.post}
         canVoidReverse={permissions.void}
         refreshTrigger={refreshTrigger}
+        initialSearch={linkSearch}
+        focusId={linkFocus}
+        autoExpandSingle={linkAutoExpand}
         onPostClick={(entry) => setEntryToPost(entry)}
         onVoidClick={(entry) => setEntryToVoid(entry)}
         onReverseClick={(entry) => setEntryToReverse(entry)}
@@ -164,7 +173,7 @@ export default function JournalsPage() {
           </AlertDialogHeader>
           <div className="my-2 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-md font-mono text-xs">
             <p className="font-bold uppercase">{entryToPost?.entry_number}</p>
-            <p className="text-[11px] mt-0.5">{entryToPost?.description}</p>
+            <p className="text-xs mt-0.5">{entryToPost?.description}</p>
           </div>
           <AlertDialogFooter>
             <Button
@@ -212,7 +221,7 @@ export default function JournalsPage() {
           </AlertDialogHeader>
           <div className="my-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-md font-mono text-xs">
             <p className="font-bold uppercase">{entryToVoid?.entry_number}</p>
-            <p className="text-[11px] mt-0.5">{entryToVoid?.description}</p>
+            <p className="text-xs mt-0.5">{entryToVoid?.description}</p>
           </div>
           <AlertDialogFooter>
             <Button
@@ -258,11 +267,11 @@ export default function JournalsPage() {
               terbalik lalu memostingnya.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="my-2 p-3 bg-violet-50 border border-violet-200 text-violet-800 rounded-md font-mono text-xs">
+          <div className="my-2 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-md font-mono text-xs">
             <p className="font-bold uppercase">
               {entryToReverse?.entry_number}
             </p>
-            <p className="text-[11px] mt-0.5">{entryToReverse?.description}</p>
+            <p className="text-xs mt-0.5">{entryToReverse?.description}</p>
           </div>
           <AlertDialogFooter>
             <Button
@@ -284,7 +293,7 @@ export default function JournalsPage() {
                   (n) => `${n} dibatalkan lewat jurnal pembalik baru.`
                 )
               }
-              className="bg-violet-600 hover:bg-violet-700 text-white text-xs h-8 cursor-pointer"
+              className="bg-rose-600 hover:bg-rose-700 text-white text-xs h-8 cursor-pointer"
             >
               {isProcessing ? "Memproses..." : "Ya, Reverse"}
             </Button>

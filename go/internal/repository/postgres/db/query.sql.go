@@ -3028,7 +3028,7 @@ SELECT
     po.id,
     po.po_number,
     s.name AS supplier_name,
-    po.total_amount::float8 AS total_amount,
+    po.total_amount::numeric AS total_amount,
     po.status,
     po.po_date
 FROM t_purchase_orders po
@@ -3042,7 +3042,7 @@ type GetDashboardRecentPOsRow struct {
 	ID           int64
 	PoNumber     string
 	SupplierName string
-	TotalAmount  float64
+	TotalAmount  pgtype.Numeric
 	Status       string
 	PoDate       pgtype.Date
 }
@@ -3078,7 +3078,7 @@ const getDashboardStats = `-- name: GetDashboardStats :one
 
 SELECT
     COALESCE((SELECT SUM(total_amount) FROM t_purchase_orders
-              WHERE deleted_at IS NULL AND status <> 'REJECTED'), 0)::float8 AS total_po_value,
+              WHERE deleted_at IS NULL AND status <> 'REJECTED'), 0)::numeric AS total_po_value,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL) AS total_po,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL AND status = 'PENDING') AS po_pending,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL AND status = 'APPROVED') AS po_approved,
@@ -3091,7 +3091,7 @@ SELECT
 `
 
 type GetDashboardStatsRow struct {
-	TotalPoValue   float64
+	TotalPoValue   pgtype.Numeric
 	TotalPo        int64
 	PoPending      int64
 	PoApproved     int64
@@ -3107,8 +3107,8 @@ type GetDashboardStatsRow struct {
 // =========================================================================
 // Ringkasan angka untuk kartu KPI dashboard dalam satu perjalanan query.
 // total_po_value sengaja mengecualikan PO REJECTED karena dokumen itu batal.
-// Diberi aliases ::float8 supaya pgx memindai langsung ke float64 Go, menghindari
-// pgtype.Numeric yang merepotkan.
+// Nilai uang tetap NUMERIC::numeric agar dipindai sebagai pgtype.Numeric dan
+// dikonversi ke domain.Money tanpa melewati float64.
 func (q *Queries) GetDashboardStats(ctx context.Context) (GetDashboardStatsRow, error) {
 	row := q.db.QueryRow(ctx, getDashboardStats)
 	var i GetDashboardStatsRow
@@ -6782,6 +6782,56 @@ func (q *Queries) ListAccountPeriods(ctx context.Context, reqLimit int32) ([]Lis
 	return items, nil
 }
 
+const listAccountingSettingDetails = `-- name: ListAccountingSettingDetails :many
+SELECT
+    s.mapping_key::text,
+    s.description,
+    s.account_id,
+    a.code AS account_code,
+    a.name AS account_name,
+    a.is_active AS account_active
+FROM s_accounting_settings s
+JOIN m_chart_of_accounts a ON a.id = s.account_id
+ORDER BY s.mapping_key
+`
+
+type ListAccountingSettingDetailsRow struct {
+	SMappingKey   string
+	Description   pgtype.Text
+	AccountID     int64
+	AccountCode   string
+	AccountName   string
+	AccountActive bool
+}
+
+// Pemetaan akun otomatis beserta kode/nama akun untuk halaman pengaturan.
+func (q *Queries) ListAccountingSettingDetails(ctx context.Context) ([]ListAccountingSettingDetailsRow, error) {
+	rows, err := q.db.Query(ctx, listAccountingSettingDetails)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAccountingSettingDetailsRow
+	for rows.Next() {
+		var i ListAccountingSettingDetailsRow
+		if err := rows.Scan(
+			&i.SMappingKey,
+			&i.Description,
+			&i.AccountID,
+			&i.AccountCode,
+			&i.AccountName,
+			&i.AccountActive,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAccountingSettings = `-- name: ListAccountingSettings :many
 SELECT mapping_key::text, account_id, description
 FROM s_accounting_settings
@@ -8321,6 +8371,32 @@ func (q *Queries) UpdateVoucher(ctx context.Context, arg UpdateVoucherParams) er
 		arg.UpdatedBy,
 		arg.ID,
 	)
+	return err
+}
+
+const upsertAccountingSetting = `-- name: UpsertAccountingSetting :exec
+INSERT INTO s_accounting_settings (mapping_key, account_id, updated_at, updated_by)
+VALUES (
+    $1::varchar,
+    $2::bigint,
+    NOW(),
+    $3::bigint
+)
+ON CONFLICT (mapping_key) DO UPDATE SET
+    account_id = EXCLUDED.account_id,
+    updated_at = NOW(),
+    updated_by = EXCLUDED.updated_by
+`
+
+type UpsertAccountingSettingParams struct {
+	MappingKey string
+	AccountID  int64
+	UpdatedBy  int64
+}
+
+// Mengubah akun tujuan satu kunci pemetaan; updated_by diisi user penyimpan.
+func (q *Queries) UpsertAccountingSetting(ctx context.Context, arg UpsertAccountingSettingParams) error {
+	_, err := q.db.Exec(ctx, upsertAccountingSetting, arg.MappingKey, arg.AccountID, arg.UpdatedBy)
 	return err
 }
 

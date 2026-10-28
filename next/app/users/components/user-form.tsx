@@ -113,7 +113,7 @@ export default function UserForm({
         disabled={!!editingUser}
         className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 hover:bg-gray-100/80 transition-colors text-left cursor-pointer"
       >
-        <span className=" text-sm font-semibold text-gray-800">
+        <span className=" text-sm font-medium text-foreground">
           {editingUser
             ? `📝 Edit Pengguna: ${editingUser.name}`
             : "Tambah Pengguna Baru"}
@@ -138,7 +138,7 @@ export default function UserForm({
             <div className="space-y-2">
               <label
                 htmlFor="user-name"
-                className="text-xs font-semibold tracking-wide text-slate-800"
+                className="text-xs font-medium text-muted-foreground"
               >
                 Nama Lengkap
               </label>
@@ -159,7 +159,7 @@ export default function UserForm({
             <div className="space-y-2">
               <label
                 htmlFor="user-email"
-                className="text-xs font-semibold tracking-wide text-slate-800"
+                className="text-xs font-medium text-muted-foreground"
               >
                 Alamat Email
               </label>
@@ -181,7 +181,7 @@ export default function UserForm({
               <div className="space-y-2">
                 <label
                   htmlFor="user-password"
-                  className="text-xs font-semibold tracking-wide text-slate-800"
+                  className="text-xs font-medium text-muted-foreground"
                 >
                   Kata Sandi (Password)
                 </label>
@@ -221,7 +221,7 @@ export default function UserForm({
 
             {/* Dropdown Role */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-wide text-slate-800">
+              <label className="text-xs font-medium text-muted-foreground">
                 Hak Akses (Role)
               </label>
               <select

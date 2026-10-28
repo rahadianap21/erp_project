@@ -15,7 +15,7 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -126,6 +126,131 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Beberapa komponen lama masih memakai palet slate/gray dan bg-white.
+     Di dark mode, palet netral dibalik agar seluruh surface, border, dan teks
+     otomatis mengikuti tema tanpa perlu mengubah setiap markup. */
+  --color-slate-50: oklch(0.24 0 0);
+  --color-slate-100: oklch(0.27 0 0);
+  --color-slate-200: oklch(0.32 0 0);
+  --color-slate-300: oklch(0.4 0 0);
+  --color-slate-400: oklch(0.56 0 0);
+  --color-slate-500: oklch(0.66 0 0);
+  --color-slate-600: oklch(0.74 0 0);
+  --color-slate-700: oklch(0.82 0 0);
+  --color-slate-800: oklch(0.91 0 0);
+  --color-slate-900: oklch(0.97 0 0);
+
+  --color-gray-50: oklch(0.24 0 0);
+  --color-gray-100: oklch(0.27 0 0);
+  --color-gray-200: oklch(0.32 0 0);
+  --color-gray-300: oklch(0.4 0 0);
+  --color-gray-400: oklch(0.56 0 0);
+  --color-gray-500: oklch(0.66 0 0);
+  --color-gray-600: oklch(0.74 0 0);
+  --color-gray-700: oklch(0.82 0 0);
+  --color-gray-800: oklch(0.91 0 0);
+  --color-gray-900: oklch(0.97 0 0);
+
+  /* Aksen status (amber/emerald/blue/rose, dsb) memakai shade terang 50-200
+     sebagai latar di light mode. Di dark mode shade tersebut digelapkan agar
+     pill dan badge tidak menyala, sementara shade teks 600-900 dicerahkan
+     lewat aturan di bawah (bukan lewat token, supaya bg-*-600 solid untuk
+     tombol tetap gelap dan teks putihnya tetap terbaca). */
+  --color-amber-50: oklch(0.28 0.04 75);
+  --color-amber-100: oklch(0.33 0.055 75);
+  --color-amber-200: oklch(0.42 0.075 75);
+  --color-emerald-50: oklch(0.27 0.04 160);
+  --color-emerald-100: oklch(0.32 0.055 160);
+  --color-emerald-200: oklch(0.41 0.07 160);
+  --color-blue-50: oklch(0.28 0.045 255);
+  --color-blue-100: oklch(0.33 0.06 255);
+  --color-blue-200: oklch(0.42 0.08 255);
+  --color-rose-50: oklch(0.28 0.045 15);
+  --color-rose-100: oklch(0.33 0.06 15);
+  --color-rose-200: oklch(0.42 0.08 15);
+  --color-sky-50: oklch(0.28 0.04 235);
+  --color-sky-100: oklch(0.33 0.055 235);
+  --color-sky-200: oklch(0.42 0.07 235);
+  --color-teal-50: oklch(0.27 0.035 180);
+  --color-teal-100: oklch(0.32 0.05 180);
+  --color-teal-200: oklch(0.41 0.06 180);
+  --color-violet-50: oklch(0.28 0.045 290);
+  --color-violet-100: oklch(0.33 0.06 290);
+  --color-violet-200: oklch(0.42 0.08 290);
+  --color-red-50: oklch(0.28 0.05 25);
+  --color-red-100: oklch(0.33 0.065 25);
+  --color-red-200: oklch(0.42 0.085 25);
+  --color-green-50: oklch(0.27 0.04 150);
+  --color-green-100: oklch(0.32 0.055 150);
+  --color-green-200: oklch(0.41 0.07 150);
+}
+
+.dark .bg-white {
+  background-color: var(--card);
+}
+
+.dark .bg-white\/60 {
+  background-color: color-mix(in oklab, var(--card) 60%, transparent);
+}
+
+.dark .text-amber-600,
+.dark .text-amber-700 {
+  color: oklch(0.86 0.13 78);
+}
+
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: oklch(0.92 0.1 80);
+}
+
+.dark .text-emerald-600,
+.dark .text-emerald-700 {
+  color: oklch(0.85 0.12 160);
+}
+
+.dark .text-emerald-800 {
+  color: oklch(0.92 0.09 160);
+}
+
+.dark .text-blue-600,
+.dark .text-blue-700 {
+  color: oklch(0.83 0.1 255);
+}
+
+.dark .text-blue-800,
+.dark .text-blue-900 {
+  color: oklch(0.91 0.08 255);
+}
+
+.dark .text-rose-600,
+.dark .text-rose-700 {
+  color: oklch(0.83 0.11 15);
+}
+
+.dark .text-rose-800 {
+  color: oklch(0.9 0.09 15);
+}
+
+.dark .text-sky-600,
+.dark .text-sky-700 {
+  color: oklch(0.85 0.1 235);
+}
+
+.dark .text-teal-700 {
+  color: oklch(0.85 0.1 180);
+}
+
+.dark .text-violet-700 {
+  color: oklch(0.85 0.11 290);
+}
+
+.dark .text-violet-800 {
+  color: oklch(0.91 0.09 290);
+}
+
+.dark .text-green-700 {
+  color: oklch(0.85 0.12 150);
 }
 
 * {

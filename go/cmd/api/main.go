@@ -116,11 +116,14 @@ func main() {
 	reportRepo := postgres.NewSQLAccountingReportRepository(dbPool)
 	coaUsecase := usecase.NewChartOfAccountUsecase(coaRepo)
 	journalUsecase := usecase.NewJournalUsecase(journalRepo, coaRepo, periodRepo, settingsRepo, reportRepo)
+	// Pengaturan akun otomatis memakai repository CoA untuk memastikan akun
+	// tujuan ada, aktif, dan bukan akun header sebelum disimpan.
+	accountingSettingsUsecase := usecase.NewAccountingSettingsUsecase(settingsRepo, coaRepo)
 	// Periode fiskal memakai journalUsecase sebagai pengelola jurnal penutup:
 	// menutup periode menerbitkan jurnal penutup, membuka kembali membaliknya.
 	periodUsecase := usecase.NewAccountingPeriodUsecase(periodRepo, journalUsecase)
 	reportUsecase := usecase.NewAccountingReportUsecase(reportRepo, coaRepo)
-	accountingHandler := handler.NewAccountingHandler(coaUsecase, periodUsecase, journalUsecase, reportUsecase)
+	accountingHandler := handler.NewAccountingHandler(coaUsecase, periodUsecase, journalUsecase, reportUsecase, accountingSettingsUsecase)
 
 	// GRN menerima journalUsecase sebagai auto-poster: penutupan penerimaan
 	// menerbitkan jurnal otomatis sebelum stok dan status PO berubah.

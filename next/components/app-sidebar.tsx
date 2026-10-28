@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { NavMain } from "@/components/nav-main";
+import { NavMain, type NavGroup } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
+import { TeamSwitcher } from "@/components/layout/team-switcher";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import {
@@ -15,48 +17,34 @@ import {
   UsersIcon,
   ShieldCheckIcon,
   BarChart3Icon,
-  Database,
   UserSquare,
   FolderTree,
   Package,
   FileText,
   PackageCheck,
-  Landmark,
   BookOpenCheck,
   BookOpenText,
+  ListTree,
   ShoppingCartIcon,
   ReceiptTextIcon,
   Users2Icon,
   CreditCardIcon,
   TicketPercentIcon,
 } from "lucide-react";
-interface SubMenuItem {
-  title: string;
-  url: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  permission?: string;
-}
 
-interface MenuItem {
-  title: string;
-  url: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  isActive?: boolean;
-  permission?: string;
-  items: SubMenuItem[];
-}
-
-const ALL_MENU_ITEMS: MenuItem[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboardIcon,
-    items: [{ title: "Overview", url: "/dashboard", icon: BarChart3Icon }],
+    label: "Umum",
+    items: [
+      {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: LayoutDashboardIcon,
+      },
+    ],
   },
   {
-    title: "Master Data",
-    url: "/suppliers",
-    icon: Database,
+    label: "Master Data",
     items: [
       {
         title: "Suppliers",
@@ -97,9 +85,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
     ],
   },
   {
-    title: "Transaction",
-    url: "/purchase-orders",
-    icon: FileText,
+    label: "Transaksi",
     items: [
       {
         title: "Purchase Orders",
@@ -128,9 +114,7 @@ const ALL_MENU_ITEMS: MenuItem[] = [
     ],
   },
   {
-    title: "Accounting",
-    url: "/accounting",
-    icon: Landmark,
+    label: "Akuntansi",
     items: [
       {
         title: "Chart of Accounts",
@@ -144,19 +128,22 @@ const ALL_MENU_ITEMS: MenuItem[] = [
         icon: BookOpenText,
         permission: "accounting:read",
       },
+      {
+        title: "Laporan",
+        url: "/accounting/reports",
+        icon: BarChart3Icon,
+        permission: "accounting:read",
+      },
+      {
+        title: "Akun Otomatis",
+        url: "/accounting/account-settings",
+        icon: ListTree,
+        permission: "accounting:read",
+      },
     ],
   },
   {
-    title: "Reporting",
-    url: "/accounting/reports",
-    icon: BarChart3Icon,
-    permission: "accounting:read",
-    items: [],
-  },
-  {
-    title: "Users Management",
-    url: "/users",
-    icon: Settings2Icon,
+    label: "Administrasi",
     items: [
       {
         title: "Users",
@@ -204,32 +191,22 @@ export function AppSidebar({
     avatar: initialUser?.avatar || "",
   };
 
-  const filteredNavMain = React.useMemo(() => {
-    return ALL_MENU_ITEMS.map((parent) => {
-      const allowedItems = parent.items.filter((subItem) => {
-        if (!subItem.permission) return true;
-        return permissions.includes(subItem.permission);
-      });
-
-      return {
-        ...parent,
-        items: allowedItems,
-      };
-    }).filter((parent) => {
-      // Izin pada item induk menyaring seluruh grup bila ditetapkan.
-      if (parent.permission && !permissions.includes(parent.permission))
-        return false;
-      // Grup dengan sub-menu tetap tampil (sub-menu sudah disaring di atas).
-      if (parent.items.length > 0) return true;
-      // Tautan tunggal hanya tampil bila punya izin yang sudah lolos di atas.
-      return Boolean(parent.permission);
-    });
+  const filteredGroups = React.useMemo(() => {
+    return NAV_GROUPS.map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) => !item.permission || permissions.includes(item.permission)
+      ),
+    })).filter((group) => group.items.length > 0);
   }, [permissions]);
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="icon" variant="inset" {...props}>
+      <SidebarHeader>
+        <TeamSwitcher />
+      </SidebarHeader>
       <SidebarContent>
-        <NavMain items={filteredNavMain} />
+        <NavMain groups={filteredGroups} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

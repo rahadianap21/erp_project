@@ -195,8 +195,8 @@ type seedProduct struct {
 	SellUnit    string
 	BuyUnit     string
 	Conversion  int
-	BuyPrice    float64
-	SellPrice   float64
+	BuyPrice    int64
+	SellPrice   int64
 	MinStock    int
 	Stock       int
 }

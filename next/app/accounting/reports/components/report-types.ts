@@ -68,14 +68,9 @@ export const ACCOUNT_TYPE_LABEL: Record<string, string> = {
   EXPENSE: "Beban",
 };
 
-// Format mata uang Rupiah mengikuti konvensi tabel lain di aplikasi.
-export function formatIDR(num: number): string {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(Number(num) || 0);
-}
+// Formatter uang dipusatkan di @/lib/money agar seluruh laporan memakai
+// pemisah dan jumlah desimal yang sama dengan halaman lain.
+export { formatIDR } from "@/lib/money";
 
 // Format tanggal ISO dari backend menjadi tanggal Indonesia yang mudah dibaca.
 export function formatTanggal(value: string): string {

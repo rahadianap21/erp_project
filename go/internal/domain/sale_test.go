@@ -2,21 +2,20 @@ package domain
 
 import (
 	"errors"
-	"math"
 	"testing"
 )
 
 // produkUji: id 1 & 2 kena PPN, id 3 & 4 tidak kena PPN.
 func produkUji() map[int64]SaleProductInfo {
 	return map[int64]SaleProductInfo{
-		1: {ID: 1, SKU: "SKU-1", Name: "Barang A", SellingPrice: 10000, AvgCost: 6000, IsTaxable: true},
-		2: {ID: 2, SKU: "SKU-2", Name: "Barang B", SellingPrice: 50000, AvgCost: 30000, IsTaxable: true},
-		3: {ID: 3, SKU: "SKU-3", Name: "Barang C", SellingPrice: 10000, AvgCost: 6000, IsTaxable: false},
-		4: {ID: 4, SKU: "SKU-4", Name: "Barang D", SellingPrice: 50000, AvgCost: 30000, IsTaxable: false},
+		1: {ID: 1, SKU: "SKU-1", Name: "Barang A", SellingPrice: Rupiah(10000), AvgCost: DecInt(6000), IsTaxable: true},
+		2: {ID: 2, SKU: "SKU-2", Name: "Barang B", SellingPrice: Rupiah(50000), AvgCost: DecInt(30000), IsTaxable: true},
+		3: {ID: 3, SKU: "SKU-3", Name: "Barang C", SellingPrice: Rupiah(10000), AvgCost: DecInt(6000), IsTaxable: false},
+		4: {ID: 4, SKU: "SKU-4", Name: "Barang D", SellingPrice: Rupiah(50000), AvgCost: DecInt(30000), IsTaxable: false},
 	}
 }
 
-func produkUjiHarga(id int64, price float64) map[int64]SaleProductInfo {
+func produkUjiHarga(id int64, price Money) map[int64]SaleProductInfo {
 	products := produkUji()
 	p := products[id]
 	p.SellingPrice = price
@@ -24,7 +23,7 @@ func produkUjiHarga(id int64, price float64) map[int64]SaleProductInfo {
 	return products
 }
 
-func produkUjiDiskon(id int64, dtype string, value float64) map[int64]SaleProductInfo {
+func produkUjiDiskon(id int64, dtype string, value Decimal) map[int64]SaleProductInfo {
 	products := produkUji()
 	p := products[id]
 	p.DiscountType = dtype
@@ -33,28 +32,24 @@ func produkUjiDiskon(id int64, dtype string, value float64) map[int64]SaleProduc
 	return products
 }
 
-func cfgInclusive() TaxConfig { return TaxConfig{Rate: 0.12, Mode: TaxModeInclusive} }
-func cfgExclusive() TaxConfig { return TaxConfig{Rate: 0.12, Mode: TaxModeExclusive} }
-
-func hampirSama(a, b float64) bool {
-	return math.Abs(a-b) < 0.01
-}
+func cfgInclusive() TaxConfig { return TaxConfig{Rate: MustDec("0.12"), Mode: TaxModeInclusive} }
+func cfgExclusive() TaxConfig { return TaxConfig{Rate: MustDec("0.12"), Mode: TaxModeExclusive} }
 
 func cekTotalBarisSamaHeader(t *testing.T, sale *Sale) {
 	t.Helper()
-	var dpp, tax float64
+	var dpp, tax Money
 	for _, d := range sale.Details {
-		dpp += d.DppAmount
-		tax += d.TaxAmount
+		dpp = dpp.Add(d.DppAmount)
+		tax = tax.Add(d.TaxAmount)
 	}
-	if !hampirSama(dpp, sale.DppAmount) {
-		t.Fatalf("jumlah DPP baris (%.2f) != DPP header (%.2f)", dpp, sale.DppAmount)
+	if dpp.Cmp(sale.DppAmount) != 0 {
+		t.Fatalf("jumlah DPP baris (%s) != DPP header (%s)", dpp, sale.DppAmount)
 	}
-	if !hampirSama(tax, sale.TaxAmount) {
-		t.Fatalf("jumlah PPN baris (%.2f) != PPN header (%.2f)", tax, sale.TaxAmount)
+	if tax.Cmp(sale.TaxAmount) != 0 {
+		t.Fatalf("jumlah PPN baris (%s) != PPN header (%s)", tax, sale.TaxAmount)
 	}
-	if !hampirSama(dpp+tax, sale.TotalAmount) {
-		t.Fatalf("DPP+PPN (%.2f) != total (%.2f)", dpp+tax, sale.TotalAmount)
+	if dpp.Add(tax).Cmp(sale.TotalAmount) != 0 {
+		t.Fatalf("DPP+PPN (%s) != total (%s)", dpp.Add(tax), sale.TotalAmount)
 	}
 }
 
@@ -65,23 +60,23 @@ func TestCalculateSaleProdukTanpaPPN(t *testing.T) {
 			{ProductID: 3, Qty: 2},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 20000},
+			{PaymentMethodID: 1, Amount: Rupiah(20000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.Subtotal != 20000 || sale.TotalAmount != 20000 {
-		t.Fatalf("subtotal/total harus 20000, dapat %.2f/%.2f", sale.Subtotal, sale.TotalAmount)
+	if sale.Subtotal.Cmp(Rupiah(20000)) != 0 || sale.TotalAmount.Cmp(Rupiah(20000)) != 0 {
+		t.Fatalf("subtotal/total harus 20000, dapat %s/%s", sale.Subtotal, sale.TotalAmount)
 	}
-	if sale.TaxAmount != 0 {
-		t.Fatalf("PPN harus 0 untuk produk tanpa PPN, dapat %.2f", sale.TaxAmount)
+	if !sale.TaxAmount.IsZero() {
+		t.Fatalf("PPN harus 0 untuk produk tanpa PPN, dapat %s", sale.TaxAmount)
 	}
 	if sale.TaxType != SaleTaxNonPPN {
 		t.Fatalf("tax_type harus NON_PPN, dapat %q", sale.TaxType)
 	}
-	if sale.CostTotal != 12000 {
-		t.Fatalf("HPP harus 12000, dapat %.2f", sale.CostTotal)
+	if sale.CostTotal.Cmp(Rupiah(12000)) != 0 {
+		t.Fatalf("HPP harus 12000, dapat %s", sale.CostTotal)
 	}
 	if sale.PaymentStatus != SalePaymentPaid {
 		t.Fatalf("status harus PAID, dapat %q", sale.PaymentStatus)
@@ -96,20 +91,20 @@ func TestCalculateSaleExclusiveMenghitungPPN(t *testing.T) {
 			{ProductID: 1, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 112000},
+			{PaymentMethodID: 1, Amount: Rupiah(112000)},
 		},
-	}, produkUjiHarga(1, 100000), cfgExclusive())
+	}, produkUjiHarga(1, Rupiah(100000)), cfgExclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.DppAmount != 100000 {
-		t.Fatalf("DPP harus 100000, dapat %.2f", sale.DppAmount)
+	if sale.DppAmount.Cmp(Rupiah(100000)) != 0 {
+		t.Fatalf("DPP harus 100000, dapat %s", sale.DppAmount)
 	}
-	if sale.TaxAmount != 12000 {
-		t.Fatalf("PPN harus 12000, dapat %.2f", sale.TaxAmount)
+	if sale.TaxAmount.Cmp(Rupiah(12000)) != 0 {
+		t.Fatalf("PPN harus 12000, dapat %s", sale.TaxAmount)
 	}
-	if sale.TotalAmount != 112000 {
-		t.Fatalf("total harus 112000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(112000)) != 0 {
+		t.Fatalf("total harus 112000, dapat %s", sale.TotalAmount)
 	}
 	if sale.TaxType != SaleTaxExclusive {
 		t.Fatalf("tax_type harus TAX_EXCLUSIVE, dapat %q", sale.TaxType)
@@ -127,20 +122,20 @@ func TestCalculateSaleInclusiveMenguraiPPN(t *testing.T) {
 			{ProductID: 1, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 112000},
+			{PaymentMethodID: 1, Amount: Rupiah(112000)},
 		},
-	}, produkUjiHarga(1, 112000), cfgInclusive())
+	}, produkUjiHarga(1, Rupiah(112000)), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.DppAmount != 100000 {
-		t.Fatalf("DPP harus 100000, dapat %.2f", sale.DppAmount)
+	if sale.DppAmount.Cmp(Rupiah(100000)) != 0 {
+		t.Fatalf("DPP harus 100000, dapat %s", sale.DppAmount)
 	}
-	if sale.TaxAmount != 12000 {
-		t.Fatalf("PPN harus 12000, dapat %.2f", sale.TaxAmount)
+	if sale.TaxAmount.Cmp(Rupiah(12000)) != 0 {
+		t.Fatalf("PPN harus 12000, dapat %s", sale.TaxAmount)
 	}
-	if sale.TotalAmount != 112000 {
-		t.Fatalf("total harus 112000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(112000)) != 0 {
+		t.Fatalf("total harus 112000, dapat %s", sale.TotalAmount)
 	}
 	if sale.TaxType != SaleTaxInclusive {
 		t.Fatalf("tax_type harus TAX_INCLUSIVE, dapat %q", sale.TaxType)
@@ -156,17 +151,17 @@ func TestCalculateSaleCampuranKenaDanTanpaPPNInclusive(t *testing.T) {
 			{ProductID: 3, Qty: 1}, // tanpa PPN
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 20000},
+			{PaymentMethodID: 1, Amount: Rupiah(20000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if !hampirSama(sale.TaxAmount, 1071.43) {
-		t.Fatalf("PPN harus 1071.43 (hanya baris kena PPN), dapat %.2f", sale.TaxAmount)
+	if sale.TaxAmount.Cmp(NewMoney(107143)) != 0 {
+		t.Fatalf("PPN harus 1071.43 (hanya baris kena PPN), dapat %s", sale.TaxAmount)
 	}
-	if !hampirSama(sale.TotalAmount, 20000) {
-		t.Fatalf("total harus 20000 (harga inclusive tidak berubah), dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(20000)) != 0 {
+		t.Fatalf("total harus 20000 (harga inclusive tidak berubah), dapat %s", sale.TotalAmount)
 	}
 	cekTotalBarisSamaHeader(t, sale)
 }
@@ -179,17 +174,17 @@ func TestCalculateSaleCampuranKenaDanTanpaPPNExclusive(t *testing.T) {
 			{ProductID: 3, Qty: 1}, // tanpa PPN
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 21200},
+			{PaymentMethodID: 1, Amount: Rupiah(21200)},
 		},
 	}, produkUji(), cfgExclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.TaxAmount != 1200 {
-		t.Fatalf("PPN harus 1200, dapat %.2f", sale.TaxAmount)
+	if sale.TaxAmount.Cmp(Rupiah(1200)) != 0 {
+		t.Fatalf("PPN harus 1200, dapat %s", sale.TaxAmount)
 	}
-	if !hampirSama(sale.TotalAmount, 21200) {
-		t.Fatalf("total harus 21200, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(21200)) != 0 {
+		t.Fatalf("total harus 21200, dapat %s", sale.TotalAmount)
 	}
 	cekTotalBarisSamaHeader(t, sale)
 }
@@ -198,12 +193,12 @@ func TestCalculateSaleMenolakDiskonNotaManual(t *testing.T) {
 	_, err := CalculateSale(CreateSaleInput{
 		MemberID:      1,
 		DiscountType:  SaleDiscountPercent,
-		DiscountValue: 10,
+		DiscountValue: DecInt(10),
 		Items: []SaleLineInput{
 			{ProductID: 1, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 9000},
+			{PaymentMethodID: 1, Amount: Rupiah(9000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if !errors.Is(err, ErrSaleDiscountInvalid) {
@@ -228,17 +223,17 @@ func TestCalculateSaleMemakaiHargaServer(t *testing.T) {
 			{ProductID: 3, Qty: 2},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 25000},
+			{PaymentMethodID: 1, Amount: Rupiah(25000)},
 		},
-	}, produkUjiHarga(3, 12500), cfgInclusive())
+	}, produkUjiHarga(3, Rupiah(12500)), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.Details[0].UnitPrice != 12500 {
-		t.Fatalf("harga harus dari master produk 12500, dapat %.2f", sale.Details[0].UnitPrice)
+	if sale.Details[0].UnitPrice.Cmp(Rupiah(12500)) != 0 {
+		t.Fatalf("harga harus dari master produk 12500, dapat %s", sale.Details[0].UnitPrice)
 	}
-	if sale.Subtotal != 25000 || sale.TotalAmount != 25000 {
-		t.Fatalf("subtotal/total harus 25000, dapat %.2f/%.2f", sale.Subtotal, sale.TotalAmount)
+	if sale.Subtotal.Cmp(Rupiah(25000)) != 0 || sale.TotalAmount.Cmp(Rupiah(25000)) != 0 {
+		t.Fatalf("subtotal/total harus 25000, dapat %s/%s", sale.Subtotal, sale.TotalAmount)
 	}
 }
 
@@ -248,26 +243,27 @@ func TestCalculateSaleMemakaiDiskonDefaultProduk(t *testing.T) {
 			{ProductID: 3, Qty: 2},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 19000},
+			{PaymentMethodID: 1, Amount: Rupiah(19000)},
 		},
-	}, produkUjiDiskon(3, SaleDiscountAmount, 1000), cfgInclusive())
+	}, produkUjiDiskon(3, SaleDiscountAmount, DecInt(1000)), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.Subtotal != 20000 {
-		t.Fatalf("subtotal harus 20000, dapat %.2f", sale.Subtotal)
+	if sale.Subtotal.Cmp(Rupiah(20000)) != 0 {
+		t.Fatalf("subtotal harus 20000, dapat %s", sale.Subtotal)
 	}
-	if sale.ItemDiscount != 1000 {
-		t.Fatalf("diskon item harus 1000, dapat %.2f", sale.ItemDiscount)
+	if sale.ItemDiscount.Cmp(Rupiah(1000)) != 0 {
+		t.Fatalf("diskon item harus 1000, dapat %s", sale.ItemDiscount)
 	}
-	if sale.DiscountType != SaleDiscountNone || sale.DiscountAmount != 0 {
-		t.Fatalf("diskon nota harus NONE/0, dapat %q/%.2f", sale.DiscountType, sale.DiscountAmount)
+	if sale.DiscountType != SaleDiscountNone || !sale.DiscountAmount.IsZero() {
+		t.Fatalf("diskon nota harus NONE/0, dapat %q/%s", sale.DiscountType, sale.DiscountAmount)
 	}
-	if sale.TotalAmount != 19000 {
-		t.Fatalf("total harus 19000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(19000)) != 0 {
+		t.Fatalf("total harus 19000, dapat %s", sale.TotalAmount)
 	}
-	if sale.Details[0].DiscountType != SaleDiscountAmount || sale.Details[0].DiscountValue != 1000 || sale.Details[0].DiscountAmount != 1000 {
-		t.Fatalf("detail harus memuat diskon default produk, dapat %+v", sale.Details[0])
+	d := sale.Details[0]
+	if d.DiscountType != SaleDiscountAmount || d.DiscountValue.Cmp(DecInt(1000)) != 0 || d.DiscountAmount.Cmp(Rupiah(1000)) != 0 {
+		t.Fatalf("detail harus memuat diskon default produk, dapat %+v", d)
 	}
 }
 
@@ -278,7 +274,7 @@ func TestCalculateSaleLebihBayarMenjadiKembalian(t *testing.T) {
 			{ProductID: 3, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 20000},
+			{PaymentMethodID: 1, Amount: Rupiah(20000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
@@ -287,11 +283,11 @@ func TestCalculateSaleLebihBayarMenjadiKembalian(t *testing.T) {
 	if sale.PaymentStatus != SalePaymentPaid {
 		t.Fatalf("status harus PAID, dapat %q", sale.PaymentStatus)
 	}
-	if sale.PaidAmount != 20000 {
-		t.Fatalf("dibayar harus 20000, dapat %.2f", sale.PaidAmount)
+	if sale.PaidAmount.Cmp(Rupiah(20000)) != 0 {
+		t.Fatalf("dibayar harus 20000, dapat %s", sale.PaidAmount)
 	}
-	if sale.ChangeAmount != 10000 {
-		t.Fatalf("kembalian harus 10000, dapat %.2f", sale.ChangeAmount)
+	if sale.ChangeAmount.Cmp(Rupiah(10000)) != 0 {
+		t.Fatalf("kembalian harus 10000, dapat %s", sale.ChangeAmount)
 	}
 }
 
@@ -302,7 +298,7 @@ func TestCalculateSaleTolakPembayaranKurang(t *testing.T) {
 			{ProductID: 3, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 9000},
+			{PaymentMethodID: 1, Amount: Rupiah(9000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if !errors.Is(err, ErrSalePaymentKurang) {
@@ -329,8 +325,8 @@ func TestCalculateSaleTolakMetodePembayaranGanda(t *testing.T) {
 			{ProductID: 3, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 10000},
-			{PaymentMethodID: 2, Amount: 10000},
+			{PaymentMethodID: 1, Amount: Rupiah(10000)},
+			{PaymentMethodID: 2, Amount: Rupiah(10000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if !errors.Is(err, ErrSaleMetodeGanda) {
@@ -357,7 +353,7 @@ func TestCalculateSaleTanpaMemberTetapSah(t *testing.T) {
 			{ProductID: 3, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 10000},
+			{PaymentMethodID: 1, Amount: Rupiah(10000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
@@ -376,17 +372,17 @@ func TestCalculateSaleTukarPoinMengurangiTotal(t *testing.T) {
 			{ProductID: 4, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 40000},
+			{PaymentMethodID: 1, Amount: Rupiah(40000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.RedeemPoints != 100 || sale.RedeemAmount != 10000 {
-		t.Fatalf("tukar poin harus 100 poin / 10000, dapat %d/%.2f", sale.RedeemPoints, sale.RedeemAmount)
+	if sale.RedeemPoints != 100 || sale.RedeemAmount.Cmp(Rupiah(10000)) != 0 {
+		t.Fatalf("tukar poin harus 100 poin / 10000, dapat %d/%s", sale.RedeemPoints, sale.RedeemAmount)
 	}
-	if sale.TotalAmount != 40000 {
-		t.Fatalf("total setelah tukar poin harus 40000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(40000)) != 0 {
+		t.Fatalf("total setelah tukar poin harus 40000, dapat %s", sale.TotalAmount)
 	}
 	if sale.PointsEarned != 4 {
 		t.Fatalf("poin perolehan harus 4, dapat %d", sale.PointsEarned)
@@ -401,16 +397,16 @@ func TestCalculateSaleTukarPoinDenganPPN(t *testing.T) {
 			{ProductID: 1, Qty: 1}, // inclusive, DPP 100000 + PPN 12000
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 102000},
+			{PaymentMethodID: 1, Amount: Rupiah(102000)},
 		},
-	}, produkUjiHarga(1, 112000), cfgInclusive())
+	}, produkUjiHarga(1, Rupiah(112000)), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if !hampirSama(sale.TotalAmount, 102000) {
-		t.Fatalf("total setelah tukar poin harus 102000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(102000)) != 0 {
+		t.Fatalf("total setelah tukar poin harus 102000, dapat %s", sale.TotalAmount)
 	}
-	if !hampirSama(sale.DppAmount+sale.TaxAmount, sale.TotalAmount) {
+	if sale.DppAmount.Add(sale.TaxAmount).Cmp(sale.TotalAmount) != 0 {
 		t.Fatalf("DPP+PPN harus sama dengan total")
 	}
 	cekTotalBarisSamaHeader(t, sale)
@@ -424,17 +420,17 @@ func TestCalculateSaleTukarPoinDibatasiLimaPuluhPersen(t *testing.T) {
 			{ProductID: 4, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 25000},
+			{PaymentMethodID: 1, Amount: Rupiah(25000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.RedeemPoints != 250 || sale.RedeemAmount != 25000 {
-		t.Fatalf("tukar poin dibatasi 50%% -> 250 poin/25000, dapat %d/%.2f", sale.RedeemPoints, sale.RedeemAmount)
+	if sale.RedeemPoints != 250 || sale.RedeemAmount.Cmp(Rupiah(25000)) != 0 {
+		t.Fatalf("tukar poin dibatasi 50%% -> 250 poin/25000, dapat %d/%s", sale.RedeemPoints, sale.RedeemAmount)
 	}
-	if sale.TotalAmount != 25000 {
-		t.Fatalf("total harus 25000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(25000)) != 0 {
+		t.Fatalf("total harus 25000, dapat %s", sale.TotalAmount)
 	}
 }
 
@@ -446,7 +442,7 @@ func TestCalculateSaleTolakRedeemTanpaMember(t *testing.T) {
 			{ProductID: 3, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 9000},
+			{PaymentMethodID: 1, Amount: Rupiah(9000)},
 		},
 	}, produkUji(), cfgInclusive())
 	if !errors.Is(err, ErrSaleRedeemTanpaMember) {
@@ -460,25 +456,25 @@ func TestCalculateSaleVoucherPersenMengurangiTotalDanPPN(t *testing.T) {
 			{ProductID: 2, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 45000},
+			{PaymentMethodID: 1, Amount: Rupiah(45000)},
 		},
 	}, produkUji(), cfgInclusive(), &Voucher{
 		ID:            9,
 		Code:          "PROMO10",
 		DiscountType:  VoucherDiscountPercent,
-		DiscountValue: 10,
+		DiscountValue: DecInt(10),
 	})
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.VoucherID != 9 || sale.VoucherCode != "PROMO10" || sale.VoucherDiscount != 5000 {
-		t.Fatalf("voucher harus tercatat 9/PROMO10/5000, dapat %d/%s/%.2f", sale.VoucherID, sale.VoucherCode, sale.VoucherDiscount)
+	if sale.VoucherID != 9 || sale.VoucherCode != "PROMO10" || sale.VoucherDiscount.Cmp(Rupiah(5000)) != 0 {
+		t.Fatalf("voucher harus tercatat 9/PROMO10/5000, dapat %d/%s/%s", sale.VoucherID, sale.VoucherCode, sale.VoucherDiscount)
 	}
-	if sale.TotalAmount != 45000 {
-		t.Fatalf("total setelah voucher harus 45000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(45000)) != 0 {
+		t.Fatalf("total setelah voucher harus 45000, dapat %s", sale.TotalAmount)
 	}
-	if sale.TaxAmount != 4821.43 {
-		t.Fatalf("PPN harus 4821.43, dapat %.2f", sale.TaxAmount)
+	if sale.TaxAmount.Cmp(NewMoney(482143)) != 0 {
+		t.Fatalf("PPN harus 4821.43, dapat %s", sale.TaxAmount)
 	}
 	cekTotalBarisSamaHeader(t, sale)
 }
@@ -491,22 +487,22 @@ func TestCalculateSaleVoucherNominalDenganPoin(t *testing.T) {
 			{ProductID: 2, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 30000},
+			{PaymentMethodID: 1, Amount: Rupiah(30000)},
 		},
 	}, produkUji(), cfgInclusive(), &Voucher{
 		ID:            10,
 		Code:          "POTONG10",
 		DiscountType:  VoucherDiscountAmount,
-		DiscountValue: 10000,
+		DiscountValue: DecInt(10000),
 	})
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.VoucherDiscount != 10000 || sale.RedeemAmount != 10000 {
-		t.Fatalf("voucher/poin harus 10000/10000, dapat %.2f/%.2f", sale.VoucherDiscount, sale.RedeemAmount)
+	if sale.VoucherDiscount.Cmp(Rupiah(10000)) != 0 || sale.RedeemAmount.Cmp(Rupiah(10000)) != 0 {
+		t.Fatalf("voucher/poin harus 10000/10000, dapat %s/%s", sale.VoucherDiscount, sale.RedeemAmount)
 	}
-	if sale.TotalAmount != 30000 {
-		t.Fatalf("total harus 30000, dapat %.2f", sale.TotalAmount)
+	if sale.TotalAmount.Cmp(Rupiah(30000)) != 0 {
+		t.Fatalf("total harus 30000, dapat %s", sale.TotalAmount)
 	}
 	cekTotalBarisSamaHeader(t, sale)
 }
@@ -517,20 +513,20 @@ func TestCalculateSaleVoucherPersenDibatasiMaksimalDiskon(t *testing.T) {
 			{ProductID: 2, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 45000},
+			{PaymentMethodID: 1, Amount: Rupiah(45000)},
 		},
 	}, produkUji(), cfgInclusive(), &Voucher{
 		ID:            11,
 		Code:          "PROMO50",
 		DiscountType:  VoucherDiscountPercent,
-		DiscountValue: 50,
-		MaxDiscount:   5000,
+		DiscountValue: DecInt(50),
+		MaxDiscount:   Rupiah(5000),
 	})
 	if err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
-	if sale.VoucherDiscount != 5000 {
-		t.Fatalf("diskon harus dibatasi 5000, dapat %.2f", sale.VoucherDiscount)
+	if sale.VoucherDiscount.Cmp(Rupiah(5000)) != 0 {
+		t.Fatalf("diskon harus dibatasi 5000, dapat %s", sale.VoucherDiscount)
 	}
 }
 
@@ -540,14 +536,14 @@ func TestCalculateSaleVoucherMinimalBelanjaDitolak(t *testing.T) {
 			{ProductID: 2, Qty: 1},
 		},
 		Payments: []SalePaymentInput{
-			{PaymentMethodID: 1, Amount: 45000},
+			{PaymentMethodID: 1, Amount: Rupiah(45000)},
 		},
 	}, produkUji(), cfgInclusive(), &Voucher{
 		ID:            12,
 		Code:          "MIN60",
 		DiscountType:  VoucherDiscountAmount,
-		DiscountValue: 10000,
-		MinPurchase:   60000,
+		DiscountValue: DecInt(10000),
+		MinPurchase:   Rupiah(60000),
 	})
 	if !errors.Is(err, ErrVoucherMinPurchase) {
 		t.Fatalf("harus ErrVoucherMinPurchase, dapat %v", err)

@@ -14,8 +14,10 @@ import {
   PackageCheck,
   TruckIcon,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatIDR } from "@/lib/money";
 
 interface DashboardStats {
   total_po_value: number;
@@ -62,14 +64,6 @@ interface DashboardOverview {
   recent_grns: RecentGRN[];
 }
 
-function formatIDR(value: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
-}
-
 function formatDate(value: string) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("id-ID", {
@@ -79,16 +73,16 @@ function formatDate(value: string) {
   });
 }
 
-function statusBadge(status: string) {
+function statusVariant(status: string) {
   switch (status) {
     case "APPROVED":
-      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      return "info";
     case "RECEIVED":
-      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+      return "success";
     case "REJECTED":
-      return "bg-rose-500/10 text-rose-600 border-rose-500/20";
+      return "danger";
     default:
-      return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      return "warning";
   }
 }
 
@@ -172,7 +166,7 @@ export default function Page() {
       icon: <AlertTriangleIcon className="size-5 text-amber-500" />,
     },
     {
-      title: "Produk Aktif",
+      title: "Produk Active",
       value: `${stats?.total_products ?? 0} item`,
       subtitle: `${stats?.total_suppliers ?? 0} supplier aktif`,
       icon: <BoxesIcon className="size-5 text-emerald-500" />,
@@ -184,19 +178,19 @@ export default function Page() {
       {/* Welcome Banner */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 rounded-2xl bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border border-primary/15 shadow-xs">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
             Axion ERP Command Center
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Visibilitas operasional pengadaan, penerimaan barang, dan stok
             gudang secara real-time.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-600 border border-emerald-500/20">
+          <Badge variant="success" className="gap-1.5 px-3 py-1">
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
             Sistem Berjalan Normal
-          </span>
+          </Badge>
         </div>
       </div>
 
@@ -219,38 +213,38 @@ export default function Page() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border bg-card p-5 shadow-2xs">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-3 w-24" />
-                  <Skeleton className="size-8 rounded-lg" />
-                </div>
-                <div className="mt-4 space-y-2">
-                  <Skeleton className="h-6 w-28" />
-                  <Skeleton className="h-3 w-32" />
-                </div>
+            <div key={i} className="rounded-xl border bg-card p-5 shadow-2xs">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="size-8 rounded-lg" />
               </div>
-            ))
+              <div className="mt-4 space-y-2">
+                <Skeleton className="h-6 w-28" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+          ))
           : statCards.map((stat, i) => (
-              <div
-                key={i}
-                className="rounded-xl border bg-card p-5 shadow-2xs hover:shadow-sm transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {stat.title}
-                  </span>
-                  <div className="p-2 rounded-lg bg-muted/60">{stat.icon}</div>
+            <div
+              key={i}
+              className="rounded-xl border bg-card p-5 shadow-2xs hover:shadow-sm transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {stat.title}
+                </span>
+                <div className="p-2 rounded-lg bg-muted/60">{stat.icon}</div>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-bold tracking-tight text-foreground">
+                  {stat.value}
                 </div>
-                <div className="mt-3">
-                  <div className="text-2xl font-bold tracking-tight text-foreground">
-                    {stat.value}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {stat.subtitle}
-                  </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {stat.subtitle}
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
       </div>
 
       {/* Quick Actions Shortcuts */}
@@ -270,7 +264,7 @@ export default function Page() {
               <div className="text-xs font-semibold text-foreground">
                 {action.title}
               </div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {action.description}
               </div>
             </div>
@@ -333,7 +327,7 @@ export default function Page() {
                         <div className="font-medium text-foreground">
                           {po.supplier_name}
                         </div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                           {formatDate(po.po_date)}
                         </div>
                       </td>
@@ -341,11 +335,9 @@ export default function Page() {
                         {formatIDR(po.total_amount)}
                       </td>
                       <td className="py-3">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${statusBadge(po.status)}`}
-                        >
+                        <Badge variant={statusVariant(po.status)}>
                           {po.status}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-3 text-muted-foreground whitespace-nowrap">
                         {formatDate(po.po_date)}
@@ -378,9 +370,9 @@ export default function Page() {
                   Stok Kritis
                 </h2>
               </div>
-              <span className="text-xs font-semibold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full">
+              <Badge variant="warning">
                 {stats?.low_stock_count ?? 0} item
-              </span>
+              </Badge>
             </div>
 
             <div className="space-y-3 mt-4">
@@ -398,7 +390,7 @@ export default function Page() {
                       <div className="text-xs font-semibold text-foreground">
                         {item.name}
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {item.sku} • {item.selling_unit}
                       </div>
                     </div>
@@ -406,7 +398,7 @@ export default function Page() {
                       <span className="text-xs font-bold text-destructive">
                         {item.current_stock} tersisa
                       </span>
-                      <div className="text-[10px] text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         Min: {item.min_stock_level}
                       </div>
                     </div>
@@ -428,7 +420,7 @@ export default function Page() {
               </h2>
               <Link
                 href="/goods-receipt-notes"
-                className="text-[11px] text-primary hover:underline max-md:inline-flex max-md:min-h-12 max-md:items-center"
+                className="text-xs text-primary hover:underline max-md:inline-flex max-md:min-h-12 max-md:items-center"
               >
                 Lihat Semua
               </Link>
@@ -450,11 +442,11 @@ export default function Page() {
                         <span className="text-xs font-medium text-foreground">
                           {grn.grn_number}
                         </span>
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {formatDate(grn.received_date)}
                         </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {grn.total_qty} unit diterima • PO {grn.po_number}
                       </p>
                     </div>

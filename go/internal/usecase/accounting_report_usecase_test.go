@@ -14,8 +14,8 @@ import (
 type fakeReportRepo struct {
 	balances   []domain.AccountBalance
 	lines      []domain.AccountLedgerLine
-	openDebit  float64
-	openCredit float64
+	openDebit  domain.Money
+	openCredit domain.Money
 	balanceErr error
 }
 
@@ -30,7 +30,7 @@ func (f *fakeReportRepo) AccountLedgerLines(context.Context, int64, time.Time, t
 	return f.lines, nil
 }
 
-func (f *fakeReportRepo) AccountOpeningBalance(context.Context, int64, time.Time) (float64, float64, error) {
+func (f *fakeReportRepo) AccountOpeningBalance(context.Context, int64, time.Time) (domain.Money, domain.Money, error) {
 	return f.openDebit, f.openCredit, nil
 }
 
@@ -62,11 +62,11 @@ func date(y int, m time.Month, d int) time.Time {
 // 300 dan beban 100 diakui sebagai laba belum ditutup 200.
 func skenarioNeraca() []domain.AccountBalance {
 	return []domain.AccountBalance{
-		{AccountID: 1, Code: "1-1101", Name: "KAS TUNAI", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 500},
-		{AccountID: 2, Code: "2-1100", Name: "HUTANG USAHA", AccountType: domain.AccountTypeLiability, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 200},
-		{AccountID: 3, Code: "3-1100", Name: "MODAL PEMILIK", AccountType: domain.AccountTypeEquity, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 100},
-		{AccountID: 4, Code: "4-1100", Name: "PENDAPATAN PENJUALAN", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 300},
-		{AccountID: 5, Code: "5-2100", Name: "BEBAN GAJI", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 100},
+		{AccountID: 1, Code: "1-1101", Name: "KAS TUNAI", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(500)},
+		{AccountID: 2, Code: "2-1100", Name: "HUTANG USAHA", AccountType: domain.AccountTypeLiability, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(200)},
+		{AccountID: 3, Code: "3-1100", Name: "MODAL PEMILIK", AccountType: domain.AccountTypeEquity, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(100)},
+		{AccountID: 4, Code: "4-1100", Name: "PENDAPATAN PENJUALAN", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(300)},
+		{AccountID: 5, Code: "5-2100", Name: "BEBAN GAJI", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(100)},
 	}
 }
 
@@ -81,14 +81,14 @@ func TestIncomeStatementMenghitungLabaRugi(t *testing.T) {
 	if len(statement.Revenue) != 1 || len(statement.Expenses) != 1 {
 		t.Fatalf("jumlah baris tidak sesuai: revenue=%d expenses=%d", len(statement.Revenue), len(statement.Expenses))
 	}
-	if statement.TotalRevenue != 300 {
-		t.Errorf("TotalRevenue = %v, ingin 300", statement.TotalRevenue)
+	if statement.TotalRevenue.Cmp(domain.Rupiah(300)) != 0 {
+		t.Errorf("TotalRevenue = %s, ingin 300", statement.TotalRevenue)
 	}
-	if statement.TotalExpenses != 100 {
-		t.Errorf("TotalExpenses = %v, ingin 100", statement.TotalExpenses)
+	if statement.TotalExpenses.Cmp(domain.Rupiah(100)) != 0 {
+		t.Errorf("TotalExpenses = %s, ingin 100", statement.TotalExpenses)
 	}
-	if statement.NetIncome != 200 {
-		t.Errorf("NetIncome = %v, ingin 200", statement.NetIncome)
+	if statement.NetIncome.Cmp(domain.Rupiah(200)) != 0 {
+		t.Errorf("NetIncome = %s, ingin 200", statement.NetIncome)
 	}
 	// Akun aset/kewajiban/ekuitas tidak boleh bocor ke laba rugi.
 	if statement.Revenue[0].Code != "4-1100" {
@@ -104,18 +104,18 @@ func TestBalanceSheetMenambahLabaBelumDitutupDanSeimbang(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BalanceSheet gagal: %v", err)
 	}
-	if sheet.TotalAssets != 500 {
-		t.Errorf("TotalAssets = %v, ingin 500", sheet.TotalAssets)
+	if sheet.TotalAssets.Cmp(domain.Rupiah(500)) != 0 {
+		t.Errorf("TotalAssets = %s, ingin 500", sheet.TotalAssets)
 	}
-	if sheet.TotalLiabilities != 200 {
-		t.Errorf("TotalLiabilities = %v, ingin 200", sheet.TotalLiabilities)
+	if sheet.TotalLiabilities.Cmp(domain.Rupiah(200)) != 0 {
+		t.Errorf("TotalLiabilities = %s, ingin 200", sheet.TotalLiabilities)
 	}
 	// 100 ekuitas nyata + 200 laba belum ditutup.
-	if sheet.TotalEquity != 300 {
-		t.Errorf("TotalEquity = %v, ingin 300", sheet.TotalEquity)
+	if sheet.TotalEquity.Cmp(domain.Rupiah(300)) != 0 {
+		t.Errorf("TotalEquity = %s, ingin 300", sheet.TotalEquity)
 	}
-	if sheet.TotalLiabilitiesAndEquity != 500 {
-		t.Errorf("TotalLiabilitiesAndEquity = %v, ingin 500", sheet.TotalLiabilitiesAndEquity)
+	if sheet.TotalLiabilitiesAndEquity.Cmp(domain.Rupiah(500)) != 0 {
+		t.Errorf("TotalLiabilitiesAndEquity = %s, ingin 500", sheet.TotalLiabilitiesAndEquity)
 	}
 	if !sheet.Balanced {
 		t.Error("neraca seharusnya seimbang")
@@ -130,18 +130,18 @@ func TestBalanceSheetMenambahLabaBelumDitutupDanSeimbang(t *testing.T) {
 	if synthetic == nil {
 		t.Fatalf("baris laba belum ditutup (%s) tidak ada di ekuitas", netIncomeEquityCode)
 	}
-	if synthetic.Balance != 200 {
-		t.Errorf("laba belum ditutup = %v, ingin 200", synthetic.Balance)
+	if synthetic.Balance.Cmp(domain.Rupiah(200)) != 0 {
+		t.Errorf("laba belum ditutup = %s, ingin 200", synthetic.Balance)
 	}
 }
 
 func TestBalanceSheetTidakMenambahBarisLabaNol(t *testing.T) {
 	// Pendapatan 300, beban 300 => laba nol => tidak perlu baris sintetis.
 	repo := &fakeReportRepo{balances: []domain.AccountBalance{
-		{AccountID: 1, Code: "1-1101", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 100},
-		{AccountID: 3, Code: "3-1100", AccountType: domain.AccountTypeEquity, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 100},
-		{AccountID: 4, Code: "4-1100", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: 300},
-		{AccountID: 5, Code: "5-2100", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: 300},
+		{AccountID: 1, Code: "1-1101", AccountType: domain.AccountTypeAsset, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(100)},
+		{AccountID: 3, Code: "3-1100", AccountType: domain.AccountTypeEquity, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(100)},
+		{AccountID: 4, Code: "4-1100", AccountType: domain.AccountTypeRevenue, NormalBalance: domain.NormalBalanceCredit, TotalCredit: domain.Rupiah(300)},
+		{AccountID: 5, Code: "5-2100", AccountType: domain.AccountTypeExpense, NormalBalance: domain.NormalBalanceDebit, TotalDebit: domain.Rupiah(300)},
 	}}
 	uc := NewAccountingReportUsecase(repo, &fakeReportCOA{})
 
@@ -154,8 +154,8 @@ func TestBalanceSheetTidakMenambahBarisLabaNol(t *testing.T) {
 			t.Fatal("baris laba belum ditutup tidak seharusnya muncul saat laba nol")
 		}
 	}
-	if sheet.TotalEquity != 100 || !sheet.Balanced {
-		t.Errorf("ekuitas=%v balanced=%v, ingin 100/true", sheet.TotalEquity, sheet.Balanced)
+	if sheet.TotalEquity.Cmp(domain.Rupiah(100)) != 0 || !sheet.Balanced {
+		t.Errorf("ekuitas=%s balanced=%v, ingin 100/true", sheet.TotalEquity, sheet.Balanced)
 	}
 }
 
@@ -168,30 +168,30 @@ func TestTrialBalanceMenjumlahDebitKreditSeimbang(t *testing.T) {
 		t.Fatalf("TrialBalance gagal: %v", err)
 	}
 	// Debit: 500 aset + 100 beban = 600. Kredit: 200 + 100 + 300 = 600.
-	if tb.TotalDebit != 600 {
-		t.Errorf("TotalDebit = %v, ingin 600", tb.TotalDebit)
+	if tb.TotalDebit.Cmp(domain.Rupiah(600)) != 0 {
+		t.Errorf("TotalDebit = %s, ingin 600", tb.TotalDebit)
 	}
-	if tb.TotalCredit != 600 {
-		t.Errorf("TotalCredit = %v, ingin 600", tb.TotalCredit)
+	if tb.TotalCredit.Cmp(domain.Rupiah(600)) != 0 {
+		t.Errorf("TotalCredit = %s, ingin 600", tb.TotalCredit)
 	}
 	if !tb.Balanced {
 		t.Error("neraca saldo seharusnya seimbang")
 	}
 	// Akun kredit normal hanya mengisi kolom kredit.
 	for _, account := range tb.Accounts {
-		if account.Code == "2-1100" && account.Debit != 0 {
-			t.Errorf("hutang seharusnya tanpa kolom debit, dapat %v", account.Debit)
+		if account.Code == "2-1100" && !account.Debit.IsZero() {
+			t.Errorf("hutang seharusnya tanpa kolom debit, dapat %s", account.Debit)
 		}
 	}
 }
 
 func TestGeneralLedgerSaldoBerjalanAkunDebit(t *testing.T) {
 	repo := &fakeReportRepo{
-		openDebit:  1000,
-		openCredit: 200,
+		openDebit:  domain.Rupiah(1000),
+		openCredit: domain.Rupiah(200),
 		lines: []domain.AccountLedgerLine{
-			{EntryNumber: "JV-1", EntryDate: date(2026, time.March, 1), Debit: 500},
-			{EntryNumber: "JV-2", EntryDate: date(2026, time.March, 5), Credit: 300},
+			{EntryNumber: "JV-1", EntryDate: date(2026, time.March, 1), Debit: domain.Rupiah(500)},
+			{EntryNumber: "JV-2", EntryDate: date(2026, time.March, 5), Credit: domain.Rupiah(300)},
 		},
 	}
 	coa := &fakeReportCOA{account: &domain.ChartOfAccount{
@@ -203,33 +203,33 @@ func TestGeneralLedgerSaldoBerjalanAkunDebit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GeneralLedger gagal: %v", err)
 	}
-	if ledger.OpeningBalance != 800 {
-		t.Errorf("OpeningBalance = %v, ingin 800", ledger.OpeningBalance)
+	if ledger.OpeningBalance.Cmp(domain.Rupiah(800)) != 0 {
+		t.Errorf("OpeningBalance = %s, ingin 800", ledger.OpeningBalance)
 	}
 	if len(ledger.Lines) != 2 {
 		t.Fatalf("jumlah baris = %d, ingin 2", len(ledger.Lines))
 	}
-	if ledger.Lines[0].Balance != 1300 {
-		t.Errorf("saldo berjalan baris 1 = %v, ingin 1300", ledger.Lines[0].Balance)
+	if ledger.Lines[0].Balance.Cmp(domain.Rupiah(1300)) != 0 {
+		t.Errorf("saldo berjalan baris 1 = %s, ingin 1300", ledger.Lines[0].Balance)
 	}
-	if ledger.Lines[1].Balance != 1000 {
-		t.Errorf("saldo berjalan baris 2 = %v, ingin 1000", ledger.Lines[1].Balance)
+	if ledger.Lines[1].Balance.Cmp(domain.Rupiah(1000)) != 0 {
+		t.Errorf("saldo berjalan baris 2 = %s, ingin 1000", ledger.Lines[1].Balance)
 	}
-	if ledger.TotalDebit != 500 || ledger.TotalCredit != 300 {
-		t.Errorf("total debit/kredit = %v/%v, ingin 500/300", ledger.TotalDebit, ledger.TotalCredit)
+	if ledger.TotalDebit.Cmp(domain.Rupiah(500)) != 0 || ledger.TotalCredit.Cmp(domain.Rupiah(300)) != 0 {
+		t.Errorf("total debit/kredit = %s/%s, ingin 500/300", ledger.TotalDebit, ledger.TotalCredit)
 	}
-	if ledger.ClosingBalance != 1000 {
-		t.Errorf("ClosingBalance = %v, ingin 1000", ledger.ClosingBalance)
+	if ledger.ClosingBalance.Cmp(domain.Rupiah(1000)) != 0 {
+		t.Errorf("ClosingBalance = %s, ingin 1000", ledger.ClosingBalance)
 	}
 }
 
 func TestGeneralLedgerSaldoBerjalanAkunKredit(t *testing.T) {
 	repo := &fakeReportRepo{
-		openDebit:  100,
-		openCredit: 500,
+		openDebit:  domain.Rupiah(100),
+		openCredit: domain.Rupiah(500),
 		lines: []domain.AccountLedgerLine{
-			{EntryNumber: "JV-1", EntryDate: date(2026, time.March, 1), Debit: 50},
-			{EntryNumber: "JV-2", EntryDate: date(2026, time.March, 5), Credit: 250},
+			{EntryNumber: "JV-1", EntryDate: date(2026, time.March, 1), Debit: domain.Rupiah(50)},
+			{EntryNumber: "JV-2", EntryDate: date(2026, time.March, 5), Credit: domain.Rupiah(250)},
 		},
 	}
 	coa := &fakeReportCOA{account: &domain.ChartOfAccount{
@@ -242,14 +242,14 @@ func TestGeneralLedgerSaldoBerjalanAkunKredit(t *testing.T) {
 		t.Fatalf("GeneralLedger gagal: %v", err)
 	}
 	// Kredit normal: saldo awal 400, lalu debit 50 turun ke 350, kredit 250 naik ke 600.
-	if ledger.OpeningBalance != 400 {
-		t.Errorf("OpeningBalance = %v, ingin 400", ledger.OpeningBalance)
+	if ledger.OpeningBalance.Cmp(domain.Rupiah(400)) != 0 {
+		t.Errorf("OpeningBalance = %s, ingin 400", ledger.OpeningBalance)
 	}
-	if ledger.Lines[0].Balance != 350 {
-		t.Errorf("saldo berjalan baris 1 = %v, ingin 350", ledger.Lines[0].Balance)
+	if ledger.Lines[0].Balance.Cmp(domain.Rupiah(350)) != 0 {
+		t.Errorf("saldo berjalan baris 1 = %s, ingin 350", ledger.Lines[0].Balance)
 	}
-	if ledger.ClosingBalance != 600 {
-		t.Errorf("ClosingBalance = %v, ingin 600", ledger.ClosingBalance)
+	if ledger.ClosingBalance.Cmp(domain.Rupiah(600)) != 0 {
+		t.Errorf("ClosingBalance = %s, ingin 600", ledger.ClosingBalance)
 	}
 }
 

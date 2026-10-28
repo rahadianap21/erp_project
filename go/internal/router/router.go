@@ -209,6 +209,10 @@ func RegisterRoutes(mux *http.ServeMux, cfg *config.Config, idempotencyStore dom
 
 	handle("/api/journals/reverse", protect(accountingHandler.HandleReverseJournal))
 
+	// 14a. Pengaturan akun otomatis (s_accounting_settings) yang dipakai jurnal
+	// penjualan, pembelian, dan tutup buku.
+	handle("/api/accounting/settings", protect(accountingHandler.AccountingSettingsHandler))
+
 	// 14b. Laporan keuangan — hanya membaca jurnal berstatus POSTED dan hanya
 	// menuntut accounting:read.
 	handle("/api/accounting/reports/balance-sheet", protect(accountingHandler.HandleBalanceSheet))

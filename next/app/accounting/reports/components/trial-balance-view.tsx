@@ -50,7 +50,7 @@ export function TrialBalanceView({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+        <label className="text-xs font-medium text-muted-foreground">
           Dari
         </label>
         <input
@@ -59,7 +59,7 @@ export function TrialBalanceView({
           onChange={(e) => setFrom(e.target.value)}
           className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
         />
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+        <label className="text-xs font-medium text-muted-foreground">
           Sampai
         </label>
         <input

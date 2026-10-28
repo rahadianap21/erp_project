@@ -1,6 +1,5 @@
 "use client";
 
-import Cookies from "js-cookie";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -25,6 +24,7 @@ import {
   BellIcon,
   LogOutIcon,
 } from "lucide-react";
+import { logout } from "@/lib/logout";
 
 export function NavUser({
   user,
@@ -36,24 +36,6 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
-
-  const handleLogout = async () => {
-    Cookies.remove("session_active", { path: "/" });
-    Cookies.remove("user_email", { path: "/" });
-    Cookies.remove("user_name", { path: "/" });
-    Cookies.remove("user_permissions", { path: "/" });
-    Cookies.remove("user_app", { path: "/" });
-
-    try {
-      // Cookie auth_token bersifat httpOnly, jadi hanya route handler inilah
-      // yang bisa menghapusnya sekaligus meneruskan logout ke backend Go.
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch (err) {
-      console.error("Gagal logout:", err);
-    }
-
-    window.location.replace("/");
-  };
 
   const initials = user.name
     ? user.name
@@ -131,7 +113,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={handleLogout}
+              onClick={() => void logout()}
               className="text-destructive focus:text-destructive cursor-pointer"
             >
               <LogOutIcon />

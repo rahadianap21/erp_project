@@ -12,6 +12,7 @@ import {
   ChartOfAccount,
 } from "./components/chart-of-account-table";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -101,20 +102,11 @@ export default function ChartOfAccountsPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
-      <div className="flex items-center gap-2 border-b pb-4">
-        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-          <BookOpenCheck className="size-5" />
-        </div>
-        <div>
-          <h1 className="text-sm font-black uppercase tracking-wider text-slate-900">
-            Bagan Akun (Chart of Accounts)
-          </h1>
-          <p className="text-xs text-slate-500">
-            Fondasi struktur buku besar: aset, kewajiban, ekuitas, pendapatan,
-            dan beban.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={BookOpenCheck}
+        title="Bagan Akun (Chart of Accounts)"
+        description="Fondasi struktur buku besar: aset, kewajiban, ekuitas, pendapatan, dan beban."
+      />
 
       {permissions.create && (
         <ChartOfAccountForm
@@ -150,7 +142,7 @@ export default function ChartOfAccountsPage() {
 
           <div className="my-2 p-3 bg-rose-50 text-rose-700 rounded-md border border-rose-100 font-mono">
             <p className="font-bold">{accountToDeactivate?.code}</p>
-            <p className="text-[11px] mt-0.5">{accountToDeactivate?.name}</p>
+            <p className="text-xs mt-0.5">{accountToDeactivate?.name}</p>
           </div>
 
           <AlertDialogFooter>

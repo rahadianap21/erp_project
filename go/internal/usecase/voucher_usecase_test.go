@@ -34,7 +34,7 @@ func TestCreateVoucherMenormalkanInput(t *testing.T) {
 		Code:          "  promo10 ",
 		Name:          "  Promo  ",
 		Description:   "  Keterangan  ",
-		DiscountValue: 10,
+		DiscountValue: domain.DecInt(10),
 	}, 1); err != nil {
 		t.Fatalf("tidak boleh error: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestCreateVoucherMenolakInputTidakValidTanpaMemanggilRepo(t *testing.T) {
 		Code:          "PROMO",
 		Name:          "Promo",
 		DiscountType:  domain.VoucherDiscountPercent,
-		DiscountValue: 150,
+		DiscountValue: domain.DecInt(150),
 	}, 1); err == nil {
 		t.Fatal("persen di atas 100 harus ditolak")
 	}

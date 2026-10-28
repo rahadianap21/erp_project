@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTableToolbar } from "@/components/data-table-toolbar";
@@ -52,16 +53,32 @@ export function RoleTableSkeleton() {
         <Skeleton className="h-5 w-36" />
       </div>
 
+      {/* Mobile Card Skeleton */}
+      <div className="space-y-3 md:hidden">
+        {Array.from({ length: 4 }).map((_, idx) => (
+          <div
+            key={`role-card-skel-${idx}`}
+            className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-8 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
       {/* Table Skeleton */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card">
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card md:block">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-10"></TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 Nama Peran
               </TableHead>
-              <TableHead className="text-right font-semibold text-xs w-32">
+              <TableHead className="text-right w-32">
                 Aksi
               </TableHead>
             </TableRow>
@@ -150,35 +167,35 @@ export function RoleTable({
     }));
   };
 
-  const getPermissionBadgeColor = (permName: string) => {
+  const getPermissionBadgeVariant = (permName: string) => {
     const lowerPerm = permName.toLowerCase();
 
     if (lowerPerm.includes("read") || lowerPerm.includes("view")) {
-      return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+      return "success";
     }
     if (
       lowerPerm.includes("create") ||
       lowerPerm.includes("write") ||
       lowerPerm.includes("add")
     ) {
-      return "bg-blue-500/10 text-blue-600 border-blue-500/20";
+      return "info";
     }
     if (
       lowerPerm.includes("update") ||
       lowerPerm.includes("edit") ||
       lowerPerm.includes("modify")
     ) {
-      return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      return "warning";
     }
     if (
       lowerPerm.includes("delete") ||
       lowerPerm.includes("remove") ||
       lowerPerm.includes("destroy")
     ) {
-      return "bg-rose-500/10 text-rose-600 border-rose-500/20";
+      return "danger";
     }
 
-    return "bg-slate-500/10 text-slate-600 border-slate-500/20";
+    return "neutral";
   };
 
   const groupPermissionsByPrefix = (permissions: string[]) => {
@@ -213,8 +230,154 @@ export function RoleTable({
         counterLabel={`Total ${total} peran ditemukan`}
       />
 
-      {/* Table Area */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card relative">
+      {/* Mobile: expandable card list */}
+      <div className="space-y-3 md:hidden">
+        {loading && roles.length === 0 ? (
+          Array.from({ length: 4 }).map((_, idx) => (
+            <div
+              key={`role-card-skeleton-${idx}`}
+              className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-8 w-full rounded-lg" />
+            </div>
+          ))
+        ) : roles.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Search className="size-5 text-muted-foreground/50" />
+              <p className="text-sm font-medium">
+                {isFiltered
+                  ? "Data tidak ditemukan. Coba sesuaikan kata kunci pencarian Anda."
+                  : "Tidak ada data peran yang terindeks di sistem."}
+              </p>
+              {isFiltered && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="mt-1 h-7 cursor-pointer text-sm"
+                >
+                  Bersihkan Filter
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          roles.map((r) => {
+            const isExpanded = !!expandedRows[r.id];
+            const groupedPermissions = groupPermissionsByPrefix(r.permissions);
+            const prefixes = Object.keys(groupedPermissions);
+            const permissionCount = r.permissions?.length ?? 0;
+
+            return (
+              <article
+                key={r.id}
+                onClick={() => toggleRow(r.id)}
+                className={`cursor-pointer rounded-xl border bg-card p-4 shadow-sm transition-colors ${isExpanded ? "border-slate-300 bg-muted/20" : ""
+                  } ${loading ? "pointer-events-none opacity-50" : ""}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ChevronRight
+                      className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-300 ${isExpanded ? "rotate-90 text-blue-600" : ""
+                        }`}
+                    />
+                    <h3 className="truncate text-sm font-medium capitalize">
+                      {r.name}
+                    </h3>
+                  </div>
+                  <Badge variant="info" className="shrink-0">
+                    {permissionCount} izin
+                  </Badge>
+                </div>
+
+                <div
+                  className={`grid transition-all duration-300 ease-in-out ${isExpanded
+                      ? "grid-rows-[1fr] opacity-100"
+                      : "grid-rows-[0fr] opacity-0"
+                    }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="space-y-2 pt-3">
+                      <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                        <KeyRound className="size-3 text-blue-500" /> Permissions
+                      </div>
+                      {prefixes.length > 0 ? (
+                        prefixes.map((prefix) => (
+                          <div
+                            key={`m-group-${prefix}-${r.id}`}
+                            className="rounded-lg border bg-card p-2.5 shadow-2xs"
+                          >
+                            <div className="flex items-center gap-1.5 border-b border-border pb-1.5 text-sm font-medium tracking-wide text-muted-foreground">
+                              <Folder className="size-3 text-muted-foreground/70" />
+                              <span>Modul {prefix}</span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {groupedPermissions[prefix].map((perm) => (
+                                <Badge
+                                  key={perm}
+                                  variant={getPermissionBadgeVariant(perm)}
+                                  className="font-mono"
+                                >
+                                  {perm}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm italic text-muted-foreground">
+                          Belum ada hak akses permission yang disematkan untuk
+                          peran ini.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {showActionColumn && (
+                  <div className="mt-3 flex justify-end gap-2 border-t pt-3">
+                    {canUpdate && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditClick(r);
+                        }}
+                        aria-label={`Edit peran ${r.name}`}
+                        className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted cursor-pointer"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" /> Edit
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteClick(r);
+                        }}
+                        aria-label={`Hapus peran ${r.name}`}
+                        className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Hapus
+                      </button>
+                    )}
+                  </div>
+                )}
+              </article>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card relative md:block">
         {/* Indikator Loading Tipis Saat Memperbarui Data yang Sudah Ada */}
         {loading && roles.length > 0 && (
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10">
@@ -226,11 +389,11 @@ export function RoleTable({
           <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-10"></TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 Nama Peran
               </TableHead>
               {showActionColumn && (
-                <TableHead className="text-right font-semibold text-xs w-32">
+                <TableHead className="text-right w-32">
                   Aksi
                 </TableHead>
               )}
@@ -266,7 +429,7 @@ export function RoleTable({
               <TableRow>
                 <TableCell
                   colSpan={showActionColumn ? 3 : 2}
-                  className="h-32 text-center text-muted-foreground font-medium text-xs"
+                  className="h-32 text-center text-muted-foreground font-medium text-sm"
                 >
                   <div className="flex flex-col items-center justify-center gap-2 py-4">
                     <Search className="size-5 text-muted-foreground/50" />
@@ -281,7 +444,7 @@ export function RoleTable({
                         variant="outline"
                         size="sm"
                         onClick={handleReset}
-                        className="mt-1 h-7 text-[11px] cursor-pointer"
+                        className="mt-1 h-7 text-sm cursor-pointer"
                       >
                         Bersihkan Filter
                       </Button>
@@ -327,7 +490,7 @@ export function RoleTable({
                           />
                         </button>
                       </TableCell>
-                      <TableCell className="font-medium text-xs py-3 text-foreground capitalize">
+                      <TableCell className="font-medium text-sm py-3 text-foreground capitalize">
                         {r.name}
                       </TableCell>
                       {showActionColumn && (
@@ -377,7 +540,7 @@ export function RoleTable({
                         >
                           <div className="overflow-hidden">
                             <div className="py-4 pl-12 pr-6 space-y-2">
-                              <div className="text-[11px] font-semibold text-foreground/80 flex items-center gap-1.5 uppercase tracking-wider">
+                              <div className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
                                 <KeyRound className="size-3 text-blue-500" />{" "}
                                 Permissions
                               </div>
@@ -388,7 +551,7 @@ export function RoleTable({
                                       key={`group-${prefix}-${r.id}`}
                                       className="bg-card border p-3 rounded-lg shadow-2xs flex flex-col gap-2 transition-all duration-300 ease-in-out"
                                     >
-                                      <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5 border-b pb-1.5 border-border">
+                                      <div className="text-sm font-medium tracking-wide text-muted-foreground flex items-center gap-1.5 border-b pb-1.5 border-border">
                                         <Folder className="size-3 text-muted-foreground/70" />
                                         <span>Modul {prefix}</span>
                                       </div>
@@ -396,12 +559,13 @@ export function RoleTable({
                                       <div className="flex flex-wrap gap-1.5">
                                         {groupedPermissions[prefix].map(
                                           (perm) => (
-                                            <span
+                                            <Badge
                                               key={perm}
-                                              className={`inline-flex items-center px-2 py-0.5 rounded-md border font-mono text-[10px] transition-all duration-200 ease-in-out ${getPermissionBadgeColor(perm)}`}
+                                              variant={getPermissionBadgeVariant(perm)}
+                                              className="font-mono"
                                             >
                                               {perm}
-                                            </span>
+                                            </Badge>
                                           )
                                         )}
                                       </div>
@@ -409,7 +573,7 @@ export function RoleTable({
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-xs text-muted-foreground italic pl-0.5 pt-0.5">
+                                <p className="text-sm text-muted-foreground italic pl-0.5 pt-0.5">
                                   Belum ada hak akses permission yang disematkan
                                   untuk peran ini.
                                 </p>

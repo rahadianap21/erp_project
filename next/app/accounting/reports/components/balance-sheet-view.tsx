@@ -54,7 +54,7 @@ export function BalanceSheetView({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600">
+        <label className="text-xs font-medium text-muted-foreground">
           Per Tanggal
         </label>
         <input
@@ -68,7 +68,7 @@ export function BalanceSheetView({
       {report && (
         <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               Total Aset
             </p>
             <p className="mt-1 font-mono text-lg font-black text-slate-900">
@@ -76,7 +76,7 @@ export function BalanceSheetView({
             </p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">
               Total Kewajiban + Ekuitas
             </p>
             <p className="mt-1 font-mono text-lg font-black text-slate-900">
@@ -93,11 +93,11 @@ export function BalanceSheetView({
             )}
             <div>
               <p
-                className={`text-[10px] font-bold uppercase tracking-wider ${report.balanced ? "text-emerald-700" : "text-rose-700"}`}
+                className={`text-xs font-medium tracking-wide text-muted-foreground ${report.balanced ? "text-emerald-700" : "text-rose-700"}`}
               >
                 {report.balanced ? "Seimbang" : "Tidak Seimbang"}
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 per {formatTanggal(report.as_of)}
               </p>
             </div>
@@ -116,7 +116,7 @@ export function BalanceSheetView({
           <>
             <Card>
               <CardHeader>
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   Aset
                 </CardTitle>
               </CardHeader>
@@ -132,7 +132,7 @@ export function BalanceSheetView({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   Kewajiban
                 </CardTitle>
               </CardHeader>
@@ -152,7 +152,7 @@ export function BalanceSheetView({
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                <CardTitle className="text-sm font-semibold text-foreground">
                   Ekuitas
                 </CardTitle>
               </CardHeader>

@@ -33,7 +33,7 @@ func (u *productUsecase) CreateProduct(ctx context.Context, prod *domain.Product
 	if prod.SupplierID <= 0 {
 		return domain.NewBusinessRuleError("mitra supplier utama wajib ditentukan secara valid")
 	}
-	if prod.SellingPrice < prod.PurchasePrice {
+	if prod.SellingPrice.Cmp(prod.PurchasePrice) < 0 {
 		return domain.NewBusinessRuleError("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
 	}
 	if err := normalizeProductDiscount(prod); err != nil {
@@ -94,7 +94,7 @@ func (u *productUsecase) UpdateProduct(ctx context.Context, prod *domain.Product
 	if prod.Name == "" {
 		return domain.NewBusinessRuleError("nama barang/produk tidak boleh kosong")
 	}
-	if prod.SellingPrice < prod.PurchasePrice {
+	if prod.SellingPrice.Cmp(prod.PurchasePrice) < 0 {
 		return domain.NewBusinessRuleError("peringatan akuntansi: harga jual tidak boleh lebih rendah dari harga beli modal (HPP)")
 	}
 	if err := normalizeProductDiscount(prod); err != nil {
@@ -128,20 +128,20 @@ func normalizeProductDiscount(prod *domain.Product) error {
 	case "":
 		// Klien lama yang tidak mengirim tipe dianggap tanpa diskon.
 		prod.DiscountType = domain.ProductDiscountNone
-		prod.DiscountValue = 0
+		prod.DiscountValue = domain.Decimal{}
 		return nil
 	case domain.ProductDiscountNone:
-		prod.DiscountValue = 0
+		prod.DiscountValue = domain.Decimal{}
 		return nil
 	case domain.ProductDiscountPercent, domain.ProductDiscountAmount:
 	default:
 		return domain.NewBusinessRuleError("tipe diskon produk tidak dikenal, gunakan NONE, PERCENT, atau AMOUNT")
 	}
 
-	if prod.DiscountValue < 0 {
+	if prod.DiscountValue.IsNegative() {
 		return domain.NewBusinessRuleError("nilai diskon produk tidak boleh negatif")
 	}
-	if prod.DiscountType == domain.ProductDiscountPercent && prod.DiscountValue > 100 {
+	if prod.DiscountType == domain.ProductDiscountPercent && prod.DiscountValue.Cmp(domain.DecInt(100)) > 0 {
 		return domain.NewBusinessRuleError("diskon persen produk tidak boleh lebih dari 100")
 	}
 	return nil

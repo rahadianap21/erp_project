@@ -3,10 +3,8 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"go_backend/internal/domain"
 	"go_backend/internal/repository/postgres/db"
-	"math/big"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -65,11 +63,11 @@ func (r *sqlProductRepository) Create(ctx context.Context, prod *domain.Product)
 		SellingUnitID:  prod.SellingUnitID,
 		PurchaseUnitID: prod.PurchaseUnitID,
 		ConversionRate: prod.ConversionRate,
-		PurchasePrice:  r.float64ToNumeric(prod.PurchasePrice),
-		SellingPrice:   r.float64ToNumeric(prod.SellingPrice),
+		PurchasePrice:  numericFromMoney(prod.PurchasePrice),
+		SellingPrice:   numericFromMoney(prod.SellingPrice),
 		MinStockLevel:  prod.MinStockLevel,
 		DiscountType:   defaultDiscountType(prod.DiscountType),
-		DiscountValue:  r.float64ToNumeric(prod.DiscountValue),
+		DiscountValue:  numericFromDecimal(prod.DiscountValue),
 		IsTaxable:      prod.IsTaxable,
 		CurrentStock:   prod.CurrentStock,
 		CreatedBy:      createdByPg,
@@ -151,13 +149,13 @@ func (r *sqlProductRepository) GetByID(ctx context.Context, id int64) (*domain.P
 		ConversionRate: row.ConversionRate,
 		CategoryName:   r.interfaceToString(row.CategoryName),
 		SupplierName:   r.interfaceToString(row.SupplierName),
-		PurchasePrice:  r.numericToFloat64(row.ProdPurchasePrice),
-		SellingPrice:   r.numericToFloat64(row.ProdSellingPrice),
+		PurchasePrice:  moneyFromNumeric(row.ProdPurchasePrice),
+		SellingPrice:   moneyFromNumeric(row.ProdSellingPrice),
 		MinStockLevel:  row.ProdMinStock,
 		DiscountType:   row.ProdDiscountType,
-		DiscountValue:  r.numericToFloat64(row.ProdDiscountValue),
+		DiscountValue:  decimalFromNumeric(row.ProdDiscountValue),
 		CurrentStock:   row.ProdCurrentStock,
-		AvgCost:        r.numericToFloat64(row.ProdAvgCost),
+		AvgCost:        decimalFromNumeric(row.ProdAvgCost),
 		IsTaxable:      row.IsTaxable,
 		IsActive:       row.IsActive,
 		CreatedAt:      r.interfaceToTime(row.CreatedAt),
@@ -192,13 +190,13 @@ func (r *sqlProductRepository) GetByIDs(ctx context.Context, ids []int64) ([]dom
 			SellingUnitName:  r.interfaceToString(row.SellingUnitName),
 			PurchaseUnitKode: r.interfaceToString(row.PurchaseUnitKode),
 			PurchaseUnitName: r.interfaceToString(row.PurchaseUnitName),
-			PurchasePrice:    r.numericToFloat64(row.ProdPurchasePrice),
-			SellingPrice:     r.numericToFloat64(row.ProdSellingPrice),
+			PurchasePrice:    moneyFromNumeric(row.ProdPurchasePrice),
+			SellingPrice:     moneyFromNumeric(row.ProdSellingPrice),
 			MinStockLevel:    row.ProdMinStock,
 			DiscountType:     row.ProdDiscountType,
-			DiscountValue:    r.numericToFloat64(row.ProdDiscountValue),
+			DiscountValue:    decimalFromNumeric(row.ProdDiscountValue),
 			CurrentStock:     row.ProdCurrentStock,
-			AvgCost:          r.numericToFloat64(row.ProdAvgCost),
+			AvgCost:          decimalFromNumeric(row.ProdAvgCost),
 			IsTaxable:        row.IsTaxable,
 			IsActive:         row.IsActive,
 			CreatedAt:        r.interfaceToTime(row.CreatedAt),
@@ -240,11 +238,11 @@ func (r *sqlProductRepository) Update(ctx context.Context, prod *domain.Product)
 		SellingUnitID:  prod.SellingUnitID,  // 🌟 Ganti pemanggilan UnitOfMeasure lama menjadi UnitID
 		PurchaseUnitID: prod.PurchaseUnitID, // 🌟 Ganti pemanggilan UnitOfMeasure lama menjadi UnitID
 		ConversionRate: prod.ConversionRate,
-		PurchasePrice:  r.float64ToNumeric(prod.PurchasePrice),
-		SellingPrice:   r.float64ToNumeric(prod.SellingPrice),
+		PurchasePrice:  numericFromMoney(prod.PurchasePrice),
+		SellingPrice:   numericFromMoney(prod.SellingPrice),
 		MinStockLevel:  prod.MinStockLevel,
 		DiscountType:   defaultDiscountType(prod.DiscountType),
-		DiscountValue:  r.float64ToNumeric(prod.DiscountValue),
+		DiscountValue:  numericFromDecimal(prod.DiscountValue),
 		IsTaxable:      prod.IsTaxable,
 		IsActive:       prod.IsActive,
 		UpdatedBy:      updatedByPg,
@@ -285,13 +283,13 @@ func (r *sqlProductRepository) mapRowToDomain(row any) domain.Product {
 		p.PurchaseUnitID = v.PurchaseUnitID
 		p.PurchaseUnitKode = r.interfaceToString(v.PurchaseUnitKode)
 		p.PurchaseUnitName = r.interfaceToString(v.PurchaseUnitName)
-		p.PurchasePrice = r.numericToFloat64(v.ProdPurchasePrice)
-		p.SellingPrice = r.numericToFloat64(v.ProdSellingPrice)
+		p.PurchasePrice = moneyFromNumeric(v.ProdPurchasePrice)
+		p.SellingPrice = moneyFromNumeric(v.ProdSellingPrice)
 		p.MinStockLevel = v.ProdMinStock
 		p.DiscountType = v.ProdDiscountType
-		p.DiscountValue = r.numericToFloat64(v.ProdDiscountValue)
+		p.DiscountValue = decimalFromNumeric(v.ProdDiscountValue)
 		p.CurrentStock = v.ProdCurrentStock
-		p.AvgCost = r.numericToFloat64(v.ProdAvgCost)
+		p.AvgCost = decimalFromNumeric(v.ProdAvgCost)
 		p.IsTaxable = v.IsTaxable
 		p.IsActive = v.IsActive
 		p.CreatedAt = r.interfaceToTime(v.CreatedAt)
@@ -314,13 +312,13 @@ func (r *sqlProductRepository) mapRowToDomain(row any) domain.Product {
 		p.PurchaseUnitID = v.PurchaseUnitID
 		p.PurchaseUnitKode = r.interfaceToString(v.PurchaseUnitKode)
 		p.PurchaseUnitName = r.interfaceToString(v.PurchaseUnitName)
-		p.PurchasePrice = r.numericToFloat64(v.ProdPurchasePrice)
-		p.SellingPrice = r.numericToFloat64(v.ProdSellingPrice)
+		p.PurchasePrice = moneyFromNumeric(v.ProdPurchasePrice)
+		p.SellingPrice = moneyFromNumeric(v.ProdSellingPrice)
 		p.MinStockLevel = v.ProdMinStock
 		p.DiscountType = v.ProdDiscountType
-		p.DiscountValue = r.numericToFloat64(v.ProdDiscountValue)
+		p.DiscountValue = decimalFromNumeric(v.ProdDiscountValue)
 		p.CurrentStock = v.ProdCurrentStock
-		p.AvgCost = r.numericToFloat64(v.ProdAvgCost)
+		p.AvgCost = decimalFromNumeric(v.ProdAvgCost)
 		p.IsTaxable = v.IsTaxable
 		p.IsActive = v.IsActive
 		p.CreatedAt = r.interfaceToTime(v.CreatedAt)
@@ -337,34 +335,6 @@ func defaultDiscountType(t string) string {
 	default:
 		return "NONE"
 	}
-}
-
-func (r *sqlProductRepository) float64ToNumeric(f float64) pgtype.Numeric {
-	var num pgtype.Numeric
-	err := num.Scan(fmt.Sprintf("%.2f", f))
-	if err != nil {
-		num.Valid = false
-	}
-	return num
-}
-
-func (r *sqlProductRepository) numericToFloat64(num pgtype.Numeric) float64 {
-	if !num.Valid {
-		return 0.0
-	}
-	if num.Exp == 0 {
-		return float64(num.Int.Int64())
-	}
-	bigF := new(big.Float).SetInt(num.Int)
-	if num.Exp < 0 {
-		divisor := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-num.Exp)), nil)
-		bigF.Quo(bigF, new(big.Float).SetInt(divisor))
-	} else {
-		multiplier := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(num.Exp)), nil)
-		bigF.Mul(bigF, new(big.Float).SetInt(multiplier))
-	}
-	f, _ := bigF.Float64()
-	return f
 }
 
 func (r *sqlProductRepository) interfaceToString(val any) string {

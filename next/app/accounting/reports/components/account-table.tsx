@@ -38,83 +38,145 @@ export function AccountTable({
   }
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow className="bg-slate-50/80">
-          <TableHead className="w-28 text-[10px] font-bold uppercase tracking-wider">
-            Kode
-          </TableHead>
-          <TableHead className="text-[10px] font-bold uppercase tracking-wider">
-            Nama Akun
-          </TableHead>
-          {full && (
-            <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">
-              Debit
-            </TableHead>
-          )}
-          {full && (
-            <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">
-              Kredit
-            </TableHead>
-          )}
-          <TableHead className="text-right text-[10px] font-bold uppercase tracking-wider">
-            Saldo
-          </TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {accounts.map((account, index) => (
-          <TableRow key={`${account.account_id}-${index}`}>
-            <TableCell className="font-mono text-[11px] text-slate-500">
-              {account.code}
-            </TableCell>
-            <TableCell className="text-xs font-medium text-slate-800">
-              {account.name}
-            </TableCell>
-            {full && (
-              <TableCell className="text-right font-mono text-xs text-slate-600">
-                {account.debit ? formatIDR(account.debit) : "-"}
-              </TableCell>
-            )}
-            {full && (
-              <TableCell className="text-right font-mono text-xs text-slate-600">
-                {account.credit ? formatIDR(account.credit) : "-"}
-              </TableCell>
-            )}
-            <TableCell
-              className={cn(
-                "text-right font-mono text-xs font-bold",
-                account.balance < 0 ? "text-rose-600" : "text-slate-900"
+    <>
+      {/* Mobile: stacked account rows */}
+      <div className="md:hidden">
+        <ul className="divide-y">
+          {accounts.map((account, index) => (
+            <li
+              key={`m-${account.account_id}-${index}`}
+              className="px-4 py-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-mono text-xs text-muted-foreground">
+                    {account.code}
+                  </p>
+                  <p className="text-sm font-medium text-foreground">
+                    {account.name}
+                  </p>
+                </div>
+                <p
+                  className={cn(
+                    "shrink-0 text-right font-mono text-xs font-bold",
+                    account.balance < 0 ? "text-rose-600" : "text-slate-900"
+                  )}
+                >
+                  {formatIDR(account.balance)}
+                </p>
+              </div>
+              {full && (
+                <div className="mt-1.5 flex gap-4 font-mono text-xs text-slate-600">
+                  <span>D: {account.debit ? formatIDR(account.debit) : "-"}</span>
+                  <span>
+                    K: {account.credit ? formatIDR(account.credit) : "-"}
+                  </span>
+                </div>
               )}
-            >
-              {formatIDR(account.balance)}
-            </TableCell>
-          </TableRow>
-        ))}
+            </li>
+          ))}
+        </ul>
         {total && (
-          <TableRow className="bg-slate-50 font-bold">
-            <TableCell
-              colSpan={2}
-              className="text-[11px] uppercase tracking-wider text-slate-700"
-            >
-              {totalLabel}
-            </TableCell>
+          <div className="border-t bg-slate-50 px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium tracking-wide text-muted-foreground">
+                {totalLabel}
+              </span>
+              <span className="font-mono text-xs font-bold text-slate-900">
+                {formatIDR(total.balance)}
+              </span>
+            </div>
             {full && (
-              <TableCell className="text-right font-mono text-xs text-slate-900">
-                {formatIDR(total.debit)}
-              </TableCell>
+              <div className="mt-1 flex gap-4 font-mono text-xs text-slate-900">
+                <span>D: {formatIDR(total.debit)}</span>
+                <span>K: {formatIDR(total.credit)}</span>
+              </div>
             )}
-            {full && (
-              <TableCell className="text-right font-mono text-xs text-slate-900">
-                {formatIDR(total.credit)}
-              </TableCell>
-            )}
-            <TableCell className="text-right font-mono text-xs text-slate-900">
-              {formatIDR(total.balance)}
-            </TableCell>
-          </TableRow>
+          </div>
         )}
-      </TableBody>
-    </Table>
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50/80">
+              <TableHead className="w-28">
+                Kode
+              </TableHead>
+              <TableHead>
+                Nama Akun
+              </TableHead>
+              {full && (
+                <TableHead className="text-right">
+                  Debit
+                </TableHead>
+              )}
+              {full && (
+                <TableHead className="text-right">
+                  Kredit
+                </TableHead>
+              )}
+              <TableHead className="text-right">
+                Saldo
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {accounts.map((account, index) => (
+              <TableRow key={`${account.account_id}-${index}`}>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {account.code}
+                </TableCell>
+                <TableCell className="text-sm font-medium text-foreground">
+                  {account.name}
+                </TableCell>
+                {full && (
+                  <TableCell className="text-right font-mono text-xs text-slate-600">
+                    {account.debit ? formatIDR(account.debit) : "-"}
+                  </TableCell>
+                )}
+                {full && (
+                  <TableCell className="text-right font-mono text-xs text-slate-600">
+                    {account.credit ? formatIDR(account.credit) : "-"}
+                  </TableCell>
+                )}
+                <TableCell
+                  className={cn(
+                    "text-right font-mono text-xs font-bold",
+                    account.balance < 0 ? "text-rose-600" : "text-slate-900"
+                  )}
+                >
+                  {formatIDR(account.balance)}
+                </TableCell>
+              </TableRow>
+            ))}
+            {total && (
+              <TableRow className="bg-slate-50 font-bold">
+                <TableCell
+                  colSpan={2}
+                  className="text-xs font-medium tracking-wide text-muted-foreground"
+                >
+                  {totalLabel}
+                </TableCell>
+                {full && (
+                  <TableCell className="text-right font-mono text-xs text-slate-900">
+                    {formatIDR(total.debit)}
+                  </TableCell>
+                )}
+                {full && (
+                  <TableCell className="text-right font-mono text-xs text-slate-900">
+                    {formatIDR(total.credit)}
+                  </TableCell>
+                )}
+                <TableCell className="text-right font-mono text-xs text-slate-900">
+                  {formatIDR(total.balance)}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

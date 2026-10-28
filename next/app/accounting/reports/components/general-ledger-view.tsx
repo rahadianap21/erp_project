@@ -114,7 +114,7 @@ export function GeneralLedgerView({
           <span className="font-medium text-slate-800">
             {selectedAccount.name}
           </span>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium tracking-wide text-muted-foreground">
             {ACCOUNT_TYPE_LABEL[selectedAccount.account_type] ||
               selectedAccount.account_type}
           </span>

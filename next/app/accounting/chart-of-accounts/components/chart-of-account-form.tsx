@@ -149,7 +149,7 @@ export function ChartOfAccountForm({
         disabled={!!editingAccount}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
           <BookOpenCheck className="size-4 text-emerald-600" />
           {editingAccount
             ? `Edit Akun: ${editingAccount.code} - ${editingAccount.name}`
@@ -169,7 +169,7 @@ export function ChartOfAccountForm({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Hash className="size-3" /> Kode Akun
               </label>
               <input
@@ -182,7 +182,7 @@ export function ChartOfAccountForm({
               />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <BookOpenCheck className="size-3" /> Nama Akun
               </label>
               <input
@@ -198,7 +198,7 @@ export function ChartOfAccountForm({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FolderOpen className="size-3" /> Tipe Akun
               </label>
               <ComboboxSelect
@@ -212,7 +212,7 @@ export function ChartOfAccountForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Scale className="size-3" /> Saldo Normal
               </label>
               <ComboboxSelect
@@ -232,7 +232,7 @@ export function ChartOfAccountForm({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FolderOpen className="size-3" /> Induk Akun (Hierarki)
               </label>
               <ComboboxSelect
@@ -255,7 +255,7 @@ export function ChartOfAccountForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Power className="size-3" /> Header / Posting
               </label>
               <label className="flex items-center gap-2 pt-1.5 cursor-pointer">
@@ -274,7 +274,7 @@ export function ChartOfAccountForm({
 
           {isEditMode && (
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Power className="size-3" /> Status Akun
               </label>
               <label className="flex items-center gap-2 pt-1.5 cursor-pointer">

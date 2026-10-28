@@ -8,6 +8,8 @@ import dynamic from "next/dynamic";
 import SupplierForm from "./components/supplier-form";
 import { toast } from "sonner";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
+import { TruckIcon } from "lucide-react";
 
 const SupplierTable = dynamic(
   () => import("./components/supplier-table").then((mod) => mod.SupplierTable),
@@ -149,6 +151,11 @@ export default function SuppliersCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <PageHeader
+        icon={TruckIcon}
+        title="Manajemen Supplier"
+        description="Kelola data vendor, kontak PIC, dan informasi rekening pembayaran."
+      />
       {/* Panel Form Pengisian Data Vendor */}
       {(permissions.create || editingSupplier) && (
         <SupplierForm

@@ -1,6 +1,15 @@
 "use client";
 
-import { Edit2, Trash2, Search, Users, CreditCard } from "lucide-react";
+import {
+  Edit2,
+  Trash2,
+  Search,
+  Users,
+  CreditCard,
+  Mail,
+  MapPin,
+  Phone,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -59,24 +68,45 @@ export function SupplierTableSkeleton() {
         <Skeleton className="h-5 w-36" />
       </div>
 
+      {/* Mobile Card Skeleton */}
+      <div className="space-y-3 md:hidden">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          <div
+            key={`supplier-card-skel-${idx}`}
+            className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-3 w-44" />
+            <Skeleton className="h-3 w-52" />
+            <Skeleton className="h-12 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
       {/* Table Skeleton */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card">
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card md:block">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 Nama Vendor
               </TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 PIC Vendor
               </TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 No. Telepon
               </TableHead>
-              <TableHead className="font-semibold text-xs">Email</TableHead>
-              <TableHead className="font-semibold text-xs">Alamat</TableHead>
-              <TableHead className="font-semibold text-xs">Status</TableHead>
-              <TableHead className="text-right font-semibold text-xs w-32">
+              <TableHead>Email</TableHead>
+              <TableHead>Alamat</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right w-32">
                 Aksi
               </TableHead>
             </TableRow>
@@ -173,8 +203,153 @@ export function SupplierTable({
         counterLabel={`Total ${total} vendor ditemukan`}
       />
 
+      {/* Mobile: card list */}
+      <div className="space-y-3 md:hidden">
+        {loading && suppliers.length === 0 ? (
+          Array.from({ length: 5 }).map((_, idx) => (
+            <div
+              key={`supplier-card-skeleton-${idx}`}
+              className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <Skeleton className="h-3 w-44" />
+              <Skeleton className="h-3 w-52" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </div>
+          ))
+        ) : suppliers.length === 0 ? (
+          <div className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Search className="size-5 text-muted-foreground/50" />
+              <p className="text-sm font-medium">
+                {isFiltered
+                  ? "Data tidak ditemukan. Coba sesuaikan kata kunci atau filter pencarian Anda."
+                  : "Tidak ada data pengguna yang terindeks di sistem."}
+              </p>
+              {isFiltered && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  className="mt-1 h-7 cursor-pointer text-sm"
+                >
+                  Bersihkan Filter
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          suppliers.map((s) => (
+            <article
+              key={s.id}
+              className={`rounded-xl border bg-card p-4 shadow-sm transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""
+                }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="truncate text-sm font-medium text-foreground">
+                    {s.name}
+                  </h3>
+                  <p className="mt-0.5 truncate text-sm text-slate-500">
+                    PIC: {s.pic_name || "-"}
+                  </p>
+                </div>
+                {s.is_active === true ? (
+                  <Badge variant="success" className="shrink-0">
+                    Active
+                  </Badge>
+                ) : (
+                  <Badge variant="danger" className="shrink-0">
+                    Inactive
+                  </Badge>
+                )}
+              </div>
+
+              <dl className="mt-3 space-y-1.5 text-sm">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Phone className="size-3.5 shrink-0 text-slate-400" />
+                  <dd className="truncate">{s.phone || "-"}</dd>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <Mail className="size-3.5 shrink-0 text-slate-400" />
+                  <dd className="truncate">{s.email || "-"}</dd>
+                </div>
+                <div className="flex items-start gap-2 text-slate-600">
+                  <MapPin className="mt-0.5 size-3.5 shrink-0 text-slate-400" />
+                  <dd className="line-clamp-2">
+                    {s.address}
+                    {s.district_name ? `, ${s.district_name}` : ""}
+                    {s.regency_name ? `, ${s.regency_name}` : ""}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-3 rounded-lg border border-slate-200/70 bg-slate-50/60 p-2.5">
+                {s.account_number ? (
+                  <div className="space-y-1">
+                    <p className="flex items-center gap-1 text-sm font-medium tracking-tight text-foreground">
+                      <CreditCard className="size-3 text-blue-500" />{" "}
+                      {s.bank_name || "BANK"}
+                    </p>
+                    <p className="inline-block rounded border border-slate-200/60 bg-slate-100/80 px-1.5 py-0.5 font-mono text-sm font-bold tracking-wide text-slate-700">
+                      {s.account_number}
+                    </p>
+                    {s.account_name && (
+                      <p className="truncate pl-1 text-sm font-semibold uppercase tracking-tight text-slate-500">
+                        <span className="font-medium text-slate-400">
+                          A/N:
+                        </span>{" "}
+                        {s.account_name}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <span className="pl-1 text-sm italic text-slate-400">
+                    Rekening belum diatur
+                  </span>
+                )}
+              </div>
+
+              {showActionColumn && (
+                <div className="mt-3 flex justify-end gap-2 border-t pt-3">
+                  {canUpdate && (
+                    <button
+                      type="button"
+                      onClick={() => onEditClick(s)}
+                      title="Edit Supplier"
+                      aria-label={`Edit ${s.name}`}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-muted cursor-pointer"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteClick(s)}
+                      title="Hapus Supplier"
+                      aria-label={`Hapus ${s.name}`}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Hapus
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          ))
+        )}
+      </div>
+
       {/* Table Area */}
-      <div className="border rounded-xl shadow-sm overflow-hidden bg-card relative">
+      <div className="hidden border rounded-xl shadow-sm overflow-hidden bg-card relative md:block">
         {/* Indikator Loading Tipis Saat Memperbarui Data yang Sudah Ada */}
         {loading && suppliers.length > 0 && (
           <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary/20 overflow-hidden z-10">
@@ -185,23 +360,23 @@ export function SupplierTable({
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="font-semibold text-xs px-4">
+              <TableHead className="px-4">
                 Nama Vendor
               </TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 PIC Vendor
               </TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>
                 No. Telepon
               </TableHead>
-              <TableHead className="font-semibold text-xs">Email</TableHead>
-              <TableHead className="font-semibold text-xs">Alamat</TableHead>
-              <TableHead className="font-semibold text-xs">
+              <TableHead>Email</TableHead>
+              <TableHead>Alamat</TableHead>
+              <TableHead>
                 Rekening Bank
               </TableHead>
-              <TableHead className="font-semibold text-xs">Status</TableHead>
+              <TableHead>Status</TableHead>
               {showActionColumn && (
-                <TableHead className="text-right font-semibold text-xs w-32 px-4">
+                <TableHead className="text-right w-32 px-4">
                   Aksi
                 </TableHead>
               )}
@@ -240,7 +415,7 @@ export function SupplierTable({
               <TableRow>
                 <TableCell
                   colSpan={showActionColumn ? 8 : 7}
-                  className="h-32 text-center text-muted-foreground font-medium text-xs"
+                  className="h-32 text-center text-muted-foreground font-medium text-sm"
                 >
                   <div className="flex flex-col items-center justify-center gap-2 py-4">
                     <Search className="size-5 text-muted-foreground/50" />
@@ -255,7 +430,7 @@ export function SupplierTable({
                         variant="outline"
                         size="sm"
                         onClick={handleReset}
-                        className="mt-1 h-7 text-[11px] cursor-pointer"
+                        className="mt-1 h-7 text-sm cursor-pointer"
                       >
                         Bersihkan Filter
                       </Button>
@@ -270,24 +445,24 @@ export function SupplierTable({
                   key={s.id}
                   className={`hover:bg-muted/30 transition-opacity duration-200 ${loading ? "opacity-50 pointer-events-none" : ""}`}
                 >
-                  <TableCell className="font-medium text-xs py-3 px-4">
+                  <TableCell className="font-medium text-sm py-3 px-4">
                     {s.name}
                   </TableCell>
-                  <TableCell className="font-medium text-xs py-3">
+                  <TableCell className="font-medium text-sm py-3">
                     {s.pic_name}
                   </TableCell>
-                  <TableCell className="font-medium text-xs py-3">
+                  <TableCell className="font-medium text-sm py-3">
                     {s.phone}
                   </TableCell>
-                  <TableCell className="font-medium text-xs py-3">
+                  <TableCell className="font-medium text-sm py-3">
                     {s.email}
                   </TableCell>
                   <TableCell className="text-xs py-3.5">
                     <div className="space-y-0.5 text-slate-600 max-w-xs">
-                      <p className="line-clamp-1 italic text-[11px] text-slate-400">
+                      <p className="line-clamp-1 italic text-xs text-slate-400">
                         {s.address}
                       </p>
-                      <p className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">
+                      <p className="text-xs text-slate-500 font-medium uppercase tracking-tight">
                         {s.district_name}, {s.regency_name}
                       </p>
                     </div>
@@ -296,16 +471,16 @@ export function SupplierTable({
                   <TableCell className="text-xs py-3.5">
                     {s.account_number ? (
                       <div className="space-y-1 max-w-[200px]">
-                        <p className="font-bold text-slate-800 flex items-center gap-1 text-[11px] tracking-tight uppercase">
+                        <p className="text-sm font-medium text-slate-600 flex items-center gap-1">
                           <CreditCard className="size-3 text-blue-500" />{" "}
                           {s.bank_name || "BANK"}
                         </p>
-                        <p className="text-[11px] font-mono font-bold text-slate-700 bg-slate-100/80 border border-slate-200/60 rounded px-1.5 py-0.5 inline-block tracking-wide">
+                        <p className="text-xs font-mono font-bold text-slate-700 bg-slate-100/80 border border-slate-200/60 rounded px-1.5 py-0.5 inline-block tracking-wide">
                           {s.account_number}
                         </p>
                         {s.account_name && (
                           <p
-                            className="text-[10px] text-slate-500 font-semibold truncate pl-1 uppercase tracking-tight"
+                            className="text-xs text-slate-500 font-semibold truncate pl-1 uppercase tracking-tight"
                             title={s.account_name}
                           >
                             <span className="text-slate-400 font-medium">
@@ -316,7 +491,7 @@ export function SupplierTable({
                         )}
                       </div>
                     ) : (
-                      <span className="text-[10px] italic text-slate-400 pl-1">
+                      <span className="text-sm italic text-slate-400 pl-1">
                         Belum diatur
                       </span>
                     )}
@@ -324,14 +499,9 @@ export function SupplierTable({
 
                   <TableCell className="font-medium text-xs py-3">
                     {s.is_active === true ? (
-                      <Badge
-                        variant="outline"
-                        className="border-green-50 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300 text-[10px] px-2"
-                      >
-                        Active
-                      </Badge>
+                      <Badge variant="success">Active</Badge>
                     ) : (
-                      <Badge variant="destructive">Inactive</Badge>
+                      <Badge variant="danger">Inactive</Badge>
                     )}
                   </TableCell>
                   {showActionColumn && (

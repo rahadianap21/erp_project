@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { History, Ban, PackageCheck, FileClock, Stamp } from "lucide-react";
 
 // Tahap happy path, mengikuti transisi yang ada di backend
@@ -26,7 +27,7 @@ const IKON = "size-3";
 
 function TooltipStatus({ children }: { children: string }) {
   return (
-    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity duration-100 group-hover:opacity-100">
+    <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-xs font-semibold text-background opacity-0 transition-opacity duration-100 group-hover:opacity-100">
       {children}
     </span>
   );
@@ -70,9 +71,7 @@ export function POStatusTimeline({ status }: { status: string }) {
   // tahap terlewati akan menyesatkan, jadi jatuh ke label polos.
   if (indexSekarang === -1) {
     return (
-      <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-slate-600">
-        {String(status ?? "PENDING")}
-      </span>
+      <Badge variant="neutral">{String(status ?? "PENDING")}</Badge>
     );
   }
 

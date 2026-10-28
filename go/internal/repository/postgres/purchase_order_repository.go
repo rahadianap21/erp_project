@@ -35,9 +35,9 @@ func (r *sqlPurchaseOrderRepository) Create(ctx context.Context, po *domain.Purc
 	qtx := r.q.WithTx(tx)
 
 	// 1. Eksekusi Header PO via Kueri SQLC
-	dppNumeric := numericFromFloat(po.DppAmount)
-	taxNumeric := numericFromFloat(po.TaxAmount)
-	totalNumeric := numericFromFloat(po.TotalAmount)
+	dppNumeric := numericFromMoney(po.DppAmount)
+	taxNumeric := numericFromMoney(po.TaxAmount)
+	totalNumeric := numericFromMoney(po.TotalAmount)
 
 	header, err := qtx.CreatePurchaseOrderHeader(ctx, db.CreatePurchaseOrderHeaderParams{
 		PoNumber:    po.PoNumber,
@@ -60,8 +60,8 @@ func (r *sqlPurchaseOrderRepository) Create(ctx context.Context, po *domain.Purc
 
 	// 2. Simpan Detail PO menggunakan Biner SQLC di dalam Loop Transaksi yang sama
 	for _, item := range po.Items {
-		uPrice := numericFromFloat(item.UnitPrice)
-		sTotal := numericFromFloat(item.SubTotal)
+		uPrice := numericFromMoney(item.UnitPrice)
+		sTotal := numericFromMoney(item.SubTotal)
 
 		// 🌟 PERBAIKAN TARGET: Ubah menjadi CreatePurchaseOrderDetail agar sesuai biner SQLC baru
 		err = qtx.CreatePurchaseOrderDetail(ctx, db.CreatePurchaseOrderDetailParams{
@@ -113,25 +113,9 @@ func (r *sqlPurchaseOrderRepository) GetListCursor(ctx context.Context, param do
 
 	var results []domain.PurchaseOrder
 	for _, v := range rows {
-		var totalAmt float64
-		if v.TotalAmount.Valid {
-			floatVal, _ := v.TotalAmount.Float64Value()
-			totalAmt = floatVal.Float64
-		}
-
-		// 🌟 EXTRAK DPP DARI LIST ROWS
-		var dppAmt float64
-		if v.DppAmount.Valid {
-			floatVal, _ := v.DppAmount.Float64Value()
-			dppAmt = floatVal.Float64
-		}
-
-		// 🌟 EXTRAK PPN DARI LIST ROWS
-		var taxAmt float64
-		if v.TaxAmount.Valid {
-			floatVal, _ := v.TaxAmount.Float64Value()
-			taxAmt = floatVal.Float64
-		}
+		totalAmt := moneyFromNumeric(v.TotalAmount)
+		dppAmt := moneyFromNumeric(v.DppAmount)
+		taxAmt := moneyFromNumeric(v.TaxAmount)
 
 		results = append(results, domain.PurchaseOrder{
 			ID:       v.ID,
@@ -175,24 +159,9 @@ func (r *sqlPurchaseOrderRepository) GetByID(ctx context.Context, id int64) (*do
 		return nil, err
 	}
 
-	var dppAmt float64
-	if row.DppAmount.Valid {
-		dppVal, _ := row.DppAmount.Float64Value()
-		dppAmt = dppVal.Float64
-	}
-
-	var taxAmt float64
-	if row.TaxAmount.Valid {
-		taxVal, _ := row.TaxAmount.Float64Value()
-		taxAmt = taxVal.Float64
-	}
-
-	var totalAmt float64
-	if row.TotalAmount.Valid {
-		// 🌟 PERBAIKAN MUTLAK: Tangkap nilai error ke-2 menggunakan blank identifier (_)
-		floatVal, _ := row.TotalAmount.Float64Value()
-		totalAmt = floatVal.Float64
-	}
+	dppAmt := moneyFromNumeric(row.DppAmount)
+	taxAmt := moneyFromNumeric(row.TaxAmount)
+	totalAmt := moneyFromNumeric(row.TotalAmount)
 
 	po := &domain.PurchaseOrder{
 		ID:            row.ID,
@@ -227,19 +196,8 @@ func (r *sqlPurchaseOrderRepository) GetByID(ctx context.Context, id int64) (*do
 
 	var detailItems []domain.PurchaseOrderDetail
 	for _, item := range items {
-		var uPrice float64
-		if item.UnitPrice.Valid {
-			// 🌟 PERBAIKAN MUTLAK: Tangkap nilai error ke-2 menggunakan blank identifier (_)
-			floatVal, _ := item.UnitPrice.Float64Value()
-			uPrice = floatVal.Float64
-		}
-
-		var sTotal float64
-		if item.SubTotal.Valid {
-			// 🌟 PERBAIKAN MUTLAK: Tangkap nilai error ke-2 menggunakan blank identifier (_)
-			floatVal, _ := item.SubTotal.Float64Value()
-			sTotal = floatVal.Float64
-		}
+		uPrice := moneyFromNumeric(item.UnitPrice)
+		sTotal := moneyFromNumeric(item.SubTotal)
 
 		detailItems = append(detailItems, domain.PurchaseOrderDetail{
 			ID:              item.ID,
@@ -373,9 +331,9 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 	// bisa dideteksi: kalau nol baris berarti PO sudah terhapus / tidak ada.
 	header, err := qtx.UpdatePurchaseOrderHeader(ctx, db.UpdatePurchaseOrderHeaderParams{
 		TaxType:     po.TaxType,
-		DppAmount:   numericFromFloat(po.DppAmount),
-		TaxAmount:   numericFromFloat(po.TaxAmount),
-		TotalAmount: numericFromFloat(po.TotalAmount),
+		DppAmount:   numericFromMoney(po.DppAmount),
+		TaxAmount:   numericFromMoney(po.TaxAmount),
+		TotalAmount: numericFromMoney(po.TotalAmount),
 		Notes:       pgtype.Text{String: po.Notes, Valid: po.Notes != ""},
 		UpdatedBy:   nullableInt8(po.UpdatedBy),
 		ID:          po.ID,
@@ -399,8 +357,8 @@ func (r *sqlPurchaseOrderRepository) Update(ctx context.Context, po *domain.Purc
 			ProductID:       item.ProductID,
 			QtyOrdered:      item.QtyOrdered,
 			PurchaseUnitID:  item.PurchaseUnitID,
-			UnitPrice:       numericFromFloat(item.UnitPrice),
-			SubTotal:        numericFromFloat(item.SubTotal),
+			UnitPrice:       numericFromMoney(item.UnitPrice),
+			SubTotal:        numericFromMoney(item.SubTotal),
 		})
 		if err != nil {
 			return err

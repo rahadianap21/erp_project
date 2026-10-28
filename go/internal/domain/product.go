@@ -46,22 +46,27 @@ type Product struct {
 	// diterima dengan faktor ini sebelum menambah stok.
 	ConversionRate int32 `json:"conversion_rate"`
 
-	PurchasePrice float64 `json:"purchase_price"`
-	SellingPrice  float64 `json:"selling_price"`
-	MinStockLevel int32   `json:"min_stock_level"`
-	CurrentStock  int32   `json:"current_stock"`
+	PurchasePrice Money `json:"purchase_price"`
+	SellingPrice  Money `json:"selling_price"`
+	MinStockLevel int32 `json:"min_stock_level"`
+	CurrentStock  int32 `json:"current_stock"`
 
 	// AvgCost adalah harga pokok rata-rata per SATUAN JUAL, hasil penimbangan
 	// seluruh penerimaan barang yang pernah ditutup untuk produk ini. Dipakai
 	// sebagai dasar penilaian persediaan dan harga pokok penjualan, dan selalu
 	// selaras dengan nilai yang dijurnal ke akun Persediaan saat penerimaan.
-	AvgCost float64 `json:"avg_cost"`
+	//
+	// Disimpan sebagai Decimal (bukan Money) karena kolom avg_cost memakai
+	// NUMERIC(15,4): biaya per satuan memang membutuhkan presisi di bawah sen.
+	AvgCost Decimal `json:"avg_cost"`
 
 	// DiscountType dan DiscountValue adalah potongan harga default yang sudah
 	// ditetapkan admin per produk. Kasir cukup memilih produk di POS dan
 	// diskon ini terbawa otomatis sebagai nilai awal baris penjualan.
-	DiscountType  string  `json:"discount_type"`
-	DiscountValue float64 `json:"discount_value"`
+	DiscountType string `json:"discount_type"`
+	// DiscountValue bisa berupa persen (0–100) atau nominal rupiah, jadi
+	// disimpan sebagai Decimal dan baru diubah ke Money saat tipenya AMOUNT.
+	DiscountValue Decimal `json:"discount_value"`
 
 	// IsTaxable menandai produk kena PPN saat dijual. Produk lama default TRUE
 	// karena usaha sudah PKP.

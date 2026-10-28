@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	"go_backend/internal/domain"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/shopspring/decimal"
 )
 
 type journalUsecase struct {
@@ -85,21 +85,21 @@ func (u *journalUsecase) CreateJournal(ctx context.Context, in domain.JournalCre
 		return nil, err
 	}
 
-	var totalDebit, totalCredit float64
+	var totalDebit, totalCredit domain.Money
 	for i, l := range in.Lines {
-		if l.Debit < 0 || l.Credit < 0 {
+		if l.Debit.IsNegative() || l.Credit.IsNegative() {
 			return nil, domain.NewBusinessRuleError("debit/kredit tidak boleh negatif")
 		}
-		if l.Debit > 0 && l.Credit > 0 {
+		if l.Debit.IsPositive() && l.Credit.IsPositive() {
 			return nil, domain.ErrJournalLineDouble
 		}
-		if l.Debit == 0 && l.Credit == 0 {
+		if l.Debit.IsZero() && l.Credit.IsZero() {
 			return nil, domain.NewBusinessRuleError("baris ke-%d: debit atau kredit wajib diisi", i+1)
 		}
-		totalDebit += l.Debit
-		totalCredit += l.Credit
+		totalDebit = totalDebit.Add(l.Debit)
+		totalCredit = totalCredit.Add(l.Credit)
 	}
-	if math.Abs(totalDebit-totalCredit) > 0.005 {
+	if totalDebit.Cmp(totalCredit) != 0 {
 		return nil, domain.ErrJournalUnbalanced
 	}
 
@@ -250,14 +250,6 @@ func toLineInputs(lines *[]domain.JournalLine) []domain.JournalLineInput {
 
 // --- Auto-posting penerimaan barang (GRN) ---
 
-// round2 membulatkan nilai ke dua desimal. Perlu dilakukan di aplikasi karena
-// baris debit dan kredit disimpan sebagai NUMERIC(15,2): bila dibulatkan
-// masing-masing oleh database, jumlah baris bisa menjauh dari total header yang
-// ikut disimpan.
-func round2(v float64) float64 {
-	return math.Round(v*100) / 100
-}
-
 // requireMapping mengambil akun hasil pemetaan auto-posting. Error menyebut kunci
 // yang kurang supaya pengguna langsung tahu baris pengaturan mana yang harus diisi.
 func requireMapping(mapping map[string]int64, key string) (int64, error) {
@@ -272,41 +264,40 @@ func requireMapping(mapping map[string]int64, key string) (int64, error) {
 // hanya boleh berasal dari PO yang sudah disetujui. Pemidahan PPN memakai matriks
 // pajak dan taxRatePPN yang sama dengan penerbitan PO, sehingga jurnal otomatis
 // tidak pernah menghasilkan angka yang berbeda dari angka PO untuk penerimaan penuh.
-func grnReceivedValues(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder) (dpp, vat float64, err error) {
+func grnReceivedValues(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder) (dpp, vat domain.Money, err error) {
 	if len(grn.Items) == 0 {
-		return 0, 0, domain.ErrGRNPenerimaanKosong
+		return domain.Money{}, domain.Money{}, domain.ErrGRNPenerimaanKosong
 	}
 
-	priceByDetail := make(map[int64]float64, len(po.Items))
+	priceByDetail := make(map[int64]domain.Money, len(po.Items))
 	for _, item := range po.Items {
 		priceByDetail[item.ID] = item.UnitPrice
 	}
 
-	var gross float64
+	var gross domain.Money
 	for _, g := range grn.Items {
 		if g.QtyReceived <= 0 {
 			continue
 		}
 		price, ok := priceByDetail[g.PurchaseOrderDetailID]
 		if !ok {
-			return 0, 0, domain.ErrGRNBarisPONotFound
+			return domain.Money{}, domain.Money{}, domain.ErrGRNBarisPONotFound
 		}
-		gross += float64(g.QtyReceived) * price
+		gross = gross.Add(price.MulInt(int64(g.QtyReceived)))
 	}
 
 	switch po.TaxType {
 	case "TAX_EXCLUSIVE":
 		dpp = gross
-		vat = math.Round(dpp * taxRatePPN)
+		vat = dpp.MulDecimal(taxRatePPN.Raw())
 	case "TAX_INCLUSIVE":
-		total := gross
-		dpp = math.Round(total / (1.0 + taxRatePPN))
-		vat = total - dpp
+		dpp = gross.DivDecimal(decimal.NewFromInt(1).Add(taxRatePPN.Raw()))
+		vat = gross.Sub(dpp)
 	default: // NON_PPN
 		dpp = gross
-		vat = 0
+		vat = domain.Money{}
 	}
-	return round2(dpp), round2(vat), nil
+	return dpp, vat, nil
 }
 
 // PostGRNJournal menerbitkan jurnal otomatis satu GRN: Debit Persediaan,
@@ -335,7 +326,7 @@ func buildGRNJournalEntry(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder
 	if err != nil {
 		return nil, err
 	}
-	if round2(dpp+vat) <= 0 {
+	if !dpp.Add(vat).IsPositive() {
 		// Tidak ada nilai ekonomis, sehingga tidak ada jurnal yang pantas terbit.
 		return nil, nil
 	}
@@ -349,7 +340,7 @@ func buildGRNJournalEntry(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder
 		return nil, err
 	}
 	var vatInputID int64
-	if vat > 0 {
+	if vat.IsPositive() {
 		if vatInputID, err = requireMapping(mapping, "VAT_INPUT"); err != nil {
 			return nil, err
 		}
@@ -368,7 +359,7 @@ func buildGRNJournalEntry(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder
 			Debit:       dpp,
 		},
 	}
-	if vat > 0 {
+	if vat.IsPositive() {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   vatInputID,
@@ -378,7 +369,7 @@ func buildGRNJournalEntry(grn *domain.GoodsReceiptNote, po *domain.PurchaseOrder
 	}
 	// Total kredit dijumlahkan dari nilai yang sudah dibulatkan per baris supaya
 	// persis sama dengan total debit.
-	ap := dpp + vat
+	ap := dpp.Add(vat)
 	lines = append(lines, domain.JournalLine{
 		LineNo:      len(lines) + 1,
 		AccountID:   apID,
@@ -572,8 +563,8 @@ func buildClosingEntry(ctx context.Context, store closingEntryStore, period *dom
 
 	description := fmt.Sprintf("Jurnal penutup periode %04d-%02d", period.PeriodYear, period.PeriodMonth)
 	lines := make([]domain.JournalLine, 0, len(balances)+1)
-	var totalDebit, totalCredit float64
-	addLine := func(accountID int64, debit, credit float64) {
+	var totalDebit, totalCredit domain.Money
+	addLine := func(accountID int64, debit, credit domain.Money) {
 		lines = append(lines, domain.JournalLine{
 			LineNo:      len(lines) + 1,
 			AccountID:   accountID,
@@ -581,28 +572,27 @@ func buildClosingEntry(ctx context.Context, store closingEntryStore, period *dom
 			Debit:       debit,
 			Credit:      credit,
 		})
-		totalDebit += debit
-		totalCredit += credit
+		totalDebit = totalDebit.Add(debit)
+		totalCredit = totalCredit.Add(credit)
 	}
 
 	for _, b := range balances {
-		var amount float64
 		switch b.AccountType {
 		case domain.AccountTypeRevenue:
 			// Saldo kredit pendapatan didebit agar nol; saldo debit (kontra
 			// pendapatan) justru dikredit.
-			amount = round2(saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit))
-			if amount > 0 {
-				addLine(b.AccountID, amount, 0)
-			} else if amount < 0 {
-				addLine(b.AccountID, 0, -amount)
+			amount := saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit)
+			if amount.IsPositive() {
+				addLine(b.AccountID, amount, domain.Money{})
+			} else if amount.IsNegative() {
+				addLine(b.AccountID, domain.Money{}, amount.Neg())
 			}
 		case domain.AccountTypeExpense:
-			amount = round2(saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit))
-			if amount > 0 {
-				addLine(b.AccountID, 0, amount)
-			} else if amount < 0 {
-				addLine(b.AccountID, -amount, 0)
+			amount := saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit)
+			if amount.IsPositive() {
+				addLine(b.AccountID, domain.Money{}, amount)
+			} else if amount.IsNegative() {
+				addLine(b.AccountID, amount.Neg(), domain.Money{})
 			}
 		}
 	}
@@ -612,8 +602,8 @@ func buildClosingEntry(ctx context.Context, store closingEntryStore, period *dom
 	}
 
 	// Sisa selisih debit-kredit adalah laba/rugi yang dipindahkan ke Laba Ditahan.
-	diff := round2(totalDebit - totalCredit)
-	if diff != 0 {
+	diff := totalDebit.Sub(totalCredit)
+	if !diff.IsZero() {
 		mapping, err := store.AccountingMapping(ctx)
 		if err != nil {
 			return nil, err
@@ -622,10 +612,10 @@ func buildClosingEntry(ctx context.Context, store closingEntryStore, period *dom
 		if err != nil {
 			return nil, err
 		}
-		if diff > 0 {
-			addLine(retainedID, 0, diff)
+		if diff.IsPositive() {
+			addLine(retainedID, domain.Money{}, diff)
 		} else {
-			addLine(retainedID, -diff, 0)
+			addLine(retainedID, diff.Neg(), domain.Money{})
 		}
 	}
 
@@ -645,8 +635,8 @@ func buildClosingEntry(ctx context.Context, store closingEntryStore, period *dom
 		SourceID:        &period.ID,
 		SourceReference: fmt.Sprintf("TUTUP BUKU %04d-%02d", period.PeriodYear, period.PeriodMonth),
 		Status:          domain.JournalStatusPosted,
-		TotalDebit:      round2(totalDebit),
-		TotalCredit:     round2(totalCredit),
+		TotalDebit:      totalDebit,
+		TotalCredit:     totalCredit,
 		PeriodYear:      period.PeriodYear,
 		PeriodMonth:     period.PeriodMonth,
 		CreatedBy:       &actorID,

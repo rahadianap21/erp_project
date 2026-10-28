@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"go_backend/internal/domain"
@@ -19,8 +18,9 @@ var reportEpoch = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
 // diurutkan setelah seluruh akun ekuitas nyata.
 const netIncomeEquityCode = "3-1900"
 
-// reportTolerance adalah ambang selisih pembulatan yang masih dianggap seimbang.
-const reportTolerance = 0.01
+// reportToleranceCents adalah ambang selisih pembulatan (1 sen) yang masih
+// dianggap seimbang.
+const reportToleranceCents = 1
 
 // reportDate membuang komponen jam, karena laporan dibatasi pada tanggal murni
 // (kolom t_journal_entries.entry_date bertipe DATE).
@@ -38,15 +38,21 @@ func validateRange(from, to time.Time) error {
 
 // saldoTertanda menghitung saldo bertanda sesuai saldo normal akun: akun
 // ber-saldo normal DEBIT bertambah pada kolom debit, begitu pula sebaliknya.
-func saldoTertanda(normalBalance string, debit, credit float64) float64 {
+func saldoTertanda(normalBalance string, debit, credit domain.Money) domain.Money {
 	if normalBalance == domain.NormalBalanceCredit {
-		return credit - debit
+		return credit.Sub(debit)
 	}
-	return debit - credit
+	return debit.Sub(credit)
 }
 
-// toReportAccounts mengubah agregat mentah menjadi baris laporan yang sudah
-// dibulatkan dua desimal, dengan saldo bertanda sesuai saldo normal akun.
+// withinTolerance melaporkan apakah selisih dua nominal masih dalam ambang
+// pembulatan 1 sen.
+func withinTolerance(a, b domain.Money) bool {
+	return a.Sub(b).Abs().Cents() <= reportToleranceCents
+}
+
+// toReportAccounts mengubah agregat mentah menjadi baris laporan dengan saldo
+// bertanda sesuai saldo normal akun.
 func toReportAccounts(balances []domain.AccountBalance) []domain.ReportAccount {
 	accounts := make([]domain.ReportAccount, 0, len(balances))
 	for _, b := range balances {
@@ -55,21 +61,21 @@ func toReportAccounts(balances []domain.AccountBalance) []domain.ReportAccount {
 			Code:        b.Code,
 			Name:        b.Name,
 			AccountType: b.AccountType,
-			Debit:       round2(b.TotalDebit),
-			Credit:      round2(b.TotalCredit),
-			Balance:     round2(saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit)),
+			Debit:       b.TotalDebit,
+			Credit:      b.TotalCredit,
+			Balance:     saldoTertanda(b.NormalBalance, b.TotalDebit, b.TotalCredit),
 		})
 	}
 	return accounts
 }
 
 // sumReportBalance menjumlahkan saldo bertanda sejumlah baris laporan.
-func sumReportBalance(accounts []domain.ReportAccount) float64 {
-	var total float64
+func sumReportBalance(accounts []domain.ReportAccount) domain.Money {
+	var total domain.Money
 	for _, a := range accounts {
-		total += a.Balance
+		total = total.Add(a.Balance)
 	}
-	return round2(total)
+	return total
 }
 
 // reportUsecase menyusun Neraca, Laba Rugi, Neraca Saldo, dan Buku Besar dari
@@ -114,7 +120,7 @@ func (u *reportUsecase) IncomeStatement(ctx context.Context, from, to time.Time)
 
 	statement.TotalRevenue = sumReportBalance(statement.Revenue)
 	statement.TotalExpenses = sumReportBalance(statement.Expenses)
-	statement.NetIncome = round2(statement.TotalRevenue - statement.TotalExpenses)
+	statement.NetIncome = statement.TotalRevenue.Sub(statement.TotalExpenses)
 	return statement, nil
 }
 
@@ -140,7 +146,7 @@ func (u *reportUsecase) BalanceSheet(ctx context.Context, asOf time.Time) (*doma
 		Equity:      make([]domain.ReportAccount, 0),
 	}
 
-	var netIncome float64
+	var netIncome domain.Money
 	for _, account := range toReportAccounts(balances) {
 		switch account.AccountType {
 		case domain.AccountTypeAsset:
@@ -150,9 +156,9 @@ func (u *reportUsecase) BalanceSheet(ctx context.Context, asOf time.Time) (*doma
 		case domain.AccountTypeEquity:
 			sheet.Equity = append(sheet.Equity, account)
 		case domain.AccountTypeRevenue:
-			netIncome += account.Balance
+			netIncome = netIncome.Add(account.Balance)
 		case domain.AccountTypeExpense:
-			netIncome -= account.Balance
+			netIncome = netIncome.Sub(account.Balance)
 		}
 	}
 
@@ -160,19 +166,18 @@ func (u *reportUsecase) BalanceSheet(ctx context.Context, asOf time.Time) (*doma
 	sheet.TotalLiabilities = sumReportBalance(sheet.Liabilities)
 	sheet.TotalEquity = sumReportBalance(sheet.Equity)
 
-	netIncome = round2(netIncome)
-	if math.Abs(netIncome) >= reportTolerance {
+	if !netIncome.IsZero() {
 		sheet.Equity = append(sheet.Equity, domain.ReportAccount{
 			Code:        netIncomeEquityCode,
 			Name:        "LABA (RUGI) BELUM DITUTUP",
 			AccountType: domain.AccountTypeEquity,
 			Balance:     netIncome,
 		})
-		sheet.TotalEquity = round2(sheet.TotalEquity + netIncome)
+		sheet.TotalEquity = sheet.TotalEquity.Add(netIncome)
 	}
 
-	sheet.TotalLiabilitiesAndEquity = round2(sheet.TotalLiabilities + sheet.TotalEquity)
-	sheet.Balanced = math.Abs(sheet.TotalAssets-sheet.TotalLiabilitiesAndEquity) <= reportTolerance
+	sheet.TotalLiabilitiesAndEquity = sheet.TotalLiabilities.Add(sheet.TotalEquity)
+	sheet.Balanced = withinTolerance(sheet.TotalAssets, sheet.TotalLiabilitiesAndEquity)
 	return sheet, nil
 }
 
@@ -195,12 +200,10 @@ func (u *reportUsecase) TrialBalance(ctx context.Context, from, to time.Time) (*
 		Accounts: toReportAccounts(balances),
 	}
 	for _, account := range report.Accounts {
-		report.TotalDebit += account.Debit
-		report.TotalCredit += account.Credit
+		report.TotalDebit = report.TotalDebit.Add(account.Debit)
+		report.TotalCredit = report.TotalCredit.Add(account.Credit)
 	}
-	report.TotalDebit = round2(report.TotalDebit)
-	report.TotalCredit = round2(report.TotalCredit)
-	report.Balanced = math.Abs(report.TotalDebit-report.TotalCredit) <= reportTolerance
+	report.Balanced = withinTolerance(report.TotalDebit, report.TotalCredit)
 	return report, nil
 }
 
@@ -241,27 +244,25 @@ func (u *reportUsecase) GeneralLedger(ctx context.Context, accountID int64, from
 		},
 		From:           fromDate,
 		To:             toDate,
-		OpeningBalance: round2(running),
+		OpeningBalance: running,
 		Lines:          make([]domain.GeneralLedgerLine, 0, len(lines)),
 	}
 
 	for _, line := range lines {
-		running += saldoTertanda(account.NormalBalance, line.Debit, line.Credit)
+		running = running.Add(saldoTertanda(account.NormalBalance, line.Debit, line.Credit))
 		ledger.Lines = append(ledger.Lines, domain.GeneralLedgerLine{
 			EntryNumber: line.EntryNumber,
 			EntryDate:   line.EntryDate,
 			Description: line.Description,
-			Debit:       round2(line.Debit),
-			Credit:      round2(line.Credit),
-			Balance:     round2(running),
+			Debit:       line.Debit,
+			Credit:      line.Credit,
+			Balance:     running,
 		})
-		ledger.TotalDebit += line.Debit
-		ledger.TotalCredit += line.Credit
+		ledger.TotalDebit = ledger.TotalDebit.Add(line.Debit)
+		ledger.TotalCredit = ledger.TotalCredit.Add(line.Credit)
 	}
 
-	ledger.TotalDebit = round2(ledger.TotalDebit)
-	ledger.TotalCredit = round2(ledger.TotalCredit)
-	ledger.ClosingBalance = round2(running)
+	ledger.ClosingBalance = running
 	ledger.Account.Debit = ledger.TotalDebit
 	ledger.Account.Credit = ledger.TotalCredit
 	ledger.Account.Balance = ledger.ClosingBalance

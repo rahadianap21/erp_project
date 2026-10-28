@@ -13,6 +13,7 @@ import {
   Phone,
   Mail,
   CreditCard,
+  UserSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComboboxSelect } from "@/components/combobox-select";
@@ -262,7 +263,8 @@ export default function SupplierForm({
         disabled={!!editingSupplier}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className=" text-sm font-semibold text-gray-800">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <UserSquare className="size-4 text-blue-600" />
           {editingSupplier
             ? `Edit Supplier: ${editingSupplier.name}`
             : "Tambah Supplier Baru"}
@@ -283,7 +285,7 @@ export default function SupplierForm({
           {/* Baris 1: Informasi Kontak Utama */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Building2 className="size-3" /> Nama Perusahaan
               </label>
               <input
@@ -296,7 +298,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <User className="size-3" /> Nama PIC Narahubung
               </label>
               <input
@@ -309,7 +311,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Phone className="size-3" /> No. Telepon
               </label>
               <input
@@ -322,7 +324,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Mail className="size-3" /> Email Bisnis
               </label>
               <input
@@ -338,7 +340,7 @@ export default function SupplierForm({
 
           {/* Baris 2: Alamat Jalan Fisik */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <MapPin className="size-3" /> Alamat Fisik (Jalan, RT/RW, No.
               Rumah)
             </label>
@@ -355,7 +357,7 @@ export default function SupplierForm({
           {/* Baris 3: Cascading Dropdown Regional Indonesia */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 bg-slate-50/40 p-4 rounded-xl border border-slate-100">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">
+              <label className="text-xs font-medium text-muted-foreground">
                 Provinsi
               </label>
               <ComboboxSelect
@@ -371,7 +373,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">
+              <label className="text-xs font-medium text-muted-foreground">
                 Kota / Kabupaten
               </label>
               <ComboboxSelect
@@ -391,7 +393,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">
+              <label className="text-xs font-medium text-muted-foreground">
                 Kecamatan
               </label>
               <ComboboxSelect
@@ -408,7 +410,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">
+              <label className="text-xs font-medium text-muted-foreground">
                 Kelurahan / Desa
               </label>
               <ComboboxSelect
@@ -426,7 +428,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase">
+              <label className="text-xs font-medium text-muted-foreground">
                 Kode Pos
               </label>
               <input
@@ -441,7 +443,7 @@ export default function SupplierForm({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-blue-50/20 p-4 rounded-xl border border-blue-100/40">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <CreditCard className="size-3" /> Bank Tujuan Transfer
               </label>
               <ComboboxSelect
@@ -455,7 +457,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <CreditCard className="size-3" /> Nomor Rekening Bank
               </label>
               <input
@@ -467,7 +469,7 @@ export default function SupplierForm({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <User className="size-3" /> Atas Nama rekening
               </label>
               <input

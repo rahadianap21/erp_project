@@ -114,7 +114,7 @@ type GoodsReceiptNoteRepository interface {
 	// SETELAH mengunci header. Kalau berbeda, penutupan gagal dengan
 	// ErrGRNReceiptChanged: GRN baru belum berjurnal, jadi stoknya tidak boleh
 	// ikut ditambahkan.
-	FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error
+	FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor Decimal, expectedGRNCount int) error
 	GetListCursor(ctx context.Context, search string, cursorID int64, limit int, direction string) ([]GoodsReceiptNote, int64, error)
 	GetByID(ctx context.Context, id int64) (*GoodsReceiptNote, error)
 	GetByPOID(ctx context.Context, poID int64) ([]GoodsReceiptNote, error)

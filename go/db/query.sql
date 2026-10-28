@@ -1296,11 +1296,11 @@ ORDER BY g.id DESC;
 -- name: GetDashboardStats :one
 -- Ringkasan angka untuk kartu KPI dashboard dalam satu perjalanan query.
 -- total_po_value sengaja mengecualikan PO REJECTED karena dokumen itu batal.
--- Diberi aliases ::float8 supaya pgx memindai langsung ke float64 Go, menghindari
--- pgtype.Numeric yang merepotkan.
+-- Nilai uang tetap NUMERIC::numeric agar dipindai sebagai pgtype.Numeric dan
+-- dikonversi ke domain.Money tanpa melewati float64.
 SELECT
     COALESCE((SELECT SUM(total_amount) FROM t_purchase_orders
-              WHERE deleted_at IS NULL AND status <> 'REJECTED'), 0)::float8 AS total_po_value,
+              WHERE deleted_at IS NULL AND status <> 'REJECTED'), 0)::numeric AS total_po_value,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL) AS total_po,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL AND status = 'PENDING') AS po_pending,
     (SELECT COUNT(*) FROM t_purchase_orders WHERE deleted_at IS NULL AND status = 'APPROVED') AS po_approved,
@@ -1335,7 +1335,7 @@ SELECT
     po.id,
     po.po_number,
     s.name AS supplier_name,
-    po.total_amount::float8 AS total_amount,
+    po.total_amount::numeric AS total_amount,
     po.status,
     po.po_date
 FROM t_purchase_orders po
@@ -1694,6 +1694,33 @@ WHERE id = sqlc.arg(id)::bigint
 SELECT mapping_key::text, account_id, description
 FROM s_accounting_settings
 ORDER BY mapping_key;
+
+-- name: ListAccountingSettingDetails :many
+-- Pemetaan akun otomatis beserta kode/nama akun untuk halaman pengaturan.
+SELECT
+    s.mapping_key::text,
+    s.description,
+    s.account_id,
+    a.code AS account_code,
+    a.name AS account_name,
+    a.is_active AS account_active
+FROM s_accounting_settings s
+JOIN m_chart_of_accounts a ON a.id = s.account_id
+ORDER BY s.mapping_key;
+
+-- name: UpsertAccountingSetting :exec
+-- Mengubah akun tujuan satu kunci pemetaan; updated_by diisi user penyimpan.
+INSERT INTO s_accounting_settings (mapping_key, account_id, updated_at, updated_by)
+VALUES (
+    sqlc.arg(mapping_key)::varchar,
+    sqlc.arg(account_id)::bigint,
+    NOW(),
+    sqlc.arg(updated_by)::bigint
+)
+ON CONFLICT (mapping_key) DO UPDATE SET
+    account_id = EXCLUDED.account_id,
+    updated_at = NOW(),
+    updated_by = EXCLUDED.updated_by;
 
 -- =========================================================================
 -- ⚙️ PENGATURAN APLIKASI UMUM (KEY-VALUE)

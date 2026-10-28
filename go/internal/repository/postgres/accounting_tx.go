@@ -80,8 +80,8 @@ func (tx *sqlAccountingTx) AccountBalances(ctx context.Context, from, to time.Ti
 			Name:          row.Name,
 			AccountType:   row.AccountType,
 			NormalBalance: row.NormalBalance,
-			TotalDebit:    numericToFloat(row.TotalDebit),
-			TotalCredit:   numericToFloat(row.TotalCredit),
+			TotalDebit:    moneyFromNumeric(row.TotalDebit),
+			TotalCredit:   moneyFromNumeric(row.TotalCredit),
 		})
 	}
 	return balances, nil

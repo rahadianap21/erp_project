@@ -2,6 +2,7 @@
 
 import { ApiError, apiGet, apiPost, messageFromError } from "@/lib/api-client";
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   ChevronDown,
@@ -16,6 +17,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComboboxSelect } from "@/components/combobox-select";
+import { MoneyInput } from "@/components/ui/money-input";
+import { formatIDR } from "@/lib/money";
 import { ChartOfAccount } from "../../chart-of-accounts/components/chart-of-account-table";
 
 interface JournalLineInput {
@@ -93,8 +96,6 @@ export function JournalForm({
     );
   };
 
-  const tx = (value: string) => Number(value.replace(/[^0-9.]/g, "")) || 0;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!totals.balanced) {
@@ -148,7 +149,7 @@ export function JournalForm({
         onClick={() => setIsExpanded(!isExpanded)}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
           <ClipboardSignature className="size-4 text-blue-600" />
           Buat Jurnal Umum Manual (Double-Entry)
         </span>
@@ -165,7 +166,7 @@ export function JournalForm({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <CalendarDays className="size-3" /> Tanggal Entri
               </label>
               <input
@@ -177,7 +178,7 @@ export function JournalForm({
               />
             </div>
             <div className="md:col-span-2 space-y-1.5">
-              <label className="text-[11px] font-bold tracking-wide text-slate-600 uppercase flex items-center gap-1">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FileText className="size-3" /> Keterangan Jurnal
               </label>
               <input
@@ -192,7 +193,7 @@ export function JournalForm({
           </div>
 
           <div className="border rounded-xl overflow-x-auto">
-            <div className="min-w-[720px] bg-slate-100/80 px-4 py-2 grid grid-cols-12 gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="min-w-[720px] bg-slate-100/80 px-4 py-2 grid grid-cols-12 gap-2 text-xs font-medium tracking-wide text-muted-foreground">
               <span className="col-span-4">Akun</span>
               <span className="col-span-3">Keterangan</span>
               <span className="col-span-2 text-right">Debit (Rp)</span>
@@ -227,37 +228,29 @@ export function JournalForm({
                     onChange={(e) =>
                       updateLine(index, { description: e.target.value })
                     }
-                    className="w-full text-[11px] px-2 py-1.5 bg-slate-50/50 border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="w-full text-xs px-2 py-1.5 bg-slate-50/50 border border-slate-200 rounded-md text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     placeholder="Opsional"
                   />
                 </div>
                 <div className="col-span-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={line.debit || ""}
-                    onChange={(e) =>
-                      updateLine(index, {
-                        debit: tx(e.target.value),
-                        credit: 0,
-                      })
+                  <MoneyInput
+                    value={line.debit}
+                    onValueChange={(value) =>
+                      updateLine(index, { debit: value, credit: 0 })
                     }
-                    className="w-full text-[11px] px-2 py-1.5 bg-blue-50/40 border border-slate-200 rounded-md text-right text-blue-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    className="h-auto rounded-md border-slate-200 bg-blue-50/40 px-2 py-1.5"
+                    inputClassName="text-xs font-semibold text-blue-700"
                     placeholder="0"
                   />
                 </div>
                 <div className="col-span-2">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={line.credit || ""}
-                    onChange={(e) =>
-                      updateLine(index, {
-                        credit: tx(e.target.value),
-                        debit: 0,
-                      })
+                  <MoneyInput
+                    value={line.credit}
+                    onValueChange={(value) =>
+                      updateLine(index, { credit: value, debit: 0 })
                     }
-                    className="w-full text-[11px] px-2 py-1.5 bg-amber-50/40 border border-slate-200 rounded-md text-right text-amber-700 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    className="h-auto rounded-md border-slate-200 bg-amber-50/40 px-2 py-1.5"
+                    inputClassName="text-xs font-semibold text-amber-700"
                     placeholder="0"
                   />
                 </div>
@@ -282,25 +275,23 @@ export function JournalForm({
                 variant="outline"
                 size="sm"
                 onClick={addLine}
-                className="text-[11px] h-7 cursor-pointer"
+                className="text-xs h-7 cursor-pointer"
               >
                 <Plus className="size-3 mr-1" /> Tambah Baris
               </Button>
               <div
-                className={`flex items-center gap-3 text-[11px] font-bold ${totals.balanced ? "text-emerald-600" : "text-rose-600"}`}
+                className={`flex items-center gap-3 text-xs font-bold ${totals.balanced ? "text-emerald-600" : "text-rose-600"}`}
               >
                 <Equal className="size-3.5" />
                 <span>
-                  Debit: {new Intl.NumberFormat("id-ID").format(totals.debit)}
+                  Debit: {formatIDR(totals.debit)}
                 </span>
                 <span>
-                  Kredit: {new Intl.NumberFormat("id-ID").format(totals.credit)}
+                  Kredit: {formatIDR(totals.credit)}
                 </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full border ${totals.balanced ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200"}`}
-                >
+                <Badge variant={totals.balanced ? "success" : "danger"}>
                   {totals.balanced ? "SEIMBANG" : "BELUM SEIMBANG"}
-                </span>
+                </Badge>
               </div>
             </div>
           </div>

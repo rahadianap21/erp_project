@@ -25,12 +25,12 @@ type fakeGRNRepo struct {
 	finishCalls         int
 	finishPOID          int64
 	finishUserID        int64
-	finishNetCostFactor float64
+	finishNetCostFactor domain.Decimal
 	finishExpectedGRNs  int
 	finishErr           error
 }
 
-func (f *fakeGRNRepo) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor float64, expectedGRNCount int) error {
+func (f *fakeGRNRepo) FinishReceiving(ctx context.Context, poID int64, updatedBy int64, netCostFactor domain.Decimal, expectedGRNCount int) error {
 	f.finishCalls++
 	f.finishPOID = poID
 	f.finishUserID = updatedBy
@@ -405,7 +405,7 @@ func TestNetCostFactorFor(t *testing.T) {
 		{"TIDAK_DIKENAL", 1.0},
 	}
 	for _, c := range cases {
-		if got := netCostFactorFor(c.taxType); math.Abs(got-c.want) > 1e-12 {
+		if got := netCostFactorFor(c.taxType); math.Abs(got.Raw().InexactFloat64()-c.want) > 1e-12 {
 			t.Fatalf("netCostFactorFor(%q) = %v, ingin %v", c.taxType, got, c.want)
 		}
 	}
@@ -432,7 +432,7 @@ func TestFinishReceivingMeneruskanFaktorHargaPokok(t *testing.T) {
 		if err := uc.FinishReceiving(context.Background(), 7, false, 99); err != nil {
 			t.Fatalf("penutupan untuk %s gagal: %v", c.taxType, err)
 		}
-		if math.Abs(grnRepo.finishNetCostFactor-c.want) > 1e-12 {
+		if math.Abs(grnRepo.finishNetCostFactor.Raw().InexactFloat64()-c.want) > 1e-12 {
 			t.Fatalf("faktor untuk %s = %v, ingin %v", c.taxType, grnRepo.finishNetCostFactor, c.want)
 		}
 	}

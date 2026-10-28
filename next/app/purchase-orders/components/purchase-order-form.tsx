@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { ComboboxSelect } from "@/components/combobox-select";
+import { formatIDR, roundMoney } from "@/lib/money";
 import {
   Table,
   TableBody,
@@ -201,12 +202,12 @@ export function PurchaseOrderForm({
     switch (taxType) {
       case "TAX_EXCLUSIVE":
         dpp = totalGrossItems;
-        tax = Math.round(dpp * taxRate);
+        tax = roundMoney(dpp * taxRate);
         grandTotal = dpp + tax;
         break;
       case "TAX_INCLUSIVE":
         grandTotal = totalGrossItems;
-        dpp = Math.round(grandTotal / (1.0 + taxRate));
+        dpp = roundMoney(grandTotal / (1.0 + taxRate));
         tax = grandTotal - dpp;
         break;
       default:
@@ -541,7 +542,7 @@ export function PurchaseOrderForm({
         disabled={!!editingPO}
         className="w-full px-6 py-3.5 flex items-center justify-between bg-slate-50/80 hover:bg-slate-100/60 transition-colors text-left cursor-pointer"
       >
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+        <span className="text-sm font-semibold text-foreground flex items-center gap-2">
           <Package className="size-4 text-blue-600" />
           {editingPO
             ? `Koreksi Spesifikasi Dokumen PO: ${editingPO.po_number}`
@@ -568,7 +569,7 @@ export function PurchaseOrderForm({
             {/* Header Parameter Dokumen */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/60 p-4 rounded-xl border">
               <div className="space-y-1.5 md:col-span-1">
-                <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Package className="size-3 text-blue-600" /> Rekanan Supplier
                 </label>
                 <ComboboxSelect
@@ -585,7 +586,7 @@ export function PurchaseOrderForm({
                 />
               </div>
               <div className="space-y-1.5 md:col-span-1">
-                <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Percent className="size-3 text-amber-600" /> Pengaturan PPN
                 </label>
                 <select
@@ -603,7 +604,7 @@ export function PurchaseOrderForm({
                 </select>
               </div>
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[11px] font-bold text-slate-600 uppercase flex items-center gap-1">
+                <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <FileText className="size-3" /> Memo Instruksi Pengiriman
                   Vendor
                 </label>
@@ -618,7 +619,7 @@ export function PurchaseOrderForm({
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between border-b pb-2">
-                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                   <Layers className="size-3.5 text-blue-600" /> Baris Komoditas
                   Detail Item Barang
                 </h3>
@@ -626,7 +627,7 @@ export function PurchaseOrderForm({
                   type="button"
                   size="sm"
                   onClick={handleAddItemRow}
-                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 text-[10px] font-bold h-7 cursor-pointer px-2.5 shadow-2xs"
+                  className="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 text-xs font-bold h-7 cursor-pointer px-2.5 shadow-2xs"
                 >
                   <Plus className="size-3 mr-1" /> Tambah Baris Item
                 </Button>
@@ -635,24 +636,24 @@ export function PurchaseOrderForm({
                 <Table>
                   <TableHeader className="bg-slate-50/70 border-b">
                     <TableRow className="h-9">
-                      <TableHead className="font-bold text-[11px] text-slate-700 text-center w-12 py-1">
+                      <TableHead className="text-center w-12 py-1">
                         No
                       </TableHead>
-                      <TableHead className="font-bold text-[11px] text-slate-700 py-1">
+                      <TableHead className="py-1">
                         Pilih Produk / Komoditas Barang
                       </TableHead>
-                      <TableHead className="font-bold text-[11px] text-slate-700 text-center w-36 py-1">
+                      <TableHead className="text-center w-36 py-1">
                         Kuantitas (Qty)
                       </TableHead>
-                      <TableHead className="font-bold text-[11px] text-slate-700 text-right w-36 py-1">
+                      <TableHead className="text-right w-36 py-1">
                         {isEditMode
                           ? "Harga Satuan (dari master)"
                           : "Harga Satuan (HPP)"}
                       </TableHead>
-                      <TableHead className="font-bold text-[11px] text-slate-700 text-right w-40 py-1">
+                      <TableHead className="text-right w-40 py-1">
                         Sub-Total
                       </TableHead>
-                      <TableHead className="font-bold text-[11px] text-slate-700 text-center w-16 py-1">
+                      <TableHead className="text-center w-16 py-1">
                         Hapus
                       </TableHead>
                     </TableRow>
@@ -705,23 +706,22 @@ export function PurchaseOrderForm({
                               }
                               className="w-full text-xs outline-none text-center font-mono font-bold text-slate-800 disabled:opacity-50"
                             />
-                            <span className="text-[9px] font-black text-slate-400 font-mono shrink-0 border-l pl-1 uppercase">
+                            <span className="text-xs font-black text-slate-400 font-mono shrink-0 border-l pl-1 uppercase">
                               {item.unit_kode || "UoM"}
                             </span>
                           </div>
                         </TableCell>
                         <TableCell className="py-1.5 text-right font-mono text-xs font-semibold text-slate-500 w-36">
                           {item.product_id ? (
-                            `Rp ${new Intl.NumberFormat("id-ID").format(item.purchase_price)}`
+                            formatIDR(item.purchase_price)
                           ) : (
-                            <span className="text-slate-300 italic font-sans text-[10px]">
+                            <span className="text-slate-300 italic font-sans text-xs">
                               Menunggu barang
                             </span>
                           )}
                         </TableCell>
                         <TableCell className="py-1.5 text-right font-mono text-xs font-bold text-slate-900 w-40">
-                          Rp{" "}
-                          {new Intl.NumberFormat("id-ID").format(
+                          {formatIDR(
                             item.qty_ordered * item.purchase_price
                           )}
                         </TableCell>
@@ -742,7 +742,7 @@ export function PurchaseOrderForm({
             </div>
             {/* Ringkasan Finansial Bawah */}
             <div className="flex flex-col md:flex-row justify-between items-end p-5 bg-slate-50 border border-slate-200 rounded-xl gap-4">
-              <div className="text-[11px] font-medium text-slate-400 flex items-start gap-1 self-start md:self-center">
+              <div className="text-xs font-medium text-slate-400 flex items-start gap-1 self-start md:self-center">
                 <DollarSign className="size-3.5 text-blue-500 shrink-0" />
                 <span>
                   Nilai DPP dan PPN 12% dihitung otomatis secara ketat
@@ -760,19 +760,13 @@ export function PurchaseOrderForm({
                 <div className="flex justify-between border-b border-dashed pb-1">
                   <span>TOTAL DPP (NETTO):</span>
                   <span className="text-slate-900">
-                    Rp{" "}
-                    {new Intl.NumberFormat("id-ID").format(
-                      financialSummary.dpp
-                    )}
+                    {formatIDR(financialSummary.dpp)}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-dashed pb-1">
                   <span>PPN MASUKAN (12%):</span>
                   <span className="text-slate-900">
-                    Rp{" "}
-                    {new Intl.NumberFormat("id-ID").format(
-                      financialSummary.tax
-                    )}
+                    {formatIDR(financialSummary.tax)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm pt-0.5">
@@ -780,11 +774,7 @@ export function PurchaseOrderForm({
                     GRAND TOTAL PO:
                   </span>
                   <span className="font-black text-blue-700 text-base">
-                    {new Intl.NumberFormat("id-ID", {
-                      style: "currency",
-                      currency: "IDR",
-                      maximumFractionDigits: 0,
-                    }).format(financialSummary.grandTotal)}
+                    {formatIDR(financialSummary.grandTotal)}
                   </span>
                 </div>
               </div>

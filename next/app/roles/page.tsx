@@ -7,6 +7,8 @@ import Cookies from "js-cookie";
 import RoleForm from "./components/role-form";
 import { RoleTable } from "./components/role-table";
 import { ForbiddenView } from "@/components/forbidden-view";
+import { PageHeader } from "@/components/page-header";
+import { ShieldCheckIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -108,6 +110,11 @@ export default function RolesCRUDPage() {
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <PageHeader
+        icon={ShieldCheckIcon}
+        title="Manajemen Role & Permission"
+        description="Atur peran pengguna beserta kumpulan hak aksesnya."
+      />
       {/* 🔄 LANGKAH PERBAIKAN 2: Form harus dirender jika user punya hak 'create' ATAU sedang meng-edit data */}
       {(permissions.create || editingRole) && (
         <RoleForm

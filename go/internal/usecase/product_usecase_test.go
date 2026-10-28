@@ -53,7 +53,7 @@ func TestUpdateProductMemaksaRateMinimalSatu(t *testing.T) {
 
 	p := &domain.Product{
 		ID: 1, Name: "Beras", SellingUnitID: 6, PurchaseUnitID: 3,
-		ConversionRate: 0, PurchasePrice: 10, SellingPrice: 20,
+		ConversionRate: 0, PurchasePrice: domain.Rupiah(10), SellingPrice: domain.Rupiah(20),
 	}
 	if err := uc.UpdateProduct(context.Background(), p); err != nil {
 		t.Fatalf("update tidak boleh gagal: %v", err)
@@ -72,7 +72,7 @@ func TestUpdateProductMemaksaRateSatuSaatSatuanSama(t *testing.T) {
 
 	p := &domain.Product{
 		ID: 1, Name: "Beras", SellingUnitID: 6, PurchaseUnitID: 6,
-		ConversionRate: 12, PurchasePrice: 10, SellingPrice: 20,
+		ConversionRate: 12, PurchasePrice: domain.Rupiah(10), SellingPrice: domain.Rupiah(20),
 	}
 	if err := uc.UpdateProduct(context.Background(), p); err != nil {
 		t.Fatalf("update tidak boleh gagal: %v", err)
@@ -88,7 +88,7 @@ func TestUpdateProductMempertahankanRateValid(t *testing.T) {
 
 	p := &domain.Product{
 		ID: 1, Name: "Beras", SellingUnitID: 6, PurchaseUnitID: 3,
-		ConversionRate: 12, PurchasePrice: 10, SellingPrice: 20,
+		ConversionRate: 12, PurchasePrice: domain.Rupiah(10), SellingPrice: domain.Rupiah(20),
 	}
 	if err := uc.UpdateProduct(context.Background(), p); err != nil {
 		t.Fatalf("update tidak boleh gagal: %v", err)
@@ -104,7 +104,7 @@ func TestCreateProductMengulangSKUOtomatisSaatBentrok(t *testing.T) {
 
 	p := &domain.Product{
 		Name: "Beras", CategoryID: 3, SupplierID: 1,
-		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: 10, SellingPrice: 20,
+		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: domain.Rupiah(10), SellingPrice: domain.Rupiah(20),
 	}
 	if err := uc.CreateProduct(context.Background(), p); err != nil {
 		t.Fatalf("create harus mengulang SKU otomatis, dapat: %v", err)
@@ -120,7 +120,7 @@ func TestCreateProductTidakMengulangSKUManualSaatBentrok(t *testing.T) {
 
 	p := &domain.Product{
 		Sku: "SKU-MANUAL", Name: "Beras", CategoryID: 3, SupplierID: 1,
-		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: 10, SellingPrice: 20,
+		SellingUnitID: 6, PurchaseUnitID: 3, PurchasePrice: domain.Rupiah(10), SellingPrice: domain.Rupiah(20),
 	}
 	if err := uc.CreateProduct(context.Background(), p); err == nil {
 		t.Fatal("SKU manual yang bentrok harus menghasilkan error")

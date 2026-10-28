@@ -129,6 +129,24 @@ type AccountingSetting struct {
 	Description string `json:"description,omitempty"`
 }
 
+// AccountingSettingDetail adalah pemetaan akun otomatis beserta identitas akun
+// tujuannya. Dipakai halaman pengaturan akun sehingga UI tidak perlu memanggil
+// CoA satu per satu.
+type AccountingSettingDetail struct {
+	MappingKey    string `json:"mapping_key"`
+	Description   string `json:"description,omitempty"`
+	AccountID     int64  `json:"account_id"`
+	AccountCode   string `json:"account_code"`
+	AccountName   string `json:"account_name"`
+	AccountActive bool   `json:"account_active"`
+}
+
+// AccountingSettingUpdateInput adalah satu perubahan pemetaan dari klien.
+type AccountingSettingUpdateInput struct {
+	MappingKey string `json:"mapping_key"`
+	AccountID  int64  `json:"account_id"`
+}
+
 // AccountingSettingsRepository menyediakan pemetaan akun untuk auto-posting.
 type AccountingSettingsRepository interface {
 	// ListMapping mengembalikan seluruh pemetaan mapping_key → account_id yang
@@ -136,16 +154,35 @@ type AccountingSettingsRepository interface {
 	ListMapping(ctx context.Context) (map[string]int64, error)
 }
 
+// AccountingSettingsAdminRepository menambahkan operasi baca detail dan simpan
+// yang hanya dibutuhkan halaman pengaturan akun otomatis. Dipisah dari
+// AccountingSettingsRepository agar usecase jurnal tidak ikut bergantung pada
+// operasi tulis pengaturan.
+type AccountingSettingsAdminRepository interface {
+	// ListDetails mengembalikan pemetaan beserta kode/nama akun tujuannya.
+	ListDetails(ctx context.Context) ([]AccountingSettingDetail, error)
+	// UpsertMany menyimpan perubahan beberapa kunci dalam satu transaksi.
+	UpsertMany(ctx context.Context, settings []AccountingSetting, actorID int64) error
+}
+
+// AccountingSettingsStore menggabungkan operasi baca auto-posting dan operasi
+// pengaturan. Implementasi SQL memenuhi keduanya, sehingga wiring cukup memakai
+// satu repository.
+type AccountingSettingsStore interface {
+	AccountingSettingsRepository
+	AccountingSettingsAdminRepository
+}
+
 // JournalLine mewakili satu baris debit/kredit jurnal.
 type JournalLine struct {
-	ID          int64   `json:"id"`
-	LineNo      int     `json:"line_no"`
-	AccountID   int64   `json:"account_id"`
-	AccountCode string  `json:"account_code,omitempty"`
-	AccountName string  `json:"account_name,omitempty"`
-	Description string  `json:"description,omitempty"`
-	Debit       float64 `json:"debit"`
-	Credit      float64 `json:"credit"`
+	ID          int64  `json:"id"`
+	LineNo      int    `json:"line_no"`
+	AccountID   int64  `json:"account_id"`
+	AccountCode string `json:"account_code,omitempty"`
+	AccountName string `json:"account_name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Debit       Money  `json:"debit"`
+	Credit      Money  `json:"credit"`
 }
 
 // JournalEntry mewakili satu jurnal umum dan baris-barisnya.
@@ -158,8 +195,8 @@ type JournalEntry struct {
 	SourceID        *int64        `json:"source_id,omitempty"`
 	SourceReference string        `json:"source_reference,omitempty"`
 	Status          string        `json:"status"`
-	TotalDebit      float64       `json:"total_debit"`
-	TotalCredit     float64       `json:"total_credit"`
+	TotalDebit      Money         `json:"total_debit"`
+	TotalCredit     Money         `json:"total_credit"`
 	PeriodYear      int           `json:"period_year"`
 	PeriodMonth     int           `json:"period_month"`
 	PostedAt        *time.Time    `json:"posted_at,omitempty"`
@@ -196,8 +233,8 @@ type JournalCreateInput struct {
 type JournalLineInput struct {
 	AccountID   int64
 	Description string
-	Debit       float64
-	Credit      float64
+	Debit       Money
+	Credit      Money
 }
 
 // JournalRepository mengatur penyimpanan jurnal umum.
@@ -302,21 +339,21 @@ type AccountBalance struct {
 	Name          string
 	AccountType   string
 	NormalBalance string
-	TotalDebit    float64
-	TotalCredit   float64
+	TotalDebit    Money
+	TotalCredit   Money
 }
 
 // ReportAccount adalah satu baris akun di dalam laporan: saldo debit/kredit
 // dalam cakupan laporan, plus Balance (sudah bertanda sesuai saldo normal,
 // sehingga angka positif selalu berarti sesuai sifat akun).
 type ReportAccount struct {
-	AccountID   int64   `json:"account_id"`
-	Code        string  `json:"code"`
-	Name        string  `json:"name"`
-	AccountType string  `json:"account_type"`
-	Debit       float64 `json:"debit"`
-	Credit      float64 `json:"credit"`
-	Balance     float64 `json:"balance"`
+	AccountID   int64  `json:"account_id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	AccountType string `json:"account_type"`
+	Debit       Money  `json:"debit"`
+	Credit      Money  `json:"credit"`
+	Balance     Money  `json:"balance"`
 }
 
 // IncomeStatement (Laba Rugi) membandingkan pendapatan dan beban pada satu
@@ -326,9 +363,9 @@ type IncomeStatement struct {
 	To            time.Time       `json:"to"`
 	Revenue       []ReportAccount `json:"revenue"`
 	Expenses      []ReportAccount `json:"expenses"`
-	TotalRevenue  float64         `json:"total_revenue"`
-	TotalExpenses float64         `json:"total_expenses"`
-	NetIncome     float64         `json:"net_income"`
+	TotalRevenue  Money           `json:"total_revenue"`
+	TotalExpenses Money           `json:"total_expenses"`
+	NetIncome     Money           `json:"net_income"`
 }
 
 // BalanceSheet (Neraca) menyajikan Aset, Kewajiban, dan Ekuitas pada satu titik
@@ -341,10 +378,10 @@ type BalanceSheet struct {
 	Assets                    []ReportAccount `json:"assets"`
 	Liabilities               []ReportAccount `json:"liabilities"`
 	Equity                    []ReportAccount `json:"equity"`
-	TotalAssets               float64         `json:"total_assets"`
-	TotalLiabilities          float64         `json:"total_liabilities"`
-	TotalEquity               float64         `json:"total_equity"`
-	TotalLiabilitiesAndEquity float64         `json:"total_liabilities_and_equity"`
+	TotalAssets               Money           `json:"total_assets"`
+	TotalLiabilities          Money           `json:"total_liabilities"`
+	TotalEquity               Money           `json:"total_equity"`
+	TotalLiabilitiesAndEquity Money           `json:"total_liabilities_and_equity"`
 	Balanced                  bool            `json:"balanced"`
 }
 
@@ -354,8 +391,8 @@ type TrialBalance struct {
 	From        time.Time       `json:"from"`
 	To          time.Time       `json:"to"`
 	Accounts    []ReportAccount `json:"accounts"`
-	TotalDebit  float64         `json:"total_debit"`
-	TotalCredit float64         `json:"total_credit"`
+	TotalDebit  Money           `json:"total_debit"`
+	TotalCredit Money           `json:"total_credit"`
 	Balanced    bool            `json:"balanced"`
 }
 
@@ -365,9 +402,9 @@ type GeneralLedgerLine struct {
 	EntryNumber string    `json:"entry_number"`
 	EntryDate   time.Time `json:"entry_date"`
 	Description string    `json:"description"`
-	Debit       float64   `json:"debit"`
-	Credit      float64   `json:"credit"`
-	Balance     float64   `json:"balance"`
+	Debit       Money     `json:"debit"`
+	Credit      Money     `json:"credit"`
+	Balance     Money     `json:"balance"`
 }
 
 // GeneralLedger (Buku Besar) menampilkan mutasi satu akun pada rentang tanggal,
@@ -376,11 +413,11 @@ type GeneralLedger struct {
 	Account        ReportAccount       `json:"account"`
 	From           time.Time           `json:"from"`
 	To             time.Time           `json:"to"`
-	OpeningBalance float64             `json:"opening_balance"`
+	OpeningBalance Money               `json:"opening_balance"`
 	Lines          []GeneralLedgerLine `json:"lines"`
-	TotalDebit     float64             `json:"total_debit"`
-	TotalCredit    float64             `json:"total_credit"`
-	ClosingBalance float64             `json:"closing_balance"`
+	TotalDebit     Money               `json:"total_debit"`
+	TotalCredit    Money               `json:"total_credit"`
+	ClosingBalance Money               `json:"closing_balance"`
 }
 
 // AccountLedgerLine adalah bahan mentah baris buku besar sebelum saldo berjalan
@@ -389,8 +426,8 @@ type AccountLedgerLine struct {
 	EntryNumber string
 	EntryDate   time.Time
 	Description string
-	Debit       float64
-	Credit      float64
+	Debit       Money
+	Credit      Money
 }
 
 // AccountingReportRepository menyediakan agregat dan mutasi jurnal POSTED untuk
@@ -403,7 +440,7 @@ type AccountingReportRepository interface {
 	AccountLedgerLines(ctx context.Context, accountID int64, from, to time.Time) ([]AccountLedgerLine, error)
 	// AccountOpeningBalance menjumlahkan debit/kredit satu akun sebelum tanggal
 	// "before" (mutasi yang menjadi saldo awal buku besar).
-	AccountOpeningBalance(ctx context.Context, accountID int64, before time.Time) (debit, credit float64, err error)
+	AccountOpeningBalance(ctx context.Context, accountID int64, before time.Time) (debit, credit Money, err error)
 }
 
 // AccountingReportUsecase menetapkan aturan penyusunan laporan keuangan.
@@ -412,6 +449,13 @@ type AccountingReportUsecase interface {
 	IncomeStatement(ctx context.Context, from, to time.Time) (*IncomeStatement, error)
 	TrialBalance(ctx context.Context, from, to time.Time) (*TrialBalance, error)
 	GeneralLedger(ctx context.Context, accountID int64, from, to time.Time) (*GeneralLedger, error)
+}
+
+// AccountingSettingsUsecase menetapkan aturan bisnis pemetaan akun otomatis
+// (s_accounting_settings) yang dipakai jurnal penjualan, pembelian, dan tutup buku.
+type AccountingSettingsUsecase interface {
+	ListSettings(ctx context.Context) ([]AccountingSettingDetail, error)
+	UpdateSettings(ctx context.Context, in []AccountingSettingUpdateInput, actorID int64) ([]AccountingSettingDetail, error)
 }
 
 // --- Error bisnis akuntansi ---
